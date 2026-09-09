@@ -148,12 +148,23 @@ const SUPABASE_URL = "https://eixbpujqsectkstkqllz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpeGJwdWpxc2VjdGtzdGtxbGx6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzMTU3MTIsImV4cCI6MjEwMzg5MTcxMn0.ffwg5ndobPUCK3-4FEFzQEeVd0c2ZgZkRvc1gR9w-8w";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const QUEUE_KEY = "strength-tracker-pending-ops-v1";
+const LAST_SYNC_KEY = "strength-tracker-last-synced";
 
 let currentSession = null;
 let pendingQueue = loadQueue();
 let exerciseIdCache = {};
 let flushing = false;
 let didReconcileThisSession = false;
+let lastSyncedAt = (function(){
+  try{ return window.localStorage.getItem(LAST_SYNC_KEY); }catch(e){ return null; }
+})();
+
+function fmtSyncTime(iso){
+  if(!iso) return null;
+  const d = new Date(iso);
+  if(isNaN(d)) return null;
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"}) + " at " + d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+}
 
 function genId(){
   if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -311,7 +322,13 @@ async function flushQueue(){
   } finally {
     flushing = false;
   }
-  if(any && view === "overview") render();
+  let becameFullySynced = false;
+  if(pendingQueue.length === 0){
+    lastSyncedAt = new Date().toISOString();
+    try{ window.localStorage.setItem(LAST_SYNC_KEY, lastSyncedAt); }catch(e){}
+    becameFullySynced = true;
+  }
+  if((any || becameFullySynced) && view === "overview") render();
 }
 
 async function pullRemoteAndMerge(){
@@ -419,6 +436,7 @@ const DAY_ORDER = {
   extra: ["Farmer's Carry","Zone 2 Ride","Incline Treadmill Walk"],
 };
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
+const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
 // ---------- state ----------
@@ -697,6 +715,7 @@ function computeSuggestion(ex){
         readyToProgress: false,
         streak, requiredStreak: ex.conservative ? 2 : 1,
         difficultyNote: null,
+        noteConcern: null,
         deload: true,
         missStreak,
       };
@@ -717,6 +736,16 @@ function computeSuggestion(ex){
       }
     }
 
+    // A concerning word in the prior session's note (tender, pain, grip, etc.)
+    // is a real signal too, not just decoration — it holds back progression
+    // the same way a brutal RPE does, even if the numbers alone said "go".
+    let noteConcern = null;
+    if(last.note){
+      const noteLower = last.note.toLowerCase();
+      if(CONCERN_WORDS.some(w => noteLower.includes(w))) noteConcern = last.note;
+    }
+    if(noteConcern && readyToProgress) readyToProgress = false;
+
     return {
       weight: readyToProgress ? last.weight + increment : last.weight,
       sets: last.sets,
@@ -726,6 +755,7 @@ function computeSuggestion(ex){
       streak,
       requiredStreak,
       difficultyNote,
+      noteConcern,
       deload: false,
     };
   }
@@ -889,6 +919,10 @@ function renderExerciseCard(name, ex){
         nextLabel = `${suggestion.weight} lbs ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}`;
         if(suggestion.deload){
           msg = `Missed target ${unitWord} for ${suggestion.missStreak} sessions straight — that's a stall, not a bad day. Dropping ~15% to rebuild with clean reps.`;
+        } else if(suggestion.noteConcern){
+          msg = suggestion.hitTarget
+            ? `Hit target ${unitWord}, but last session's note flagged "${escapeHtml(suggestion.noteConcern)}" — holding weight here until that clears up before adding more load.`
+            : `Missed target ${unitWord}, and last session's note flagged "${escapeHtml(suggestion.noteConcern)}" — hold weight and keep an eye on that.`;
         } else if(suggestion.difficultyNote === "hard"){
           msg = `Hit target ${unitWord}, but rated 9-10/10 — holding here until it feels more manageable.`;
         } else if(suggestion.difficultyNote === "easy"){
@@ -1405,8 +1439,7 @@ function generateCoachNotes(){
   const hitCount = items.filter(i => i.hit).length;
   const increased = items.filter(i => i.trend === "increased");
   const missed = items.filter(i => !i.hit);
-  const concernWords = ["heavy","tender","grip","pain","sore","ache","hurt"];
-  const concerns = items.filter(i => i.entry.note && concernWords.some(w => i.entry.note.toLowerCase().includes(w)));
+  const concerns = items.filter(i => i.entry.note && CONCERN_WORDS.some(w => i.entry.note.toLowerCase().includes(w)));
 
   const sentences = [];
   sentences.push(`${dayLabel} on ${fmtDate(lastDate)} — ${hitCount}/${total} lifts hit target clean.`);
@@ -1599,7 +1632,9 @@ function renderBackupSyncCard(){
   let html = `<div class="card"><h3 class="section">Backup &amp; Restore</h3>`;
 
   if(currentSession){
-    html += `<p style="font-size:0.72rem;color:var(--slate);margin:0 0 0.5rem;">☁ ${escapeHtml(currentSession.user.email)} · ${pending ? pending + " pending" : "synced"}</p>`;
+    const syncedLabel = fmtSyncTime(lastSyncedAt);
+    html += `<p style="font-size:0.72rem;color:var(--slate);margin:0 0 0.2rem;">☁ ${escapeHtml(currentSession.user.email)} · ${pending ? pending + " pending" : "synced"}</p>`;
+    html += `<p style="font-size:0.64rem;color:var(--slate);margin:0 0 0.5rem;">Last synced: ${syncedLabel || "never yet"}</p>`;
     html += `<div class="header-tools" style="margin-bottom:0.6rem;">
       <button class="tool-btn" onclick="flushQueue()">↻ Sync now</button>
       <button class="tool-btn" onclick="signOutUser()">Sign out</button>
