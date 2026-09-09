@@ -383,7 +383,7 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
 async function handleSignIn(){
   const email = document.getElementById("auth-email").value.trim();
   const password = document.getElementById("auth-password").value;
-  const statusEl = document.getElementById("auth-status");
+  const statusEl = document.getElementById("card-status");
   if(!email || !password){ if(statusEl) statusEl.textContent = "Enter email and password."; return; }
   if(statusEl) statusEl.textContent = "Signing in…";
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
@@ -392,7 +392,7 @@ async function handleSignIn(){
 async function handleSignUp(){
   const email = document.getElementById("auth-email").value.trim();
   const password = document.getElementById("auth-password").value;
-  const statusEl = document.getElementById("auth-status");
+  const statusEl = document.getElementById("card-status");
   if(!email || !password){ if(statusEl) statusEl.textContent = "Enter email and password."; return; }
   if(password.length < 6){ if(statusEl) statusEl.textContent = "Password must be at least 6 characters."; return; }
   if(statusEl) statusEl.textContent = "Creating account…";
@@ -484,13 +484,13 @@ function backupData(){
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  const statusEl = document.getElementById("tool-status");
+  const statusEl = document.getElementById("card-status");
   if(statusEl) statusEl.textContent = "Backup downloaded — save it somewhere safe (Files, email, iCloud).";
 }
 
 function restoreData(event){
   const file = event.target.files[0];
-  const statusEl = document.getElementById("tool-status");
+  const statusEl = document.getElementById("card-status");
   if(!file) return;
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -1586,45 +1586,39 @@ function renderOverview(){
     </button>
   </div>`;
 
-  html += renderCloudSyncCard();
-
-  html += `<div class="card">
-    <h3 class="section">Backup &amp; Restore</h3>
-    <div class="header-tools">
-      <button class="tool-btn" onclick="backupData()">⬇ Backup data</button>
-      <button class="tool-btn" onclick="document.getElementById('restore-input').click()">⬆ Restore backup</button>
-      <input type="file" id="restore-input" accept="application/json" style="display:none" onchange="restoreData(event)">
-    </div>
-    <p id="tool-status" style="font-size:0.68rem;color:var(--slate);margin:0.5rem 0 0;"></p>
-  </div>`;
+  html += renderBackupSyncCard();
 
   app.innerHTML = html;
 }
 
-function renderCloudSyncCard(){
+function renderBackupSyncCard(){
   const pending = pendingQueue.length;
-  let html = `<div class="card"><h3 class="section">Cloud Sync</h3>`;
+  let html = `<div class="card"><h3 class="section">Backup &amp; Restore</h3>`;
+
   if(currentSession){
-    html += `<p style="font-size:0.82rem;color:var(--ink);margin:0 0 0.5rem;">Signed in as <b>${escapeHtml(currentSession.user.email)}</b></p>`;
-    html += `<p style="font-size:0.76rem;color:var(--slate);margin:0 0 0.6rem;">${pending ? pending + " change" + (pending>1?"s":"") + " waiting to sync" : "All changes synced"}</p>`;
-    html += `<div class="header-tools">
+    html += `<p style="font-size:0.72rem;color:var(--slate);margin:0 0 0.5rem;">☁ ${escapeHtml(currentSession.user.email)} · ${pending ? pending + " pending" : "synced"}</p>`;
+    html += `<div class="header-tools" style="margin-bottom:0.6rem;">
       <button class="tool-btn" onclick="flushQueue()">↻ Sync now</button>
       <button class="tool-btn" onclick="signOutUser()">Sign out</button>
     </div>`;
   } else {
-    html += `<p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.6rem;">Sign in once so your data backs up to the cloud and survives a lost or reset phone. Logging still works without this.</p>`;
-    html += `<div class="form-row">
-      <div class="field" style="flex:1 1 100%;"><label>Email</label><input type="email" id="auth-email"></div>
+    html += `<p style="font-size:0.7rem;color:var(--slate);margin:0 0 0.4rem;">Sign in to back up to the cloud (optional — logging works without it).</p>`;
+    html += `<div class="form-row" style="margin-top:0;">
+      <div class="field"><input type="email" id="auth-email" placeholder="Email"></div>
+      <div class="field"><input type="password" id="auth-password" placeholder="Password"></div>
     </div>
-    <div class="form-row">
-      <div class="field" style="flex:1 1 100%;"><label>Password</label><input type="password" id="auth-password"></div>
-    </div>
-    <div class="header-tools">
+    <div class="header-tools" style="margin-bottom:0.6rem;">
       <button class="tool-btn" onclick="handleSignIn()">Sign In</button>
       <button class="tool-btn" onclick="handleSignUp()">Create Account</button>
     </div>`;
   }
-  html += `<p id="auth-status" style="font-size:0.68rem;color:var(--slate);margin-top:0.5rem;"></p>`;
+
+  html += `<div class="header-tools" style="padding-top:0.5rem;border-top:1px dashed var(--line);">
+    <button class="tool-btn" onclick="backupData()">⬇ Backup data</button>
+    <button class="tool-btn" onclick="document.getElementById('restore-input').click()">⬆ Restore backup</button>
+    <input type="file" id="restore-input" accept="application/json" style="display:none" onchange="restoreData(event)">
+  </div>`;
+  html += `<p id="card-status" style="font-size:0.68rem;color:var(--slate);margin-top:0.5rem;"></p>`;
   html += `</div>`;
   return html;
 }
