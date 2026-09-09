@@ -908,7 +908,7 @@ function renderExerciseCard(name, ex){
           ? `Felt easy last time — adding 5 minutes.`
           : suggestion.difficultyNote === "hard"
           ? `Rated hard last time — pulling back 5 minutes to stay sustainable.`
-          : `Held steady — log a difficulty rating next time for a sharper call.`;
+          : `Held steady — log an RPE next time for a sharper call.`;
       } else {
         nextLabel = repLabel(suggestion.sets,suggestion.reps,ex.unit);
         msg = `Bodyweight move, aiming for a couple more reps.`;
@@ -918,7 +918,7 @@ function renderExerciseCard(name, ex){
       const loadLine = ex.equipment === "barbell" ? `<div class="plate-line" style="margin-top:0.4rem;">Load: ${platesLabel(suggestion.weight, ex.equipment)}</div>` : "";
       recHtml = `<div class="rec-box">
         <div class="rec-headline">Next: ${nextLabel}${restPart}</div>
-        <div class="rec-desc">${msg} Last difficulty: <b>${diffText}</b></div>
+        <div class="rec-desc">${msg} Last RPE: <b>${diffText}</b></div>
         ${loadLine}
       </div>`;
     }
@@ -939,7 +939,7 @@ function renderExerciseCard(name, ex){
 
     html += `<div style="margin-top:0.9rem;">`;
     html += `<h3 class="section" style="margin-bottom:0.4rem;">Recent History</h3>`;
-    html += `<div class="hist-row header"><span>Date</span><span>${ex.trackBy==="weight"?"Weight/":""}${ex.unit==="sec"?"Sets/Sec":"Sets/Reps"}</span><span>Diff.</span><span>Note</span></div>`;
+    html += `<div class="hist-row header"><span>Date</span><span>${ex.trackBy==="weight"?"Weight/":""}${ex.unit==="sec"?"Sets/Sec":"Sets/Reps"}</span><span>RPE</span><span>Note</span></div>`;
     recent.forEach((r, idx) => { html += renderHistRow(r.e, r.i, idx === 0, ex, name); });
 
     if(older.length){
@@ -976,7 +976,8 @@ function renderHistRow(e, idx, isLatest, ex, name){
         <div class="field" style="flex:1 1 100%;"><label>Date</label><input type="date" id="edit-date" value="${e.date || todayISO()}"></div>
       </div>
       <div class="form-row">
-        <div class="field" style="flex:1 1 100%;"><label>Note</label><input type="text" id="edit-note" value="${e.note ? escapeHtml(e.note) : ''}"></div>
+        <div class="field" style="flex:0 0 68px;"><label>RPE / 10</label><input type="number" inputmode="numeric" id="edit-difficulty" min="1" max="10" value="${e.difficulty ?? ''}"></div>
+        <div class="field" style="flex:1 1 140px;"><label>Note</label><input type="text" id="edit-note" value="${e.note ? escapeHtml(e.note) : ''}"></div>
       </div>
       <div class="edit-actions">
         <button class="save-btn" onclick="saveEditEntry('${name.replace(/'/g,"\\'")}', ${idx})">Save</button>
@@ -1019,8 +1020,10 @@ function saveEditEntry(name, idx){
   const entry = ex.entries[idx];
   const dateVal = document.getElementById("edit-date").value || entry.date;
   const noteVal = document.getElementById("edit-note").value || "";
+  const difficultyEl = document.getElementById("edit-difficulty");
   entry.date = dateVal;
   entry.note = noteVal.trim();
+  entry.difficulty = difficultyEl && difficultyEl.value ? Math.max(1, Math.min(10, Number(difficultyEl.value))) : null;
 
   if(ex.trackBy === "duration"){
     const minutesEl = document.getElementById("edit-minutes");
@@ -1076,7 +1079,7 @@ function renderForm(name, ex){
   }
   html += `</div>`;
   html += `<div class="form-row">
-    <div class="field" style="flex:0 0 68px;"><label>Difficulty</label><input type="number" inputmode="numeric" id="f-difficulty" min="1" max="10" value="7"></div>
+    <div class="field" style="flex:0 0 68px;"><label>RPE / 10</label><input type="number" inputmode="numeric" id="f-difficulty" min="1" max="10" value="7"></div>
     <div class="field" style="flex:1 1 140px;"><label>Note</label><input type="text" id="f-note" placeholder="${ex.trackBy==='duration' ? 'e.g. easy spin' : 'e.g. felt heavy'}"></div>
   </div>`;
   html += `<div class="date-row">
