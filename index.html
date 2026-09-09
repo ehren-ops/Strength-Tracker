@@ -22,6 +22,7 @@
   header{background:linear-gradient(180deg,var(--pine) 0%,var(--pine-2) 100%);color:var(--stone);padding:calc(1.4rem + env(safe-area-inset-top)) 1.1rem 1.1rem;}
   header h1{font-family:'Fjalla One',sans-serif;font-weight:400;letter-spacing:0.03em;font-size:1.7rem;margin:0 0 0.2rem;text-transform:uppercase;}
   header p{margin:0;color:#C9D4C6;font-size:0.85rem;}
+  .sync-status{margin-top:0.4rem !important;font-size:0.68rem !important;color:#9FB09A !important;font-family:'IBM Plex Mono',monospace;}
   .tabs{display:flex;gap:0.35rem;margin-top:0.9rem;flex-wrap:wrap;}
   .tab{flex:1;min-width:64px;display:flex;align-items:center;justify-content:center;text-align:center;padding:0.5rem 0.3rem;border-radius:7px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);color:#C9D4C6;font-size:0.74rem;font-weight:600;cursor:pointer;}
   .tab.active{background:var(--amber);border-color:var(--amber);color:#1B211C;}
@@ -128,14 +129,283 @@
 <header>
   <h1 id="page-title">Full Body</h1>
   <p id="page-sub">Tap a day, log your sets, watch progress build.</p>
+  <p id="sync-status" class="sync-status">☁ Not signed in — logging locally</p>
   <div class="tabs" id="tabs"></div>
 </header>
 <main id="app"></main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 const STORAGE_KEY = "strength-tracker-v1";
 const BAR_WEIGHT = 45;
 const PLATE_SET = [45, 35, 25, 10, 5, 2.5];
+
+// ---------- cloud sync (Supabase) ----------
+// The anon key below is meant to be public in client-side code; access is
+// controlled by Row Level Security policies scoped to auth.uid(), not by
+// keeping this key secret.
+const SUPABASE_URL = "https://eixbpujqsectkstkqllz.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpeGJwdWpxc2VjdGtzdGtxbGx6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzMTU3MTIsImV4cCI6MjEwMzg5MTcxMn0.ffwg5ndobPUCK3-4FEFzQEeVd0c2ZgZkRvc1gR9w-8w";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const QUEUE_KEY = "strength-tracker-pending-ops-v1";
+
+let currentSession = null;
+let pendingQueue = loadQueue();
+let exerciseIdCache = {};
+let flushing = false;
+let didReconcileThisSession = false;
+
+function genId(){
+  if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return "id-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+}
+
+function loadQueue(){
+  try{
+    const raw = window.localStorage.getItem(QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function saveQueue(){
+  try{ window.localStorage.setItem(QUEUE_KEY, JSON.stringify(pendingQueue)); }catch(e){}
+}
+
+function enqueueOp(op){
+  pendingQueue.push(op);
+  saveQueue();
+  renderSyncStatus();
+  flushQueue();
+}
+
+function renderSyncStatus(){
+  const el = document.getElementById("sync-status");
+  if(!el) return;
+  if(!currentSession){
+    el.textContent = "☁ Not signed in — logging locally";
+  } else if(typeof navigator !== "undefined" && navigator.onLine === false){
+    el.textContent = pendingQueue.length ? `☁ Offline — ${pendingQueue.length} pending` : "☁ Offline";
+  } else if(pendingQueue.length){
+    el.textContent = `☁ Syncing… ${pendingQueue.length} pending`;
+  } else {
+    el.textContent = "☁ Synced";
+  }
+}
+
+function exerciseToRow(ex){
+  return {
+    track_by: ex.trackBy,
+    day: ex.day || null,
+    equipment: ex.equipment || null,
+    conservative: !!ex.conservative,
+    target_reps: ex.targetReps ?? null,
+    target_reps_ski: ex.targetRepsSki ?? null,
+    ski_tempo: ex.skiTempo || null,
+    increment: ex.increment ?? null,
+    unit: ex.unit || null,
+    actual_1rm: ex.actual1RM ?? null,
+  };
+}
+function rowToExercise(row){
+  const ex = { trackBy: row.track_by, entries: [] };
+  if(row.day) ex.day = row.day;
+  if(row.equipment) ex.equipment = row.equipment;
+  if(row.conservative) ex.conservative = true;
+  if(row.target_reps != null) ex.targetReps = row.target_reps;
+  if(row.target_reps_ski != null) ex.targetRepsSki = row.target_reps_ski;
+  if(row.ski_tempo) ex.skiTempo = row.ski_tempo;
+  if(row.increment != null) ex.increment = row.increment;
+  if(row.unit) ex.unit = row.unit;
+  if(row.actual_1rm != null) ex.actual1RM = row.actual_1rm;
+  return ex;
+}
+function entryToRow(entry, exerciseId, userId){
+  return {
+    exercise_id: exerciseId,
+    user_id: userId,
+    client_id: entry.clientId,
+    entry_date: entry.date,
+    confirmed: entry.confirmed !== false,
+    weight: entry.weight ?? null,
+    sets: entry.sets ?? null,
+    reps: entry.reps ?? null,
+    minutes: entry.minutes ?? null,
+    difficulty: entry.difficulty ?? null,
+    note: entry.note || "",
+  };
+}
+function rowToEntry(row){
+  return {
+    clientId: row.client_id,
+    date: row.entry_date,
+    confirmed: row.confirmed,
+    weight: row.weight,
+    sets: row.sets,
+    reps: row.reps,
+    minutes: row.minutes,
+    difficulty: row.difficulty,
+    note: row.note || "",
+  };
+}
+
+async function ensureExerciseId(name){
+  if(exerciseIdCache[name]) return exerciseIdCache[name];
+  const userId = currentSession.user.id;
+  const { data: row, error } = await supabaseClient.from("exercises").select("id").eq("user_id", userId).eq("name", name).maybeSingle();
+  if(error){ console.error(error); return null; }
+  if(row){ exerciseIdCache[name] = row.id; return row.id; }
+  return null;
+}
+
+async function runOp(op){
+  const userId = currentSession.user.id;
+  if(op.type === "upsert_exercise"){
+    const ex = data[op.payload.name];
+    if(!ex) return true;
+    const { data: saved, error } = await supabaseClient.from("exercises")
+      .upsert({ ...exerciseToRow(ex), name: op.payload.name, user_id: userId }, { onConflict: "user_id,name" })
+      .select("id").single();
+    if(error) throw error;
+    exerciseIdCache[op.payload.name] = saved.id;
+    return true;
+  }
+  if(op.type === "upsert_entry"){
+    const ex = data[op.payload.exerciseName];
+    const entry = ex && ex.entries.find(e => e.clientId === op.payload.clientId);
+    if(!entry) return true;
+    const exerciseId = await ensureExerciseId(op.payload.exerciseName);
+    if(!exerciseId) return false;
+    const { error } = await supabaseClient.from("entries").upsert(entryToRow(entry, exerciseId, userId), { onConflict: "user_id,client_id" });
+    if(error) throw error;
+    return true;
+  }
+  if(op.type === "delete_entry"){
+    const { error } = await supabaseClient.from("entries").delete().eq("user_id", userId).eq("client_id", op.payload.clientId);
+    if(error) throw error;
+    return true;
+  }
+  if(op.type === "upsert_settings"){
+    const { error } = await supabaseClient.from("user_settings").upsert({ user_id: userId, ski_season_mode: skiSeasonMode }, { onConflict: "user_id" });
+    if(error) throw error;
+    return true;
+  }
+  return true;
+}
+
+async function flushQueue(){
+  if(flushing) return;
+  if(!currentSession) return;
+  if(typeof navigator !== "undefined" && navigator.onLine === false) return;
+  flushing = true;
+  let any = false;
+  try{
+    while(pendingQueue.length){
+      const op = pendingQueue[0];
+      let ok;
+      try{ ok = await runOp(op); }catch(e){ console.error("sync op failed", op, e); ok = false; }
+      if(!ok) break;
+      pendingQueue.shift();
+      saveQueue();
+      any = true;
+      renderSyncStatus();
+    }
+  } finally {
+    flushing = false;
+  }
+  if(any && view === "overview") render();
+}
+
+async function pullRemoteAndMerge(){
+  const userId = currentSession.user.id;
+  const { data: exRows, error: exErr } = await supabaseClient.from("exercises").select("*").eq("user_id", userId);
+  if(exErr){ console.error(exErr); return; }
+  const { data: entryRows, error: enErr } = await supabaseClient.from("entries").select("*").eq("user_id", userId);
+  if(enErr){ console.error(enErr); return; }
+
+  const entriesByExerciseId = {};
+  (entryRows || []).forEach(r => { (entriesByExerciseId[r.exercise_id] ||= []).push(r); });
+
+  (exRows || []).forEach(row => {
+    exerciseIdCache[row.name] = row.id;
+    const remoteEntries = (entriesByExerciseId[row.id] || []).map(rowToEntry);
+    if(!data[row.name]){
+      const ex = rowToExercise(row);
+      ex.entries = remoteEntries.sort((a,b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      ex.entries.forEach((e,i) => { e.label = "S" + (i+1); });
+      data[row.name] = ex;
+    } else {
+      const existingIds = new Set(data[row.name].entries.map(e => e.clientId).filter(Boolean));
+      remoteEntries.forEach(e => { if(!existingIds.has(e.clientId)) data[row.name].entries.push(e); });
+      data[row.name].entries.sort((a,b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      data[row.name].entries.forEach((e,i) => { e.label = "S" + (i+1); });
+    }
+  });
+
+  const { data: settingsRow } = await supabaseClient.from("user_settings").select("*").eq("user_id", userId).maybeSingle();
+  if(settingsRow && window.localStorage.getItem(SKI_MODE_KEY) === null){
+    skiSeasonMode = settingsRow.ski_season_mode;
+    try{ window.localStorage.setItem(SKI_MODE_KEY, skiSeasonMode ? "1" : "0"); }catch(e){}
+  }
+
+  persist();
+  render();
+}
+
+function reconcileAllToQueue(){
+  Object.keys(data).forEach(name => {
+    enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name } });
+  });
+  Object.entries(data).forEach(([name, ex]) => {
+    ex.entries.forEach(entry => {
+      enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: name, clientId: entry.clientId } });
+    });
+  });
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+}
+
+async function syncOnSignIn(){
+  await pullRemoteAndMerge();
+  if(!didReconcileThisSession){
+    didReconcileThisSession = true;
+    reconcileAllToQueue();
+  }
+  flushQueue();
+}
+
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  const wasSignedIn = !!currentSession;
+  currentSession = session;
+  if(!session) didReconcileThisSession = false;
+  renderSyncStatus();
+  if(view === "overview") render();
+  if(session && !wasSignedIn) syncOnSignIn();
+});
+
+async function handleSignIn(){
+  const email = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value;
+  const statusEl = document.getElementById("auth-status");
+  if(!email || !password){ if(statusEl) statusEl.textContent = "Enter email and password."; return; }
+  if(statusEl) statusEl.textContent = "Signing in…";
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error && statusEl) statusEl.textContent = error.message;
+}
+async function handleSignUp(){
+  const email = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value;
+  const statusEl = document.getElementById("auth-status");
+  if(!email || !password){ if(statusEl) statusEl.textContent = "Enter email and password."; return; }
+  if(password.length < 6){ if(statusEl) statusEl.textContent = "Password must be at least 6 characters."; return; }
+  if(statusEl) statusEl.textContent = "Creating account…";
+  const { data: signUpData, error } = await supabaseClient.auth.signUp({ email, password });
+  if(error){ if(statusEl) statusEl.textContent = error.message; return; }
+  if(statusEl) statusEl.textContent = signUpData.session ? "Account created and signed in." : "Check your email to confirm your account, then sign in.";
+}
+async function signOutUser(){
+  await supabaseClient.auth.signOut();
+}
+
+window.addEventListener("online", () => { renderSyncStatus(); flushQueue(); });
+window.addEventListener("offline", () => { renderSyncStatus(); });
 
 const SEED = {
   // Intentionally empty — publish this version without personal data baked in.
@@ -153,6 +423,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
 // ---------- state ----------
 let data = loadSaved() || JSON.parse(JSON.stringify(SEED));
+ensureClientIds();
 let view = "full";
 let selected = DAY_ORDER.full[0];
 let calendarYear = new Date().getFullYear();
@@ -173,6 +444,7 @@ let skiSeasonMode = (function(){
 function toggleSkiSeason(){
   skiSeasonMode = !skiSeasonMode;
   try{ window.localStorage.setItem(SKI_MODE_KEY, skiSeasonMode ? "1" : "0"); }catch(e){}
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
   render();
 }
 
@@ -191,6 +463,14 @@ function persist(){
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     return true;
   }catch(e){ return false; }
+}
+
+function ensureClientIds(){
+  let changed = false;
+  Object.values(data).forEach(ex => {
+    ex.entries.forEach(e => { if(!e.clientId){ e.clientId = genId(); changed = true; } });
+  });
+  if(changed) persist();
 }
 
 function backupData(){
@@ -219,7 +499,9 @@ function restoreData(event){
       const restored = parsed.data ? parsed.data : parsed; // support raw data or {exportedAt,data} wrapper
       if(typeof restored !== "object") throw new Error("bad shape");
       data = restored;
+      ensureClientIds();
       persist();
+      reconcileAllToQueue();
       render();
       if(statusEl) statusEl.textContent = "Backup restored successfully.";
     }catch(err){
@@ -507,6 +789,7 @@ function renderDay(day){
   if(!ex && DAY_ORDER[day].includes(selected)){
     ex = data[selected] = { trackBy:"weight", entries:[] };
     persist();
+    enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name: selected } });
   }
   if(!ex){
     app.innerHTML = html + `<p style="color:var(--slate);font-size:0.85rem;">Select an exercise above.</p>`;
@@ -548,6 +831,7 @@ function renderProgressionToggle(name, ex){
 function toggleConservative(name){
   data[name].conservative = !data[name].conservative;
   persist();
+  enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name } });
   render();
 }
 
@@ -559,6 +843,7 @@ function save1RM(name){
   else delete data[name].actual1RM;
   editing1RM = null;
   persist();
+  enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name } });
   render();
 }
 
@@ -754,15 +1039,18 @@ function saveEditEntry(name, idx){
 
   editingKey = null;
   persist();
+  enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: name, clientId: entry.clientId } });
   render();
 }
 
 function confirmDeleteEntry(name, idx){
   const ex = data[name];
+  const clientId = ex.entries[idx].clientId;
   ex.entries.splice(idx, 1);
   ex.entries.forEach((e,i) => { e.label = "S" + (i+1); });
   deletingKey = null;
   persist();
+  enqueueOp({ id: genId(), type: "delete_entry", payload: { clientId } });
   render();
 }
 
@@ -1298,6 +1586,8 @@ function renderOverview(){
     </button>
   </div>`;
 
+  html += renderCloudSyncCard();
+
   html += `<div class="card">
     <h3 class="section">Backup &amp; Restore</h3>
     <div class="header-tools">
@@ -1309,6 +1599,34 @@ function renderOverview(){
   </div>`;
 
   app.innerHTML = html;
+}
+
+function renderCloudSyncCard(){
+  const pending = pendingQueue.length;
+  let html = `<div class="card"><h3 class="section">Cloud Sync</h3>`;
+  if(currentSession){
+    html += `<p style="font-size:0.82rem;color:var(--ink);margin:0 0 0.5rem;">Signed in as <b>${escapeHtml(currentSession.user.email)}</b></p>`;
+    html += `<p style="font-size:0.76rem;color:var(--slate);margin:0 0 0.6rem;">${pending ? pending + " change" + (pending>1?"s":"") + " waiting to sync" : "All changes synced"}</p>`;
+    html += `<div class="header-tools">
+      <button class="tool-btn" onclick="flushQueue()">↻ Sync now</button>
+      <button class="tool-btn" onclick="signOutUser()">Sign out</button>
+    </div>`;
+  } else {
+    html += `<p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.6rem;">Sign in once so your data backs up to the cloud and survives a lost or reset phone. Logging still works without this.</p>`;
+    html += `<div class="form-row">
+      <div class="field" style="flex:1 1 100%;"><label>Email</label><input type="email" id="auth-email"></div>
+    </div>
+    <div class="form-row">
+      <div class="field" style="flex:1 1 100%;"><label>Password</label><input type="password" id="auth-password"></div>
+    </div>
+    <div class="header-tools">
+      <button class="tool-btn" onclick="handleSignIn()">Sign In</button>
+      <button class="tool-btn" onclick="handleSignUp()">Create Account</button>
+    </div>`;
+  }
+  html += `<p id="auth-status" style="font-size:0.68rem;color:var(--slate);margin-top:0.5rem;"></p>`;
+  html += `</div>`;
+  return html;
 }
 
 // ---------- interactions ----------
@@ -1332,6 +1650,7 @@ function addExercise(){
   data[name] = { trackBy:"weight", entries:[], day: view };
   selected = name;
   persist();
+  enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name } });
   render();
 }
 function cssId(name){ return name.replace(/[^a-z0-9]/gi,"-"); }
@@ -1349,6 +1668,7 @@ function logEntry(){
     const minutesEl = document.getElementById("f-minutes");
     if(!minutesEl || !minutesEl.value) return;
     entry = {
+      clientId: genId(),
       label: "S" + (ex.entries.length + 1),
       date: dateEl.value || todayISO(),
       confirmed: true,
@@ -1369,6 +1689,7 @@ function logEntry(){
     if(!isBodyweight && !weightEl.value) return;
 
     entry = {
+      clientId: genId(),
       label: "S" + (ex.entries.length + 1),
       date: dateEl.value || todayISO(),
       confirmed: true,
@@ -1379,6 +1700,7 @@ function logEntry(){
   }
   ex.entries.push(entry);
   persist();
+  enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: selected, clientId: entry.clientId } });
   render();
 
   const btn = document.querySelector(".log");
