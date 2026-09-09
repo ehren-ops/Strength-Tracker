@@ -214,6 +214,8 @@ function exerciseToRow(ex){
     increment: ex.increment ?? null,
     unit: ex.unit || null,
     actual_1rm: ex.actual1RM ?? null,
+    track_distance: !!ex.trackDistance,
+    track_incline: !!ex.trackIncline,
   };
 }
 function rowToExercise(row){
@@ -227,6 +229,8 @@ function rowToExercise(row){
   if(row.increment != null) ex.increment = row.increment;
   if(row.unit) ex.unit = row.unit;
   if(row.actual_1rm != null) ex.actual1RM = row.actual_1rm;
+  if(row.track_distance) ex.trackDistance = true;
+  if(row.track_incline) ex.trackIncline = true;
   return ex;
 }
 function entryToRow(entry, exerciseId, userId){
@@ -240,6 +244,8 @@ function entryToRow(entry, exerciseId, userId){
     sets: entry.sets ?? null,
     reps: entry.reps ?? null,
     minutes: entry.minutes ?? null,
+    distance: entry.distance ?? null,
+    incline: entry.incline ?? null,
     difficulty: entry.difficulty ?? null,
     note: entry.note || "",
   };
@@ -253,6 +259,8 @@ function rowToEntry(row){
     sets: row.sets,
     reps: row.reps,
     minutes: row.minutes,
+    distance: row.distance,
+    incline: row.incline,
     difficulty: row.difficulty,
     note: row.note || "",
   };
@@ -437,6 +445,16 @@ const DAY_ORDER = {
 };
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
 const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
+
+// Built-in exercises that shouldn't default to weight/sets/reps when first
+// created — cardio work is logged by time, distance, and incline instead.
+const EXERCISE_DEFAULTS = {
+  "Zone 2 Ride": { trackBy: "duration", trackDistance: true },
+  "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true },
+};
+function newExerciseShell(name){
+  return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
+}
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
 // ---------- state ----------
@@ -573,7 +591,12 @@ function repLabel(sets, reps, unit){
 
 function formatEntryValue(e, ex){
   if(ex.trackBy === "weight") return `${e.weight}lbs ${repLabel(e.sets, e.reps, ex.unit)}`;
-  if(ex.trackBy === "duration") return `${e.minutes} min`;
+  if(ex.trackBy === "duration"){
+    let s = `${e.minutes} min`;
+    if(e.distance != null && e.distance !== "") s += `, ${e.distance} mi`;
+    if(e.incline != null && e.incline !== "") s += ` @ ${e.incline}% incline`;
+    return s;
+  }
   return repLabel(e.sets, e.reps, ex.unit);
 }
 function niceTicks(values, forceStep){
@@ -817,7 +840,7 @@ function renderDay(day){
 
   let ex = data[selected];
   if(!ex && DAY_ORDER[day].includes(selected)){
-    ex = data[selected] = { trackBy:"weight", entries:[] };
+    ex = data[selected] = newExerciseShell(selected);
     persist();
     enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name: selected } });
   }
@@ -973,7 +996,10 @@ function renderExerciseCard(name, ex){
 
     html += `<div style="margin-top:0.9rem;">`;
     html += `<h3 class="section" style="margin-bottom:0.4rem;">Recent History</h3>`;
-    html += `<div class="hist-row header"><span>Date</span><span>${ex.trackBy==="weight"?"Weight/":""}${ex.unit==="sec"?"Sets/Sec":"Sets/Reps"}</span><span>RPE</span><span>Note</span></div>`;
+    const histColLabel = ex.trackBy==="duration"
+      ? "Time" + (ex.trackDistance ? "/Dist" : "") + (ex.trackIncline ? "/Incl" : "")
+      : `${ex.trackBy==="weight"?"Weight/":""}${ex.unit==="sec"?"Sets/Sec":"Sets/Reps"}`;
+    html += `<div class="hist-row header"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;
     recent.forEach((r, idx) => { html += renderHistRow(r.e, r.i, idx === 0, ex, name); });
 
     if(older.length){
@@ -1001,7 +1027,9 @@ function renderHistRow(e, idx, isLatest, ex, name){
       <div class="form-row">
         ${ex.trackBy==="weight" ? `<div class="field"><label>Weight</label><input type="number" inputmode="decimal" id="edit-weight" value="${e.weight}"></div>` : ""}
         ${ex.trackBy==="duration"
-          ? `<div class="field" style="flex:1 1 100%;"><label>Minutes</label><input type="number" inputmode="numeric" id="edit-minutes" value="${e.minutes}"></div>`
+          ? `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="edit-minutes" value="${e.minutes}"></div>`
+            + (ex.trackDistance ? `<div class="field"><label>Distance (mi)</label><input type="number" inputmode="decimal" step="0.1" id="edit-distance" value="${e.distance ?? ''}"></div>` : "")
+            + (ex.trackIncline ? `<div class="field"><label>Incline (%)</label><input type="number" inputmode="decimal" step="0.5" id="edit-incline" value="${e.incline ?? ''}"></div>` : "")
           : `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="edit-sets" value="${e.sets}"></div>
              <div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="edit-reps" value="${e.reps}"></div>`
         }
@@ -1062,6 +1090,14 @@ function saveEditEntry(name, idx){
   if(ex.trackBy === "duration"){
     const minutesEl = document.getElementById("edit-minutes");
     if(minutesEl) entry.minutes = Number(minutesEl.value) || entry.minutes;
+    if(ex.trackDistance){
+      const distEl = document.getElementById("edit-distance");
+      entry.distance = distEl && distEl.value ? Number(distEl.value) : null;
+    }
+    if(ex.trackIncline){
+      const inclineEl = document.getElementById("edit-incline");
+      entry.incline = inclineEl && inclineEl.value ? Number(inclineEl.value) : null;
+    }
   } else {
     const isBodyweight = ex.trackBy === "reps";
     const weightEl = document.getElementById("edit-weight");
@@ -1106,7 +1142,9 @@ function renderForm(name, ex){
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="3"></div>`;
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${effectiveTargetReps(ex)}"></div>`;
   } else if(ex.trackBy === "duration"){
-    html += `<div class="field" style="flex:1 1 100%;"><label>Minutes</label><input type="number" inputmode="numeric" id="f-minutes"></div>`;
+    html += `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="f-minutes"></div>`;
+    if(ex.trackDistance) html += `<div class="field"><label>Distance (mi)</label><input type="number" inputmode="decimal" step="0.1" id="f-distance"></div>`;
+    if(ex.trackIncline) html += `<div class="field"><label>Incline (%)</label><input type="number" inputmode="decimal" step="0.5" id="f-incline"></div>`;
   } else {
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="3"></div>`;
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${effectiveTargetReps(ex)}"></div>`;
@@ -1131,6 +1169,10 @@ function repeatLast(name){
   if(ex.trackBy === "duration"){
     const m = document.getElementById("f-minutes");
     if(m) m.value = last.minutes;
+    const dist = document.getElementById("f-distance");
+    if(dist && last.distance != null) dist.value = last.distance;
+    const incl = document.getElementById("f-incline");
+    if(incl && last.incline != null) incl.value = last.incline;
   } else {
     const w = document.getElementById("f-weight");
     const s = document.getElementById("f-sets");
@@ -1679,7 +1721,7 @@ function addExercise(){
   const input = document.getElementById("new-ex-name");
   const name = input.value.trim();
   if(!name || data[name]) return;
-  data[name] = { trackBy:"weight", entries:[], day: view };
+  data[name] = Object.assign(newExerciseShell(name), { day: view });
   selected = name;
   persist();
   enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name } });
@@ -1708,6 +1750,14 @@ function logEntry(){
       difficulty,
       note: (noteEl.value || "").trim(),
     };
+    if(ex.trackDistance){
+      const distEl = document.getElementById("f-distance");
+      if(distEl && distEl.value) entry.distance = Number(distEl.value);
+    }
+    if(ex.trackIncline){
+      const inclineEl = document.getElementById("f-incline");
+      if(inclineEl && inclineEl.value) entry.incline = Number(inclineEl.value);
+    }
   } else {
     const isBodyweight = ex.trackBy === "reps";
     const weightEl = document.getElementById("f-weight");
