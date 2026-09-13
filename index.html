@@ -451,15 +451,34 @@ const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
 const EXERCISE_DEFAULTS = {
   "Zone 2 Ride": { trackBy: "duration", trackDistance: true },
   "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true },
+  "Squat": { targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent" },
+  "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec eccentric descent per leg" },
+  "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec controlled descent each step" },
 };
+// Exercises that ship with a ski-season target already existed for some users
+// before this was wired up, so backfill the ski fields onto them (additive
+// metadata only — never touches trackBy or anything already logged).
+const SKI_FIELD_KEYS = ["targetRepsSki", "skiTempo"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
+}
+function backfillSkiDefaults(){
+  Object.entries(EXERCISE_DEFAULTS).forEach(([name, preset]) => {
+    if(preset.targetRepsSki == null) return;
+    const ex = data[name];
+    if(ex && ex.targetRepsSki == null){
+      SKI_FIELD_KEYS.forEach(key => { if(preset[key] !== undefined) ex[key] = preset[key]; });
+      persist();
+      enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name } });
+    }
+  });
 }
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
 // ---------- state ----------
 let data = loadSaved() || JSON.parse(JSON.stringify(SEED));
 ensureClientIds();
+backfillSkiDefaults();
 let view = "full";
 let selected = DAY_ORDER.full[0];
 let calendarYear = new Date().getFullYear();
