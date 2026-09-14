@@ -120,6 +120,13 @@
   .card.ski-mode{border-color:#1565C0;box-shadow:0 0 0 1px rgba(21,101,192,0.18);}
   .ski-badge{display:inline-block;background:#1565C0;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
   .ski-tempo-line{font-size:0.76rem;color:#0D47A1;background:#E3F0FC;border:1px solid #BBD9F5;border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
+  .card.knee-mode{border-color:#B3660A;box-shadow:0 0 0 1px rgba(179,102,10,0.18);}
+  .card.back-mode{border-color:#8C2F39;box-shadow:0 0 0 1px rgba(140,47,57,0.18);}
+  .knee-badge{display:inline-block;background:#B3660A;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
+  .back-badge{display:inline-block;background:#8C2F39;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
+  .care-line{font-size:0.76rem;border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
+  .knee-care-line{color:#7A4A0A;background:#FFF3E0;border:1px solid #F0C889;}
+  .back-care-line{color:#6B1F26;background:#FBEAEA;border:1px solid #E3B3B8;}
 </style>
 
 
@@ -303,7 +310,12 @@ async function runOp(op){
     return true;
   }
   if(op.type === "upsert_settings"){
-    const { error } = await supabaseClient.from("user_settings").upsert({ user_id: userId, ski_season_mode: skiSeasonMode }, { onConflict: "user_id" });
+    const { error } = await supabaseClient.from("user_settings").upsert({
+      user_id: userId,
+      ski_season_mode: skiSeasonMode,
+      knee_care_mode: kneeCareMode,
+      low_back_care_mode: lowBackCareMode,
+    }, { onConflict: "user_id" });
     if(error) throw error;
     return true;
   }
@@ -369,6 +381,14 @@ async function pullRemoteAndMerge(){
   if(settingsRow && window.localStorage.getItem(SKI_MODE_KEY) === null){
     skiSeasonMode = settingsRow.ski_season_mode;
     try{ window.localStorage.setItem(SKI_MODE_KEY, skiSeasonMode ? "1" : "0"); }catch(e){}
+  }
+  if(settingsRow && window.localStorage.getItem(KNEE_MODE_KEY) === null){
+    kneeCareMode = settingsRow.knee_care_mode;
+    try{ window.localStorage.setItem(KNEE_MODE_KEY, kneeCareMode ? "1" : "0"); }catch(e){}
+  }
+  if(settingsRow && window.localStorage.getItem(BACK_MODE_KEY) === null){
+    lowBackCareMode = settingsRow.low_back_care_mode;
+    try{ window.localStorage.setItem(BACK_MODE_KEY, lowBackCareMode ? "1" : "0"); }catch(e){}
   }
 
   persist();
@@ -446,6 +466,23 @@ const DAY_ORDER = {
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
 const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
 
+// Fixed classification, not user-editable per exercise — no need for these
+// to live on the exercise object or round-trip through Supabase like the
+// ski-season fields do.
+const KNEE_SENSITIVE_EXERCISES = new Set(["Squat", "Bulgarian Split Squat", "Walking Lunge"]);
+const LOW_BACK_SENSITIVE_EXERCISES = new Set(["Squat", "RDL", "Barbell Row", "Kettlebell Swings"]);
+const KNEE_CARE_TIP = {
+  "Squat": "Consider a shallower squat depth or a box squat to reduce knee flexion range.",
+  "Bulgarian Split Squat": "Consider less rear-foot elevation or a shorter range to ease knee flexion.",
+  "Walking Lunge": "Consider a shorter step length or reduced depth to ease knee flexion.",
+};
+const LOW_BACK_CARE_TIP = {
+  "Squat": "Consider a lighter load or reduced depth to ease spinal load.",
+  "RDL": "Consider a shorter range (mid-shin instead of full stretch) to ease lower back load.",
+  "Barbell Row": "Consider a chest-supported row variation to reduce lower back loading.",
+  "Kettlebell Swings": "Consider a lighter bell or a hip thrust substitute to ease lower back load.",
+};
+
 // Built-in exercises that shouldn't default to weight/sets/reps when first
 // created — cardio work is logged by time, distance, and incline instead.
 const EXERCISE_DEFAULTS = {
@@ -495,10 +532,30 @@ const SKI_MODE_KEY = "strength-tracker-ski-mode";
 let skiSeasonMode = (function(){
   try{ return window.localStorage.getItem(SKI_MODE_KEY) === "1"; }catch(e){ return false; }
 })();
+const KNEE_MODE_KEY = "strength-tracker-knee-mode";
+let kneeCareMode = (function(){
+  try{ return window.localStorage.getItem(KNEE_MODE_KEY) === "1"; }catch(e){ return false; }
+})();
+const BACK_MODE_KEY = "strength-tracker-back-mode";
+let lowBackCareMode = (function(){
+  try{ return window.localStorage.getItem(BACK_MODE_KEY) === "1"; }catch(e){ return false; }
+})();
 
 function toggleSkiSeason(){
   skiSeasonMode = !skiSeasonMode;
   try{ window.localStorage.setItem(SKI_MODE_KEY, skiSeasonMode ? "1" : "0"); }catch(e){}
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  render();
+}
+function toggleKneeCareMode(){
+  kneeCareMode = !kneeCareMode;
+  try{ window.localStorage.setItem(KNEE_MODE_KEY, kneeCareMode ? "1" : "0"); }catch(e){}
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  render();
+}
+function toggleLowBackCareMode(){
+  lowBackCareMode = !lowBackCareMode;
+  try{ window.localStorage.setItem(BACK_MODE_KEY, lowBackCareMode ? "1" : "0"); }catch(e){}
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
   render();
 }
@@ -720,7 +777,7 @@ function computeRecoveryReadiness(){
 }
 
 
-function computeSuggestion(ex){
+function computeSuggestion(ex, name){
   if(!ex.entries.length) return null;
   const last = ex.entries[ex.entries.length-1];
   const targetReps = effectiveTargetReps(ex);
@@ -760,6 +817,28 @@ function computeSuggestion(ex){
         noteConcern: null,
         deload: true,
         missStreak,
+      };
+    }
+
+    // Knee/back care modes are a standing safety flag, not a per-session
+    // read — while active on a flagged exercise, always hold and proactively
+    // trim load rather than waiting for a miss streak like a normal deload.
+    const careFlags = [];
+    if(kneeCareMode && KNEE_SENSITIVE_EXERCISES.has(name)) careFlags.push("knee");
+    if(lowBackCareMode && LOW_BACK_SENSITIVE_EXERCISES.has(name)) careFlags.push("back");
+    if(careFlags.length){
+      const careWeight = Math.round((last.weight * 0.90) / 2.5) * 2.5;
+      return {
+        weight: careWeight,
+        sets: last.sets,
+        reps: targetReps,
+        hitTarget: last.reps >= targetReps,
+        readyToProgress: false,
+        streak, requiredStreak: ex.conservative ? 2 : 1,
+        difficultyNote: null,
+        noteConcern: null,
+        deload: false,
+        careFlags,
       };
     }
 
@@ -923,11 +1002,22 @@ function renderExerciseCard(name, ex){
   const hasEntries = ex.entries.length > 0;
   const last = hasEntries ? ex.entries[ex.entries.length-1] : null;
   const first = hasEntries ? ex.entries[0] : null;
-  const suggestion = computeSuggestion(ex);
+  const suggestion = computeSuggestion(ex, name);
   const skiActive = skiSeasonMode && !!ex.targetRepsSki;
+  const kneeActive = kneeCareMode && KNEE_SENSITIVE_EXERCISES.has(name);
+  const backActive = lowBackCareMode && LOW_BACK_SENSITIVE_EXERCISES.has(name);
 
-  let html = `<div class="card${skiActive ? ' ski-mode' : ''}">`;
-  html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}</h2>`;
+  let html = `<div class="card${skiActive ? ' ski-mode' : ''}${kneeActive ? ' knee-mode' : ''}${backActive ? ' back-mode' : ''}">`;
+  html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}</h2>`;
+  if(kneeActive && KNEE_CARE_TIP[name]){
+    html += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
+  }
+  if(backActive && LOW_BACK_CARE_TIP[name]){
+    html += `<div class="care-line back-care-line">${LOW_BACK_CARE_TIP[name]}</div>`;
+  }
+  if(kneeActive || backActive){
+    html += `<p style="font-size:0.64rem;color:var(--slate);margin:0 0 0.6rem;font-style:italic;">Adjusts training load only — not a substitute for a PT or doctor's evaluation.</p>`;
+  }
   if(skiActive && ex.skiTempo){
     html += `<div class="ski-tempo-line">Tempo: ${ex.skiTempo} — target reps shifted to ${ex.targetRepsSki} for ski season</div>`;
   }
@@ -965,6 +1055,9 @@ function renderExerciseCard(name, ex){
           msg = suggestion.hitTarget
             ? `Hit target ${unitWord}, but last session's note flagged "${escapeHtml(suggestion.noteConcern)}" — holding weight here until that clears up before adding more load.`
             : `Missed target ${unitWord}, and last session's note flagged "${escapeHtml(suggestion.noteConcern)}" — hold weight and keep an eye on that.`;
+        } else if(suggestion.careFlags && suggestion.careFlags.length){
+          const flagLabel = suggestion.careFlags.map(f => f === "knee" ? "Knee Care" : "Low Back Care").join(" + ");
+          msg = `${flagLabel} mode is on — cutting load ~10% and holding here while that settles down.`;
         } else if(suggestion.difficultyNote === "hard"){
           msg = `Hit target ${unitWord}, but rated 9-10/10 — holding here until it feels more manageable.`;
         } else if(suggestion.difficultyNote === "easy"){
@@ -1523,6 +1616,12 @@ function generateCoachNotes(){
   if(skiSeasonMode && (dayGuess === "lower" || dayGuess === "full")){
     sentences.push(`🎿 Ski season is on — keep leaning into single-leg work and a controlled lowering phase on squat/split squat/lunge.`);
   }
+  if(kneeCareMode){
+    sentences.push(`🦵 Knee care mode is on — squat, Bulgarian split squat, and walking lunge are holding at a lighter load.`);
+  }
+  if(lowBackCareMode){
+    sentences.push(`🩺 Low back care mode is on — squat, RDL, barbell row, and kettlebell swings are holding at a lighter load.`);
+  }
 
   return sentences.join(" ");
 }
@@ -1673,14 +1772,33 @@ function renderOverview(){
   }
   html += `</div>`;
 
-  html += `<div class="card${skiSeasonMode ? ' ski-mode' : ''}">
-    <h3 class="section">🎿 Ski Season</h3>
-    <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.7rem;">
-      When on, Squat, Bulgarian Split Squat, and Walking Lunge shift to lower rep targets with a slower eccentric tempo and more single-leg emphasis. Everything else keeps training as normal. Roughly Nov-March.
-    </p>
-    <button class="tool-btn" onclick="toggleSkiSeason()" style="background:${skiSeasonMode ? '#1565C0' : ''};color:${skiSeasonMode ? '#fff' : ''};border-color:${skiSeasonMode ? '#1565C0' : ''};">
-      ${skiSeasonMode ? '🎿 Ski Season: ON' : '🎿 Ski Season: OFF'}
-    </button>
+  html += `<div class="card">
+    <h3 class="section">Training Modifiers</h3>
+    <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
+      <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
+        🎿 Squat, Bulgarian Split Squat, and Walking Lunge shift to lower rep targets with a slower eccentric tempo and more single-leg emphasis. Roughly Nov-March.
+      </p>
+      <button class="tool-btn" onclick="toggleSkiSeason()" style="background:${skiSeasonMode ? '#1565C0' : ''};color:${skiSeasonMode ? '#fff' : ''};border-color:${skiSeasonMode ? '#1565C0' : ''};">
+        ${skiSeasonMode ? '🎿 Ski Season: ON' : '🎿 Ski Season: OFF'}
+      </button>
+    </div>
+    <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
+      <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
+        🦵 Squat, Bulgarian Split Squat, and Walking Lunge hold and cut load ~10% while your knee settles down. Everything else trains as normal.
+      </p>
+      <button class="tool-btn" onclick="toggleKneeCareMode()" style="background:${kneeCareMode ? '#B3660A' : ''};color:${kneeCareMode ? '#fff' : ''};border-color:${kneeCareMode ? '#B3660A' : ''};">
+        ${kneeCareMode ? '🦵 Knee Care: ON' : '🦵 Knee Care: OFF'}
+      </button>
+    </div>
+    <div>
+      <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
+        🩺 Squat, RDL, Barbell Row, and Kettlebell Swings hold and cut load ~10% while your lower back settles down. Everything else trains as normal.
+      </p>
+      <button class="tool-btn" onclick="toggleLowBackCareMode()" style="background:${lowBackCareMode ? '#8C2F39' : ''};color:${lowBackCareMode ? '#fff' : ''};border-color:${lowBackCareMode ? '#8C2F39' : ''};">
+        ${lowBackCareMode ? '🩺 Low Back Care: ON' : '🩺 Low Back Care: OFF'}
+      </button>
+    </div>
+    <p style="font-size:0.64rem;color:var(--slate);margin:0.7rem 0 0;font-style:italic;">Knee and Low Back Care adjust training load only — not a substitute for a PT or doctor's evaluation.</p>
   </div>`;
 
   html += renderBackupSyncCard();
