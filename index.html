@@ -36,6 +36,7 @@
   .pill{flex:0 0 auto;font-size:0.7rem;padding:0.35rem 0.6rem;border-radius:7px;font-weight:500;cursor:pointer;background:#fff;border:1px solid var(--line);color:var(--slate);white-space:nowrap;}
   .pill-add{font-weight:700;padding:0.35rem 0.65rem;color:var(--amber);border-color:var(--amber-light);}
   .pill.active{background:var(--amber);border-color:var(--amber);color:#fff;}
+  .pill.logged-today:not(.active){opacity:0.55;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:0.7rem;}
   .ex-name{font-family:'Fjalla One',sans-serif;font-size:1.1rem;text-transform:uppercase;color:var(--pine);margin:0 0 0.6rem;}
   .big-val{font-family:'IBM Plex Mono',monospace;font-size:1.7rem;font-weight:600;}
@@ -490,23 +491,33 @@ const LOW_BACK_CARE_TIP = {
 const EXERCISE_DEFAULTS = {
   "Zone 2 Ride": { trackBy: "duration", trackDistance: true },
   "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true },
-  "Squat": { targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent" },
+  "Squat": { targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell" },
   "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec eccentric descent per leg" },
   "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec controlled descent each step" },
+  "Bench Press": { equipment: "barbell" },
+  "RDL": { equipment: "barbell" },
+  "Barbell Row": { equipment: "barbell" },
 };
-// Exercises that ship with a ski-season target already existed for some users
-// before this was wired up, so backfill the ski fields onto them (additive
-// metadata only — never touches trackBy or anything already logged).
-const SKI_FIELD_KEYS = ["targetRepsSki", "skiTempo"];
+// Fields that are safe to backfill onto an exercise that already existed
+// locally before this default existed: purely additive metadata that never
+// reinterprets anything already logged (unlike trackBy/trackDistance, which
+// would misrepresent already-logged weight/sets/reps entries if changed).
+const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
 }
-function backfillSkiDefaults(){
+function backfillExerciseDefaults(){
   Object.entries(EXERCISE_DEFAULTS).forEach(([name, preset]) => {
-    if(preset.targetRepsSki == null) return;
     const ex = data[name];
-    if(ex && ex.targetRepsSki == null){
-      SKI_FIELD_KEYS.forEach(key => { if(preset[key] !== undefined) ex[key] = preset[key]; });
+    if(!ex) return;
+    let changed = false;
+    BACKFILL_KEYS.forEach(key => {
+      if(preset[key] !== undefined && ex[key] === undefined){
+        ex[key] = preset[key];
+        changed = true;
+      }
+    });
+    if(changed){
       persist();
       enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name } });
     }
@@ -517,7 +528,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // ---------- state ----------
 let data = loadSaved() || JSON.parse(JSON.stringify(SEED));
 ensureClientIds();
-backfillSkiDefaults();
+backfillExerciseDefaults();
 let view = "full";
 let selected = DAY_ORDER.full[0];
 let calendarYear = new Date().getFullYear();
@@ -635,6 +646,11 @@ function fmtDate(iso){
 function todayISO(){
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+function isLoggedToday(name){
+  const ex = data[name];
+  return !!(ex && ex.entries.some(e => e.date === todayISO()));
 }
 
 function daysBetween(dateStrA, dateStrB){
@@ -930,7 +946,8 @@ function renderDay(day){
 
   let html = `<div class="pill-row" id="pill-scroll">`;
   list.forEach((name, i) => {
-    html += `<div class="pill ${selected===name?'active':''}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')">${(day !== "extra" && i < DAY_ORDER[day].length) ? (i+1)+'. ' : ''}${name}</div>`;
+    const loggedToday = isLoggedToday(name);
+    html += `<div class="pill ${selected===name?'active':''}${loggedToday?' logged-today':''}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')">${(day !== "extra" && i < DAY_ORDER[day].length) ? (i+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
   });
   html += `<div class="pill pill-add" onclick="toggleAddExercise()">+</div></div>`;
   html += `<div id="add-ex-row" style="display:none" class="add-ex-row">
