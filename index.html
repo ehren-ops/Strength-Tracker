@@ -157,7 +157,7 @@
 <header>
   <h1 id="page-title">Full Body</h1>
   <p id="page-sub">Tap a day, log your sets, watch progress build.</p>
-  <p id="sync-status" class="sync-status">☁ Not signed in — logging locally</p>
+  <p id="sync-status" class="sync-status">☁ Not signed in - logging locally</p>
   <div class="tabs" id="tabs"></div>
 </header>
 <main id="app"></main>
@@ -220,9 +220,9 @@ function renderSyncStatus(){
   const el = document.getElementById("sync-status");
   if(!el) return;
   if(!currentSession){
-    el.textContent = "☁ Not signed in — logging locally";
+    el.textContent = "☁ Not signed in - logging locally";
   } else if(typeof navigator !== "undefined" && navigator.onLine === false){
-    el.textContent = pendingQueue.length ? `☁ Offline — ${pendingQueue.length} pending` : "☁ Offline";
+    el.textContent = pendingQueue.length ? `☁ Offline - ${pendingQueue.length} pending` : "☁ Offline";
   } else if(pendingQueue.length){
     el.textContent = `☁ Syncing… ${pendingQueue.length} pending`;
   } else {
@@ -480,7 +480,7 @@ window.addEventListener("online", () => { renderSyncStatus(); flushQueue(); });
 window.addEventListener("offline", () => { renderSyncStatus(); });
 
 const SEED = {
-  // Intentionally empty — publish this version without personal data baked in.
+  // Intentionally empty - publish this version without personal data baked in.
 
 };
 
@@ -493,7 +493,7 @@ const DAY_ORDER = {
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
 const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
 
-// Fixed classification, not user-editable per exercise — no need for these
+// Fixed classification, not user-editable per exercise - no need for these
 // to live on the exercise object or round-trip through Supabase like the
 // ski-season fields do.
 const KNEE_SENSITIVE_EXERCISES = new Set(["Squat", "Bulgarian Split Squat", "Walking Lunge"]);
@@ -511,7 +511,7 @@ const LOW_BACK_CARE_TIP = {
 };
 
 // Built-in exercises that shouldn't default to weight/sets/reps when first
-// created — cardio work is logged by time, distance, and incline instead.
+// created - cardio work is logged by time, distance, and incline instead.
 const EXERCISE_DEFAULTS = {
   "Zone 2 Ride": { trackBy: "duration", trackDistance: true, trackSpeed: true },
   "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true, trackSpeed: true },
@@ -533,7 +533,7 @@ const EXERCISE_DEFAULTS = {
 // daily checklist of stretches/moves with a collapsible how-to per item.
 const CHECKLIST_ROUTINES = {
   "Thoracic Spine Stretch": {
-    intro: "Mobility for the mid-back — tightness here shows up a lot from cycling, skiing tuck, and running posture.",
+    intro: "Mobility for the mid-back - tightness here shows up a lot from cycling, skiing tuck, and running posture.",
     items: [
       { name: "Cat-Cow", dose: "10 reps", description: "On hands and knees, arch your back up toward the ceiling on the exhale, then let it sag down on the inhale, leading with your chest.", variation: "Seated Cat-Cow: do the same spinal movement seated in a chair if you're short on floor space." },
       { name: "Thread the Needle", dose: "8 reps each side", description: "From hands and knees, slide one arm under your body and rotate your chest toward the floor, then reverse and reach that arm toward the ceiling.", variation: "Yoga flow: pair with a rotation to Extended Side Stretch for more shoulder opening." },
@@ -543,9 +543,9 @@ const CHECKLIST_ROUTINES = {
     ],
   },
   "Hip Stretch": {
-    intro: "Hip mobility — the usual tight spot from biking, skiing, and running.",
+    intro: "Hip mobility - the usual tight spot from biking, skiing, and running.",
     items: [
-      { name: "90/90 Hip Stretch", dose: "45 sec each side", description: "Sit with your front leg bent 90° in front of you and back leg bent 90° to the side, then lean your torso forward over the front shin.", variation: "Yoga version: this is essentially a seated Pigeon variation — stay upright for a gentler stretch." },
+      { name: "90/90 Hip Stretch", dose: "45 sec each side", description: "Sit with your front leg bent 90° in front of you and back leg bent 90° to the side, then lean your torso forward over the front shin.", variation: "Yoga version: this is essentially a seated Pigeon variation - stay upright for a gentler stretch." },
       { name: "Couch Stretch", dose: "45 sec each side", description: "Kneel with your back foot up on a couch or bench behind you, back knee bent, and drive your hips forward to stretch the front of the hip and quad.", variation: "Elevate the back foot less if it's too intense at first." },
       { name: "Pigeon Pose", dose: "45 sec each side", description: "Front leg bent in front of you, back leg extended straight behind, hips squared forward, fold over the front leg.", variation: "Reclined Figure-4 (lying on your back) is a gentler alternative to full Pigeon." },
       { name: "Standing Figure-4 Stretch", dose: "30 sec each side", description: "Cross one ankle over the opposite knee while standing, then sit your hips back like sitting in a chair.", variation: "Hold onto a wall or chair for balance if needed." },
@@ -553,19 +553,19 @@ const CHECKLIST_ROUTINES = {
     ],
   },
   "Leg Stretch": {
-    intro: "Glutes and quads — the muscles doing most of the work in squats, lunges, and pedaling.",
+    intro: "Glutes and quads - the muscles doing most of the work in squats, lunges, and pedaling.",
     items: [
       { name: "Kneeling Quad Stretch", dose: "30 sec each side", description: "Kneel on one knee, grab the back foot of that leg, and gently pull the heel toward your glute while keeping hips forward.", variation: "Standing Quad Stretch works the same muscle if kneeling bothers your knees." },
       { name: "Standing Quad Stretch", dose: "30 sec each side", description: "Standing on one leg, grab your other ankle behind you and pull the heel toward your glute, knees close together.", variation: "Hold a wall or chair for balance." },
-      { name: "Lying Figure-4 Glute Stretch", dose: "45 sec each side", description: "Lying on your back, cross one ankle over the opposite knee, then pull the uncrossed thigh toward your chest.", variation: "Yoga version: Reclined Pigeon — same position, held longer with slow breathing." },
+      { name: "Lying Figure-4 Glute Stretch", dose: "45 sec each side", description: "Lying on your back, cross one ankle over the opposite knee, then pull the uncrossed thigh toward your chest.", variation: "Yoga version: Reclined Pigeon - same position, held longer with slow breathing." },
       { name: "Frog Stretch", dose: "45 sec", description: "On hands and knees, widen your knees out to the sides and sink your hips back toward your heels to stretch the inner thighs and hips.", variation: "Come up onto forearms for a deeper version once it feels comfortable." },
-      { name: "Runner's Lunge with Quad Pull", dose: "30 sec each side", description: "From a lunge, drop the back knee down and grab that back foot to add a quad stretch to the hip flexor stretch.", variation: "Skip the foot pull if balance is tough — the lunge alone still stretches the hip flexor." },
+      { name: "Runner's Lunge with Quad Pull", dose: "30 sec each side", description: "From a lunge, drop the back knee down and grab that back foot to add a quad stretch to the hip flexor stretch.", variation: "Skip the foot pull if balance is tough - the lunge alone still stretches the hip flexor." },
     ],
   },
   "Full Body Stretch": {
     intro: "A quick full-body cooldown when you don't need to target anything specific.",
     items: [
-      { name: "Downward Dog", dose: "30 sec", description: "Hands and feet on the floor, hips lifted high to form an inverted V, pedaling the heels to stretch calves and hamstrings.", variation: "Bend the knees generously if the hamstrings are tight — the priority is a long spine, not straight legs." },
+      { name: "Downward Dog", dose: "30 sec", description: "Hands and feet on the floor, hips lifted high to form an inverted V, pedaling the heels to stretch calves and hamstrings.", variation: "Bend the knees generously if the hamstrings are tight - the priority is a long spine, not straight legs." },
       { name: "Standing Forward Fold", dose: "30 sec", description: "Feet hip-width, hinge at the hips and let your upper body hang toward the floor, knees soft.", variation: "Yoga version: Ragdoll Pose, holding opposite elbows and gently swaying side to side." },
       { name: "Cat-Cow", dose: "10 reps", description: "On hands and knees, arch and round the spine slowly with your breath.", variation: "A seated version works too if you're short on floor space." },
       { name: "Child's Pose", dose: "45 sec", description: "Kneel and sit back onto your heels, reaching your arms forward and resting your forehead on the floor.", variation: "Widen the knees for more room for your torso if that's more comfortable." },
@@ -573,9 +573,9 @@ const CHECKLIST_ROUTINES = {
     ],
   },
   "5-Minute Core Routine": {
-    intro: "A short core circuit — run through each move once for about 5 minutes total.",
+    intro: "A short core circuit - run through each move once for about 5 minutes total.",
     items: [
-      { name: "Plank", dose: "30-45 sec", description: "Forearms and toes on the floor, body in a straight line from head to heels, brace your core.", variation: "Drop to knees if a full plank isn't sustainable yet — same bracing pattern." },
+      { name: "Plank", dose: "30-45 sec", description: "Forearms and toes on the floor, body in a straight line from head to heels, brace your core.", variation: "Drop to knees if a full plank isn't sustainable yet - same bracing pattern." },
       { name: "Dead Bug", dose: "10 reps each side", description: "Lying on your back, arms up and knees bent 90°, slowly extend the opposite arm and leg toward the floor while keeping your low back flat.", variation: "Keep both feet on the floor and just do the arm reach if the full movement is too hard at first." },
       { name: "Bird Dog", dose: "10 reps each side", description: "From hands and knees, extend the opposite arm and leg straight out, keeping hips level.", variation: "Add a 2 second hold at full extension for more of a stability challenge." },
       { name: "Side Plank", dose: "20 sec each side", description: "Forearm and stacked feet on the floor, hips lifted so your body forms a straight line.", variation: "Drop the bottom knee to the floor for a more supported version." },
@@ -610,10 +610,10 @@ function backfillExerciseDefaults(){
 }
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
-// Bumped by hand with each shipped change — v23 picks up the count from this
+// Bumped by hand with each shipped change - v23 picks up the count from this
 // file's git history (22 prior commits touching index.html at the time this
 // was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v23";
+const APP_VERSION = "v24";
 const APP_UPDATED = "Sep 17, 2026";
 
 // ---------- state ----------
@@ -703,7 +703,7 @@ function backupData(){
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   const statusEl = document.getElementById("card-status");
-  if(statusEl) statusEl.textContent = "Backup downloaded — save it somewhere safe (Files, email, iCloud).";
+  if(statusEl) statusEl.textContent = "Backup downloaded - save it somewhere safe (Files, email, iCloud).";
 }
 
 function restoreData(event){
@@ -732,7 +732,7 @@ function restoreData(event){
 
 // ---------- helpers ----------
 function fmtDate(iso){
-  if(!iso) return "—";
+  if(!iso) return "-";
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
 }
@@ -770,7 +770,7 @@ function showCelebration(msg){
   window.__celebrationTimer = setTimeout(() => { el.hidden = true; }, 4000);
 }
 
-// Only the numbered, built-in exercises for full/upper/lower count as "core" —
+// Only the numbered, built-in exercises for full/upper/lower count as "core" -
 // custom exercises the user adds later (lateral raises, etc.) don't gate this,
 // and Extra/Off-Day isn't a "core workout" to begin with (its pills are never
 // numbered), so it's excluded entirely.
@@ -782,7 +782,7 @@ function checkCoreWorkoutComplete(day){
   if(celebratedToday[day] === today) return;
   celebratedToday[day] = today;
   try{ window.localStorage.setItem(CELEBRATED_KEY, JSON.stringify(celebratedToday)); }catch(e){}
-  showCelebration(`🎉 ${DAY_TITLES[day]} complete — nice work!`);
+  showCelebration(`🎉 ${DAY_TITLES[day]} complete - nice work!`);
   if(currentSession) flushQueue();
 }
 
@@ -810,7 +810,7 @@ function platesLabel(totalWeight, equipment){
   const { perSide, plates, unreachable } = calcPlates(totalWeight);
   if(perSide === 0) return `No plates needed`;
   const parts = plates.map(p => `${p.count}×${p.plate}`).join(" + ");
-  return `${parts} per side${unreachable ? " — closest with standard plates" : ""}`;
+  return `${parts} per side${unreachable ? " - closest with standard plates" : ""}`;
 }
 function repLabel(sets, reps, unit){
   return unit === "sec" ? `${sets}x${reps}sec` : `${sets}x${reps}`;
@@ -869,7 +869,7 @@ function ticksBetween(lo, hi, step){
 }
 
 function estimate1RM(weight, reps){
-  // Epley formula — rough estimate, not a substitute for an actual tested max
+  // Epley formula - rough estimate, not a substitute for an actual tested max
   return Math.round(weight * (1 + reps / 30));
 }
 
@@ -925,7 +925,7 @@ function computeRecoveryReadiness(){
 
   // ~3 days rested reaches full readiness on its own; only a genuinely hard
   // recent stretch (avg difficulty above 7) pulls it back down, and only
-  // modestly — this isn't meant to demand a week off for one tough session.
+  // modestly - this isn't meant to demand a week off for one tough session.
   let readiness = daysSince * 3.5;
   if(avgDifficulty !== null && avgDifficulty > 7) readiness -= (avgDifficulty - 7) * 0.8;
   readiness = Math.max(0, Math.min(10, Math.round(readiness)));
@@ -952,7 +952,7 @@ function computeSuggestion(ex, name){
     }
 
     // Separately: how many *consecutive* misses at this same weight, most
-    // recent first — stops at the first hit or the first different weight.
+    // recent first - stops at the first hit or the first different weight.
     let missStreak = 0;
     for(let i = ex.entries.length - 1; i >= 0; i--){
       const e = ex.entries[i];
@@ -961,7 +961,7 @@ function computeSuggestion(ex, name){
     }
 
     // Deload check takes priority over everything else: 3+ straight misses
-    // at the same weight means grinding harder isn't working — drop the load.
+    // at the same weight means grinding harder isn't working - drop the load.
     if(missStreak >= 3){
       const deloadWeight = Math.round((last.weight * 0.85) / 2.5) * 2.5;
       return {
@@ -979,7 +979,7 @@ function computeSuggestion(ex, name){
     }
 
     // Knee/back care modes are a standing safety flag, not a per-session
-    // read — while active on a flagged exercise, always hold and proactively
+    // read - while active on a flagged exercise, always hold and proactively
     // trim load rather than waiting for a miss streak like a normal deload.
     const careFlags = [];
     if(kneeCareMode && KNEE_SENSITIVE_EXERCISES.has(name)) careFlags.push("knee");
@@ -1016,7 +1016,7 @@ function computeSuggestion(ex, name){
     }
 
     // A concerning word in the prior session's note (tender, pain, grip, etc.)
-    // is a real signal too, not just decoration — it holds back progression
+    // is a real signal too, not just decoration - it holds back progression
     // the same way a brutal RPE does, even if the numbers alone said "go".
     let noteConcern = null;
     if(last.note){
@@ -1129,7 +1129,7 @@ function render1RMInline(name, ex, last){
   if(!ex.actual1RM && !last.weight){
     return `<div class="onerm-box" onclick="start1RM('${name.replace(/'/g,"\\'")}')">
       <span class="onerm-label">1RM</span>
-      <span class="onerm-val">— ✎</span>
+      <span class="onerm-val">- ✎</span>
     </div>`;
   }
   const oneRM = ex.actual1RM || estimate1RM(last.weight, last.reps);
@@ -1246,14 +1246,14 @@ function renderExerciseCard(name, ex){
     html += `<div class="care-line back-care-line">${LOW_BACK_CARE_TIP[name]}</div>`;
   }
   if(kneeActive || backActive){
-    html += `<p style="font-size:0.64rem;color:var(--slate);margin:0 0 0.6rem;font-style:italic;">Adjusts training load only — not a substitute for a PT or doctor's evaluation.</p>`;
+    html += `<p style="font-size:0.64rem;color:var(--slate);margin:0 0 0.6rem;font-style:italic;">Adjusts training load only - not a substitute for a PT or doctor's evaluation.</p>`;
   }
   if(skiActive && ex.skiTempo){
-    html += `<div class="ski-tempo-line">Tempo: ${ex.skiTempo} — target reps shifted to ${ex.targetRepsSki} for ski season</div>`;
+    html += `<div class="ski-tempo-line">Tempo: ${ex.skiTempo} - target reps shifted to ${ex.targetRepsSki} for ski season</div>`;
   }
 
   if(!hasEntries){
-    html += `<p style="color:var(--slate);font-size:0.85rem;">No entries yet — log your first set below.</p>`;
+    html += `<p style="color:var(--slate);font-size:0.85rem;">No entries yet - log your first set below.</p>`;
   } else {
     const delta = ex.entries.length > 1
       ? (ex.trackBy==="weight" ? last.weight-first.weight : ex.trackBy==="duration" ? last.minutes-first.minutes : last.reps-first.reps)
@@ -1280,34 +1280,34 @@ function renderExerciseCard(name, ex){
       if(ex.trackBy === "weight"){
         nextLabel = `${suggestion.weight} lbs ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}`;
         if(suggestion.deload){
-          msg = `Missed target ${unitWord} for ${suggestion.missStreak} sessions straight — that's a stall, not a bad day. Dropping ~15% to rebuild with clean reps.`;
+          msg = `Missed target ${unitWord} for ${suggestion.missStreak} sessions straight - that's a stall, not a bad day. Dropping ~15% to rebuild with clean reps.`;
         } else if(suggestion.noteConcern){
           msg = suggestion.hitTarget
-            ? `Hit target ${unitWord}, but last session's note flagged "${escapeHtml(suggestion.noteConcern)}" — holding weight here until that clears up before adding more load.`
-            : `Missed target ${unitWord}, and last session's note flagged "${escapeHtml(suggestion.noteConcern)}" — hold weight and keep an eye on that.`;
+            ? `Hit target ${unitWord}, but last session's note flagged "${escapeHtml(suggestion.noteConcern)}" - holding weight here until that clears up before adding more load.`
+            : `Missed target ${unitWord}, and last session's note flagged "${escapeHtml(suggestion.noteConcern)}" - hold weight and keep an eye on that.`;
         } else if(suggestion.careFlags && suggestion.careFlags.length){
           const flagLabel = suggestion.careFlags.map(f => f === "knee" ? "Knee Care" : "Low Back Care").join(" + ");
-          msg = `${flagLabel} mode is on — cutting load ~10% and holding here while that settles down.`;
+          msg = `${flagLabel} mode is on - cutting load ~10% and holding here while that settles down.`;
         } else if(suggestion.difficultyNote === "hard"){
-          msg = `Hit target ${unitWord}, but rated 9-10/10 — holding here until it feels more manageable.`;
+          msg = `Hit target ${unitWord}, but rated 9-10/10 - holding here until it feels more manageable.`;
         } else if(suggestion.difficultyNote === "easy"){
-          msg = `Hit target ${unitWord} and rated it easy — fast-tracking the increase.`;
+          msg = `Hit target ${unitWord} and rated it easy - fast-tracking the increase.`;
         } else if(suggestion.readyToProgress){
           msg = ex.conservative
             ? `Hit target ${unitWord} for ${suggestion.streak} sessions straight, progress it.`
             : `Hit target ${unitWord} last time, progress the weight.`;
         } else if(suggestion.hitTarget){
-          msg = `Hit target ${unitWord}, but only ${suggestion.streak} session${suggestion.streak>1?'s':''} at this weight — hold one more before adding.`;
+          msg = `Hit target ${unitWord}, but only ${suggestion.streak} session${suggestion.streak>1?'s':''} at this weight - hold one more before adding.`;
         } else {
           msg = `Missed target ${unitWord} last time, hold weight and chase it.`;
         }
       } else if(ex.trackBy === "duration"){
         nextLabel = `${suggestion.minutes} min`;
         msg = suggestion.difficultyNote === "easy"
-          ? `Felt easy last time — adding 5 minutes.`
+          ? `Felt easy last time - adding 5 minutes.`
           : suggestion.difficultyNote === "hard"
-          ? `Rated hard last time — pulling back 5 minutes to stay sustainable.`
-          : `Held steady — log an RPE next time for a sharper call.`;
+          ? `Rated hard last time - pulling back 5 minutes to stay sustainable.`
+          : `Held steady - log an RPE next time for a sharper call.`;
       } else {
         nextLabel = repLabel(suggestion.sets,suggestion.reps,ex.unit);
         msg = `Bodyweight move, aiming for a couple more reps.`;
@@ -1403,7 +1403,7 @@ function renderHistRow(e, idx, isLatest, ex, name){
   const todayTag = (isLatest && e.date === todayISO()) ? ' (TODAY)' : '';
   html += `<span>${fmtDate(e.date)}${e.confirmed===false?'<span class="est">*</span>':''}${isLatest?` <span class="latest-tag">Latest${todayTag}</span>`:''}<br><span class="hist-session-label">${e.label}</span></span>`;
   html += `<span class="exact">${formatEntryValue(e, ex)}</span>`;
-  html += `<span class="exact">${e.difficulty ?? "—"}</span>`;
+  html += `<span class="exact">${e.difficulty ?? "-"}</span>`;
   html += `<span>`;
   if(e.note) html += `<span class="note">${escapeHtml(e.note)}</span>`;
   html += `<span class="row-actions">
@@ -1548,7 +1548,7 @@ function suggestionValue(suggestion, ex){
 }
 
 // Retroactively flags any point where the weight dropped right after a
-// 3+ session stall at the prior weight — i.e. a deload, whether the user
+// 3+ session stall at the prior weight - i.e. a deload, whether the user
 // followed the app's suggestion exactly or just dropped weight themselves.
 function computeDeloadFlags(ex){
   const entries = ex.entries;
@@ -1662,9 +1662,9 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     const path = points.map((p,i) => `${i===0?'M':'L'}${xAt(i).toFixed(1)},${yAt(p.y).toFixed(1)}`).join(" ");
     svg += `<path d="${path}" fill="none" stroke="#C2761A" stroke-width="2.5"/>`;
   }
-  // dots + x labels for actual points — deload gets a hollow red marker,
+  // dots + x labels for actual points - deload gets a hollow red marker,
   // under 3 sets gets dark red, missed target reps gets red, extra reps/sets
-  // (that actually hit target) gets green — each with a small sets×reps label
+  // (that actually hit target) gets green - each with a small sets×reps label
   points.forEach((p,i) => {
     const isDeload = deloadFlags[i];
     const targetReps = ex.targetReps || 8;
@@ -1672,7 +1672,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     const isMissed = isRealExercise && !isDeload && !isUnder && ex.trackBy !== "duration" && p.entry.reps < targetReps;
     const isExtra = isRealExercise && !isDeload && !isUnder && !isMissed && ex.trackBy !== "duration" &&
       (p.entry.reps > targetReps || p.entry.sets > 3);
-    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" — "+p.entry.note:""}${isDeload?" — deload":""}${isExtra?" — extra volume":""}${isUnder?" — under 3 sets":""}${isMissed?" — missed target reps":""}`;
+    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" - "+p.entry.note:""}${isDeload?" - deload":""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
 
     function labelWithHalo(text, color){
       const labelY = Math.max(padT + 7, yAt(p.y) - 8);
@@ -1817,7 +1817,7 @@ function renderCalendar(){
         const ex = data[n];
         const entry = ex.entries.slice().reverse().find(e => e.date === calendarSelectedDate);
         if(entry){
-          html += `<div style="font-size:0.78rem;color:var(--slate);font-family:'IBM Plex Mono',monospace;">${n} — ${formatEntryValue(entry, ex)}</div>`;
+          html += `<div style="font-size:0.78rem;color:var(--slate);font-family:'IBM Plex Mono',monospace;">${n} - ${formatEntryValue(entry, ex)}</div>`;
         }
       });
       html += `</div>`;
@@ -1836,7 +1836,7 @@ function renderCalendar(){
     const readinessColor = recovery.readiness >= 7 ? "var(--emerald)" : recovery.readiness >= 4 ? "var(--amber)" : "#B3261E";
     html += `<p style="font-size:0.76rem;color:var(--slate);margin:0.6rem 0 0;padding-top:0.5rem;border-top:1px dashed var(--line);">
       Recovery readiness: <b style="color:${readinessColor};font-family:'IBM Plex Mono',monospace;">${recovery.readiness}/10</b>
-      — ${recovery.daysSince} day${recovery.daysSince===1?'':'s'} rested${recovery.neededRestDays > 0 ? `, ~${recovery.neededRestDays} more suggested` : ', should be ready'}
+      - ${recovery.daysSince} day${recovery.daysSince===1?'':'s'} rested${recovery.neededRestDays > 0 ? `, ~${recovery.neededRestDays} more suggested` : ', should be ready'}
     </p>`;
   }
 
@@ -1891,31 +1891,31 @@ function generateCoachNotes(){
   const concerns = items.filter(i => i.entry.note && CONCERN_WORDS.some(w => i.entry.note.toLowerCase().includes(w)));
 
   const sentences = [];
-  sentences.push(`${dayLabel} on ${fmtDate(lastDate)} — ${hitCount}/${total} lifts hit target clean.`);
+  sentences.push(`${dayLabel} on ${fmtDate(lastDate)} - ${hitCount}/${total} lifts hit target clean.`);
 
   if(increased.length){
     const names = increased.slice(0,2).map(i => i.name).join(" and ");
-    sentences.push(`${names} moved up in weight and still landed it — good sign, keep building there.`);
+    sentences.push(`${names} moved up in weight and still landed it - good sign, keep building there.`);
   }
   if(missed.length){
     const names = missed.slice(0,2).map(i => i.ex.trackBy==="weight" ? `${i.name} (${i.entry.weight}lbs)` : i.name).join(" and ");
-    sentences.push(`${names} missed target — hold steady there next time instead of adding more.`);
+    sentences.push(`${names} missed target - hold steady there next time instead of adding more.`);
   }
   if(concerns.length){
     const c = concerns[0];
-    sentences.push(`Worth flagging: ${c.name} noted "${escapeHtml(c.entry.note)}" — keep an eye on that rather than pushing through it.`);
+    sentences.push(`Worth flagging: ${c.name} noted "${escapeHtml(c.entry.note)}" - keep an eye on that rather than pushing through it.`);
   }
   if(!missed.length && !concerns.length && hitCount === total){
-    sentences.push(increased.length ? `Clean session across the board — nothing to dial back here.` : `Solid and consistent — everything landed, nothing urgent to change.`);
+    sentences.push(increased.length ? `Clean session across the board - nothing to dial back here.` : `Solid and consistent - everything landed, nothing urgent to change.`);
   }
   if(skiSeasonMode && (dayGuess === "lower" || dayGuess === "full")){
-    sentences.push(`🎿 Ski season is on — keep leaning into single-leg work and a controlled lowering phase on squat/split squat/lunge.`);
+    sentences.push(`🎿 Ski season is on - keep leaning into single-leg work and a controlled lowering phase on squat/split squat/lunge.`);
   }
   if(kneeCareMode){
-    sentences.push(`🦵 Knee care mode is on — squat, Bulgarian split squat, and walking lunge are holding at a lighter load.`);
+    sentences.push(`🦵 Knee care mode is on - squat, Bulgarian split squat, and walking lunge are holding at a lighter load.`);
   }
   if(lowBackCareMode){
-    sentences.push(`🩺 Low back care mode is on — squat, RDL, barbell row, and kettlebell swings are holding at a lighter load.`);
+    sentences.push(`🩺 Low back care mode is on - squat, RDL, barbell row, and kettlebell swings are holding at a lighter load.`);
   }
 
   return sentences.join(" ");
@@ -1942,7 +1942,7 @@ function renderLastSessionBreakdown(){
         html += `<div class="session-row">
           <span>${n}</span>
           <span class="exact">${formatEntryValue(entry, ex)}</span>
-          <span class="exact">${entry.difficulty ?? "—"}</span>
+          <span class="exact">${entry.difficulty ?? "-"}</span>
         </div>`;
       }
     });
@@ -2007,7 +2007,7 @@ function renderOverview(){
       <div class="ov-grid">`;
   dayAgg.forEach(d => {
     const color = d.avg===null ? "var(--slate)" : d.avg>0 ? "var(--emerald)" : d.avg<0 ? "var(--amber)" : "var(--slate)";
-    html += `<div><div class="n" style="color:${color}">${d.avg===null?'—':(d.avg>0?'+':'')+d.avg.toFixed(0)+'%'}</div><div class="l">${d.title}</div><div style="font-size:0.62rem;color:var(--slate);">${d.count}/${d.total} lifts w/ data</div></div>`;
+    html += `<div><div class="n" style="color:${color}">${d.avg===null?'-':(d.avg>0?'+':'')+d.avg.toFixed(0)+'%'}</div><div class="l">${d.title}</div><div style="font-size:0.62rem;color:var(--slate);">${d.count}/${d.total} lifts w/ data</div></div>`;
   });
   html += `</div></div></div>`;
 
@@ -2024,10 +2024,10 @@ function renderOverview(){
       const prev = history.length > 1 ? history[history.length-2].weight : null;
       const pct = (latest !== null && prev) ? ((latest - prev) / prev) * 100 : null;
       const pctColor = pct === null ? "var(--slate)" : pct > 0 ? "var(--emerald)" : pct < 0 ? "var(--amber)" : "var(--slate)";
-      const pctText = pct === null ? "—" : `${pct>0?'+':''}${pct.toFixed(0)}%`;
+      const pctText = pct === null ? "-" : `${pct>0?'+':''}${pct.toFixed(0)}%`;
       html += `<div class="session-row">
         <span>${DAY_TITLES[day]}</span>
-        <span class="exact">${latest !== null ? latest.toLocaleString()+" lbs" : "—"}</span>
+        <span class="exact">${latest !== null ? latest.toLocaleString()+" lbs" : "-"}</span>
         <span class="exact" style="color:${pctColor};">${pctText}</span>
       </div>`;
     });
@@ -2093,7 +2093,7 @@ function renderOverview(){
         ${lowBackCareMode ? '🩺 Low Back Care: ON' : '🩺 Low Back Care: OFF'}
       </button>
     </div>
-    <p style="font-size:0.64rem;color:var(--slate);margin:0.7rem 0 0;font-style:italic;">Knee and Low Back Care adjust training load only — not a substitute for a PT or doctor's evaluation.</p>
+    <p style="font-size:0.64rem;color:var(--slate);margin:0.7rem 0 0;font-style:italic;">Knee and Low Back Care adjust training load only - not a substitute for a PT or doctor's evaluation.</p>
   </div>`;
 
   html += renderBackupSyncCard();
@@ -2116,7 +2116,7 @@ function renderBackupSyncCard(){
       <button class="tool-btn" onclick="signOutUser()">Sign out</button>
     </div>`;
   } else {
-    html += `<p style="font-size:0.7rem;color:var(--slate);margin:0 0 0.4rem;">Sign in to back up to the cloud (optional — logging works without it).</p>`;
+    html += `<p style="font-size:0.7rem;color:var(--slate);margin:0 0 0.4rem;">Sign in to back up to the cloud (optional - logging works without it).</p>`;
     html += `<div class="form-row" style="margin-top:0;">
       <div class="field"><input type="email" id="auth-email" placeholder="Email"></div>
       <div class="field"><input type="password" id="auth-password" placeholder="Password"></div>
