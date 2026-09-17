@@ -61,7 +61,7 @@
   svg.chart{width:100%;height:150px;display:block;margin-top:0.6rem;}
   .form-row{display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;}
   .field{flex:1 1 60px;}
-  .field label{display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);margin-bottom:0.2rem;}
+  .field label{display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);margin-bottom:0.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .field input{width:100%;padding:0.45rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;}
   .field input:focus{outline:2px solid var(--amber-light);border-color:var(--amber);}
   button.log{margin-top:0.7rem;width:100%;background:var(--pine);color:var(--stone);border:none;border-radius:7px;padding:0.6rem;font-weight:600;font-size:0.85rem;cursor:pointer;transition:background-color 0.4s ease;}
@@ -510,7 +510,7 @@ const LOW_BACK_CARE_TIP = {
 // Built-in exercises that shouldn't default to weight/sets/reps when first
 // created — cardio work is logged by time, distance, and incline instead.
 const EXERCISE_DEFAULTS = {
-  "Zone 2 Ride": { trackBy: "duration", trackDistance: true },
+  "Zone 2 Ride": { trackBy: "duration", trackDistance: true, trackSpeed: true },
   "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true, trackSpeed: true },
   "Squat": { targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell" },
   "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec eccentric descent per leg" },
@@ -733,7 +733,15 @@ function todayISO(){
 
 function isLoggedToday(name){
   const ex = data[name];
-  return !!(ex && ex.entries.some(e => e.date === todayISO()));
+  if(!ex) return false;
+  const entry = ex.entries.find(e => e.date === todayISO());
+  if(!entry) return false;
+  if(ex.trackBy === "checklist"){
+    const routine = CHECKLIST_ROUTINES[name];
+    const total = routine ? routine.items.length : 0;
+    return total > 0 && (entry.completedIndices || []).length >= total;
+  }
+  return true;
 }
 
 // Purely a "don't show the banner twice today" UX flag, not real workout
@@ -803,7 +811,13 @@ function formatEntryValue(e, ex){
   if(ex.trackBy === "duration"){
     let s = `${e.minutes} min`;
     if(e.distance != null && e.distance !== "") s += `, ${e.distance} mi`;
-    if(e.speed != null && e.speed !== "") s += ` @ ${e.speed} mph`;
+    let speed = (e.speed != null && e.speed !== "") ? e.speed : null;
+    let speedIsCalculated = false;
+    if(speed == null && ex.trackSpeed && e.distance != null && e.distance !== "" && e.minutes){
+      speed = Math.round((e.distance / (e.minutes / 60)) * 10) / 10;
+      speedIsCalculated = true;
+    }
+    if(speed != null) s += ` @ ${speedIsCalculated ? "~" : ""}${speed} mph`;
     if(e.incline != null && e.incline !== "") s += ` @ ${e.incline}% incline`;
     return s;
   }
@@ -1033,10 +1047,19 @@ function allDayNames(){
 }
 
 // ---------- rendering ----------
+let lastRenderedView = null;
 function render(){
+  const oldPillScroll = document.getElementById("pill-scroll");
+  const sameView = lastRenderedView === view;
+  const savedPillScrollLeft = (sameView && oldPillScroll) ? oldPillScroll.scrollLeft : null;
   renderTabs();
   if(view === "overview") renderOverview();
   else renderDay(view);
+  if(savedPillScrollLeft !== null){
+    const newPillScroll = document.getElementById("pill-scroll");
+    if(newPillScroll) newPillScroll.scrollLeft = savedPillScrollLeft;
+  }
+  lastRenderedView = view;
 }
 
 function renderTabs(){
@@ -1337,9 +1360,9 @@ function renderHistRow(e, idx, isLatest, ex, name){
         ${ex.trackBy==="weight" ? `<div class="field"><label>Weight</label><input type="number" inputmode="decimal" id="edit-weight" value="${e.weight}"></div>` : ""}
         ${ex.trackBy==="duration"
           ? `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="edit-minutes" value="${e.minutes}"></div>`
-            + (ex.trackDistance ? `<div class="field"><label>Distance (mi)</label><input type="number" inputmode="decimal" step="0.1" id="edit-distance" value="${e.distance ?? ''}"></div>` : "")
-            + (ex.trackSpeed ? `<div class="field"><label>Speed (mph)</label><input type="number" inputmode="decimal" step="0.1" id="edit-speed" value="${e.speed ?? ''}"></div>` : "")
-            + (ex.trackIncline ? `<div class="field"><label>Incline (%)</label><input type="number" inputmode="decimal" step="0.5" id="edit-incline" value="${e.incline ?? ''}"></div>` : "")
+            + (ex.trackDistance ? `<div class="field"><label>Miles</label><input type="number" inputmode="decimal" step="0.1" id="edit-distance" value="${e.distance ?? ''}"></div>` : "")
+            + (ex.trackSpeed ? `<div class="field"><label>MPH</label><input type="number" inputmode="decimal" step="0.1" id="edit-speed" value="${e.speed ?? ''}"></div>` : "")
+            + (ex.trackIncline ? `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="edit-incline" value="${e.incline ?? ''}"></div>` : "")
           : `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="edit-sets" value="${e.sets}"></div>
              <div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="edit-reps" value="${e.reps}"></div>`
         }
@@ -1457,9 +1480,9 @@ function renderForm(name, ex){
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${effectiveTargetReps(ex)}"></div>`;
   } else if(ex.trackBy === "duration"){
     html += `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="f-minutes"></div>`;
-    if(ex.trackDistance) html += `<div class="field"><label>Distance (mi)</label><input type="number" inputmode="decimal" step="0.1" id="f-distance"></div>`;
-    if(ex.trackSpeed) html += `<div class="field"><label>Speed (mph)</label><input type="number" inputmode="decimal" step="0.1" id="f-speed"></div>`;
-    if(ex.trackIncline) html += `<div class="field"><label>Incline (%)</label><input type="number" inputmode="decimal" step="0.5" id="f-incline"></div>`;
+    if(ex.trackDistance) html += `<div class="field"><label>Miles</label><input type="number" inputmode="decimal" step="0.1" id="f-distance"></div>`;
+    if(ex.trackSpeed) html += `<div class="field"><label>MPH</label><input type="number" inputmode="decimal" step="0.1" id="f-speed"></div>`;
+    if(ex.trackIncline) html += `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="f-incline"></div>`;
   } else {
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="3"></div>`;
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${effectiveTargetReps(ex)}"></div>`;
@@ -2052,12 +2075,8 @@ function renderBackupSyncCard(){
 
 // ---------- interactions ----------
 function selectExercise(name){
-  const oldContainer = document.getElementById("pill-scroll");
-  const savedScrollLeft = oldContainer ? oldContainer.scrollLeft : 0;
   selected = name;
   render();
-  const newContainer = document.getElementById("pill-scroll");
-  if(newContainer) newContainer.scrollLeft = savedScrollLeft;
 }
 function toggleHistory(name){ openHistory[name] = !openHistory[name]; render(); }
 function toggleAddExercise(){
