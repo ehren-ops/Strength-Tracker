@@ -31,6 +31,9 @@
   .tab.active{background:var(--amber);border-color:var(--amber);color:#1B211C;}
   .header-tools{display:flex;gap:0.4rem;margin-top:0.7rem;}
   .tool-btn{background:#FFFFFF;border:1px solid var(--line);color:var(--slate);font-size:0.72rem;font-weight:600;padding:0.4rem 0.7rem;border-radius:7px;cursor:pointer;}
+  .tool-btn:disabled{opacity:0.4;cursor:default;}
+  .chart-quarter-nav{display:flex;align-items:center;justify-content:space-between;gap:0.4rem;margin-top:0.6rem;}
+  .chart-quarter-label{font-size:0.7rem;color:var(--slate);font-weight:600;text-align:center;flex:1;}
   main{max-width:640px;margin:0 auto;padding:1rem 1rem 3rem;}
   .day-banner{background:#FFFFFF !important;border:2px solid var(--pine) !important;border-radius:8px;padding:0.55rem 0.75rem;margin-bottom:0.8rem;font-size:0.76rem;color:var(--pine) !important;font-weight:600;}
   .pill-row{display:flex;gap:0.35rem;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:0.7rem;padding-bottom:0.15rem;}
@@ -607,6 +610,12 @@ function backfillExerciseDefaults(){
 }
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
+// Bumped by hand with each shipped change — v23 picks up the count from this
+// file's git history (22 prior commits touching index.html at the time this
+// was added), so it keeps counting forward rather than restarting at v1.
+const APP_VERSION = "v23";
+const APP_UPDATED = "Sep 17, 2026";
+
 // ---------- state ----------
 let data = loadSaved() || JSON.parse(JSON.stringify(SEED));
 ensureClientIds();
@@ -621,6 +630,7 @@ let lastSessionExpanded = false;
 let volumeExpanded = false;
 let openHistory = {};
 let openStretchItems = {};
+let chartQuarterOffset = {};
 let editingKey = null;
 let deletingKey = null;
 let editing1RM = null;
@@ -1313,7 +1323,7 @@ function renderExerciseCard(name, ex){
     }
 
     html += recHtml;
-    html += renderChart(ex, suggestion, true);
+    html += renderChart(ex, suggestion, true, name);
   }
 
   html += renderForm(name, ex);
@@ -1560,13 +1570,65 @@ function computeDeloadFlags(ex){
   return flags;
 }
 
+// ---------- chart quarters (calendar-aligned: Q1 Jan-Mar ... Q4 Oct-Dec) ----------
+const QUARTER_MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function currentQuarterIndex(){
+  const d = new Date();
+  return d.getFullYear() * 4 + Math.floor(d.getMonth() / 3);
+}
+function quarterFromIndex(qIndex){
+  const year = Math.floor(qIndex / 4);
+  const q = qIndex - year * 4;
+  return { year, q };
+}
+function quarterDateRange(qIndex){
+  const { year, q } = quarterFromIndex(qIndex);
+  const startMonth = q * 3;
+  const start = new Date(Date.UTC(year, startMonth, 1));
+  const end = new Date(Date.UTC(year, startMonth + 3, 0, 23, 59, 59, 999));
+  return { start, end, year, q };
+}
+function dateInQuarter(dateStr, qIndex){
+  if(!dateStr) return false;
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const t = Date.UTC(y, m - 1, d);
+  const { start, end } = quarterDateRange(qIndex);
+  return t >= start.getTime() && t <= end.getTime();
+}
+function fmtQuarterRange(qIndex){
+  const { start, end, year, q } = quarterDateRange(qIndex);
+  const s = `${QUARTER_MONTH_ABBR[start.getUTCMonth()]} ${start.getUTCDate()}`;
+  const e = `${QUARTER_MONTH_ABBR[end.getUTCMonth()]} ${end.getUTCDate()}`;
+  return `Q${q + 1} ${year} · ${s} – ${e}`;
+}
+function shiftChartQuarter(chartKey, delta){
+  chartQuarterOffset[chartKey] = (chartQuarterOffset[chartKey] || 0) + delta;
+  render();
+}
+
 // ---------- chart (pure inline SVG, no external library) ----------
-function renderChart(ex, suggestion, isRealExercise){
+function renderChart(ex, suggestion, isRealExercise, chartKey){
   const W = 320, H = 130, padR = 14, padT = 10, padB = 20;
   const entries = ex.entries;
-  const points = entries.map((e,i) => ({ x:i, y: chartValue(e, ex), entry:e }));
-  const deloadFlags = isRealExercise ? computeDeloadFlags(ex) : new Array(entries.length).fill(false);
-  const hasProjection = !!suggestion;
+  const deloadFlagsFull = isRealExercise ? computeDeloadFlags(ex) : new Array(entries.length).fill(false);
+
+  const offset = chartQuarterOffset[chartKey] || 0;
+  const qIndex = currentQuarterIndex() + offset;
+  const points = entries
+    .map((e, i) => ({ x: i, y: chartValue(e, ex), entry: e, deload: deloadFlagsFull[i] }))
+    .filter(p => dateInQuarter(p.entry.date, qIndex));
+  const deloadFlags = points.map(p => p.deload);
+
+  let nav = `<div class="chart-quarter-nav">
+    <button class="tool-btn" onclick="shiftChartQuarter('${chartKey.replace(/'/g,"\\'")}', -1)">‹ Prev</button>
+    <span class="chart-quarter-label">${fmtQuarterRange(qIndex)}</span>
+    <button class="tool-btn" ${offset >= 0 ? "disabled" : ""} onclick="shiftChartQuarter('${chartKey.replace(/'/g,"\\'")}', 1)">Next ›</button>
+  </div>`;
+  if(!points.length){
+    return nav + `<p style="font-size:0.76rem;color:var(--slate);font-style:italic;margin:0.4rem 0 0;">No sessions logged this quarter.</p>`;
+  }
+
+  const hasProjection = !!suggestion && offset === 0;
   const projY = hasProjection ? suggestionValue(suggestion, ex) : null;
 
   const allY = points.map(p=>p.y).concat(hasProjection ? [projY] : []);
@@ -1649,7 +1711,7 @@ function renderChart(ex, suggestion, isRealExercise){
   }
 
   svg += `</svg>`;
-  return svg;
+  return nav + svg;
 }
 
 // ---------- overview ----------
@@ -1979,7 +2041,7 @@ function renderOverview(){
           ${history.length ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.76rem;color:var(--slate);">${history[history.length-1].weight.toLocaleString()} lbs last session</span>` : ''}
         </div>`;
       if(history.length){
-        html += renderChart({ trackBy:"weight", entries: history }, null);
+        html += renderChart({ trackBy:"weight", entries: history }, null, false, "volume:" + day);
       } else {
         html += `<p style="font-size:0.78rem;color:var(--slate);font-style:italic;margin:0.3rem 0 0;">No sessions logged yet.</p>`;
       }
@@ -2035,6 +2097,8 @@ function renderOverview(){
   </div>`;
 
   html += renderBackupSyncCard();
+
+  html += `<p class="save-note">${APP_VERSION} · Last updated ${APP_UPDATED}</p>`;
 
   app.innerHTML = html;
 }
