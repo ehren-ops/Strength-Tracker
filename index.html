@@ -11,100 +11,132 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
   :root{
     color-scheme: light;
     --pine:#1F2B22; --pine-2:#2A3B2C; --stone:#F1EFE7; --card:#FBFAF6;
     --amber:#C97A2B; --amber-light:#E3A45F; --slate:#5B675C; --ink:#1B211C; --line:#DEDACB;
     --emerald:#0F6B4A;
+    --accent-2:#1F2B22; --header-text:#F1EFE7; --header-muted:#C9D4C6;
+    --tab-bg:rgba(255,255,255,0.06); --tab-border:rgba(255,255,255,0.18);
+    --log-btn-bg:#1F2B22; --log-btn-text:#F1EFE7; --surface:#FFFFFF; --input-bg:#FFFFFF;
+    --sync-muted:#9FB09A; --danger:#B3261E;
+    --rec-bg:#FBF1E1; --rec-text:#5C3A0F; --rec-headline:#4A2E0A;
+    --panel-soft:#F7F4EC; --panel-soft-active:#F0EBDF; --hairline:#F0EDE2; --track-bg:#EFEBDF;
+    --chart-grid:#E7E2D6; --chart-axis:#78716C; --chart-line:#C2761A; --chart-label-halo:#FBFAF6;
+    --chart-white:#fff; --chart-under:#D32F2F; --chart-missed:#6B1F1F; --chart-extra:#0B4F37;
+    --ski:#1565C0; --ski-bg:#E3F0FC; --ski-border:#BBD9F5; --ski-text:#0D47A1;
+    --knee:#B3660A; --knee-bg:#FFF3E0; --knee-border:#F0C889; --knee-text:#7A4A0A;
+    --back:#8C2F39; --back-bg:#FBEAEA; --back-border:#E3B3B8; --back-text:#6B1F26;
+    --font-display:'Fjalla One',sans-serif; --font-body:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --pine:#150c26; --pine-2:#05030a; --stone:#050308; --card:#0e0a1a;
+    --amber:#ff2d95; --amber-light:#ff8fc7; --slate:#8f80c2; --ink:#f2eefc; --line:#3a2560;
+    --emerald:#00f0ff;
+    --accent-2:#b967ff; --header-text:#f2eefc; --header-muted:#b8adde;
+    --tab-bg:rgba(0,240,255,0.08); --tab-border:rgba(0,240,255,0.25);
+    --log-btn-bg:linear-gradient(90deg,#ff2d95,#b967ff 50%,#00f0ff); --log-btn-text:#050308;
+    --surface:#150c26; --input-bg:#150c26;
+    --sync-muted:#6a5d94; --danger:#ff2054;
+    --rec-bg:rgba(185,103,255,0.10); --rec-text:#d8cff2; --rec-headline:#fee440;
+    --panel-soft:#150c26; --panel-soft-active:#1c1430; --hairline:#241a3a; --track-bg:#1c1430;
+    --chart-grid:#241a3a; --chart-axis:#6a5d94; --chart-line:#00f0ff; --chart-label-halo:#0e0a1a;
+    --chart-white:#050308; --chart-under:#b967ff; --chart-missed:#ff2d95; --chart-extra:#fee440;
+    --ski:#b967ff; --ski-bg:rgba(185,103,255,0.12); --ski-border:#b967ff; --ski-text:#e0c8ff;
+    --knee:#fee440; --knee-bg:rgba(254,228,64,0.12); --knee-border:#fee440; --knee-text:#fee440;
+    --back:#ff3860; --back-bg:rgba(255,56,96,0.12); --back-border:#ff3860; --back-text:#ff8fa3;
+    --font-display:'Orbitron',sans-serif; --font-body:'Rajdhani',sans-serif; --font-mono:'Share Tech Mono',monospace;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--stone);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom);}
-  header{background:linear-gradient(180deg,var(--pine) 0%,var(--pine-2) 100%);color:var(--stone);padding:calc(1.4rem + env(safe-area-inset-top)) 1.1rem 1.1rem;}
-  header h1{font-family:'Fjalla One',sans-serif;font-weight:400;letter-spacing:0.03em;font-size:1.7rem;margin:0 0 0.2rem;text-transform:uppercase;}
-  header p{margin:0;color:#C9D4C6;font-size:0.85rem;}
-  .sync-status{margin-top:0.4rem !important;font-size:0.68rem !important;color:#9FB09A !important;font-family:'IBM Plex Mono',monospace;}
-  .celebration-banner{position:fixed;top:0;left:0;right:0;z-index:50;background:var(--emerald);color:#fff;text-align:center;padding:calc(0.7rem + env(safe-area-inset-top)) 1rem 0.7rem;font-weight:700;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.25);}
+  body{margin:0;background:var(--stone);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom);}
+  header{background:linear-gradient(180deg,var(--pine) 0%,var(--pine-2) 100%);color:var(--header-text);padding:calc(1.4rem + env(safe-area-inset-top)) 1.1rem 1.1rem;}
+  header h1{font-family:var(--font-display);font-weight:400;letter-spacing:0.03em;font-size:1.7rem;margin:0 0 0.2rem;text-transform:uppercase;}
+  header p{margin:0;color:var(--header-muted);font-size:0.85rem;}
+  .sync-status{margin-top:0.4rem !important;font-size:0.68rem !important;color:var(--sync-muted) !important;font-family:var(--font-mono);}
+  .celebration-banner{position:fixed;top:0;left:0;right:0;z-index:50;background:var(--emerald);color:var(--chart-white);text-align:center;padding:calc(0.7rem + env(safe-area-inset-top)) 1rem 0.7rem;font-weight:700;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.25);}
   .tabs{display:flex;gap:0.35rem;margin-top:0.9rem;flex-wrap:wrap;}
-  .tab{flex:1;min-width:64px;display:flex;align-items:center;justify-content:center;text-align:center;padding:0.5rem 0.3rem;border-radius:7px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);color:#C9D4C6;font-size:0.74rem;font-weight:600;cursor:pointer;}
+  .tab{flex:1;min-width:64px;display:flex;align-items:center;justify-content:center;text-align:center;padding:0.5rem 0.3rem;border-radius:7px;background:var(--tab-bg);border:1px solid var(--tab-border);color:var(--header-muted);font-size:0.74rem;font-weight:600;cursor:pointer;}
   .tab.active{background:var(--amber);border-color:var(--amber);color:#1B211C;}
   .header-tools{display:flex;gap:0.4rem;margin-top:0.7rem;}
-  .tool-btn{background:#FFFFFF;border:1px solid var(--line);color:var(--slate);font-size:0.72rem;font-weight:600;padding:0.4rem 0.7rem;border-radius:7px;cursor:pointer;}
+  .tool-btn{background:var(--surface);border:1px solid var(--line);color:var(--slate);font-size:0.72rem;font-weight:600;padding:0.4rem 0.7rem;border-radius:7px;cursor:pointer;}
   .tool-btn:disabled{opacity:0.4;cursor:default;}
   .chart-quarter-nav{display:flex;align-items:center;justify-content:space-between;gap:0.4rem;margin-top:0.6rem;}
   .chart-quarter-label{font-size:0.7rem;color:var(--slate);font-weight:600;text-align:center;flex:1;}
   main{max-width:640px;margin:0 auto;padding:1rem 1rem 3rem;}
-  .day-banner{background:#FFFFFF !important;border:2px solid var(--pine) !important;border-radius:8px;padding:0.55rem 0.75rem;margin-bottom:0.8rem;font-size:0.76rem;color:var(--pine) !important;font-weight:600;}
+  .day-banner{background:var(--surface) !important;border:2px solid var(--accent-2) !important;border-radius:8px;padding:0.55rem 0.75rem;margin-bottom:0.8rem;font-size:0.76rem;color:var(--accent-2) !important;font-weight:600;}
   .pill-row{display:flex;gap:0.35rem;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:0.7rem;padding-bottom:0.15rem;}
-  .pill{flex:0 0 auto;font-size:0.7rem;padding:0.35rem 0.6rem;border-radius:7px;font-weight:500;cursor:pointer;background:#fff;border:1px solid var(--line);color:var(--slate);white-space:nowrap;}
+  .pill{flex:0 0 auto;font-size:0.7rem;padding:0.35rem 0.6rem;border-radius:7px;font-weight:500;cursor:pointer;background:var(--surface);border:1px solid var(--line);color:var(--slate);white-space:nowrap;}
   .pill-add{font-weight:700;padding:0.35rem 0.65rem;color:var(--amber);border-color:var(--amber-light);}
   .pill.active{background:var(--amber);border-color:var(--amber);color:#fff;}
   .pill.logged-today:not(.active){opacity:0.55;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:0.7rem;}
-  .ex-name{font-family:'Fjalla One',sans-serif;font-size:1.1rem;text-transform:uppercase;color:var(--pine);margin:0 0 0.6rem;}
-  .big-val{font-family:'IBM Plex Mono',monospace;font-size:1.7rem;font-weight:600;}
-  .delta{font-family:'IBM Plex Mono',monospace;font-size:0.82rem;font-weight:600;}
-  .delta-line{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;font-weight:600;margin-top:0.2rem;}
-  .plate-line{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--slate);margin-top:0.15rem;}
+  .ex-name{font-family:var(--font-display);font-size:1.1rem;text-transform:uppercase;color:var(--accent-2);margin:0 0 0.6rem;}
+  .big-val{font-family:var(--font-mono);font-size:1.7rem;font-weight:600;}
+  .delta{font-family:var(--font-mono);font-size:0.82rem;font-weight:600;}
+  .delta-line{font-family:var(--font-mono);font-size:0.78rem;font-weight:600;margin-top:0.2rem;}
+  .plate-line{font-family:var(--font-mono);font-size:0.72rem;color:var(--slate);margin-top:0.15rem;}
   .weight-row{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem 0.9rem;}
   .weight-main{display:flex;align-items:baseline;flex-wrap:wrap;gap:0.4rem;}
   .onerm-box{text-align:right;flex-shrink:0;cursor:pointer;}
   .onerm-label{display:block;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);white-space:nowrap;}
-  .onerm-val{font-family:'IBM Plex Mono',monospace;font-size:0.85rem;font-weight:700;color:var(--ink);white-space:nowrap;}
+  .onerm-val{font-family:var(--font-mono);font-size:0.85rem;font-weight:700;color:var(--ink);white-space:nowrap;}
   .onerm-edit{display:flex;align-items:center;gap:0.25rem;}
-  .onerm-edit input{width:58px;padding:0.2rem 0.35rem;border:1px solid var(--line);border-radius:5px;font-size:0.85rem;}
-  .rec-box{margin-top:0.7rem;background:#FBF1E1;border:1px solid var(--amber-light);border-radius:8px;padding:0.65rem 0.75rem;color:#5C3A0F;}
-  .rec-headline{font-family:'IBM Plex Mono',monospace;font-size:0.85rem;font-weight:700;margin-bottom:0.3rem;color:#4A2E0A;white-space:nowrap;overflow-x:auto;}
+  .onerm-edit input{width:58px;padding:0.2rem 0.35rem;border:1px solid var(--line);border-radius:5px;font-size:0.85rem;background:var(--input-bg);color:var(--ink);}
+  .rec-box{margin-top:0.7rem;background:var(--rec-bg);border:1px solid var(--amber-light);border-radius:8px;padding:0.65rem 0.75rem;color:var(--rec-text);}
+  .rec-headline{font-family:var(--font-mono);font-size:0.85rem;font-weight:700;margin-bottom:0.3rem;color:var(--rec-headline);white-space:nowrap;overflow-x:auto;}
   .rec-desc{font-size:0.76rem;line-height:1.35;max-width:100%;}
-  .rec-desc b{font-family:'IBM Plex Mono',monospace;}
-  .progression-btn{display:inline-block;background:#fff;border:1px solid var(--line);color:var(--slate);font-size:0.72rem;font-weight:600;padding:0.4rem 0.7rem;border-radius:7px;cursor:pointer;}
-  .progression-btn:active{background:#F7F4EC;}
+  .rec-desc b{font-family:var(--font-mono);}
+  .progression-btn{display:inline-block;background:var(--surface);border:1px solid var(--line);color:var(--slate);font-size:0.72rem;font-weight:600;padding:0.4rem 0.7rem;border-radius:7px;cursor:pointer;}
+  .progression-btn:active{background:var(--panel-soft);}
   .action-row{display:flex;gap:0.8rem;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:0.7rem;}
   svg.chart{width:100%;height:150px;display:block;margin-top:0.6rem;}
   .form-row{display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;}
   .field{flex:1 1 60px;}
   .field label{display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);margin-bottom:0.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .field input{width:100%;padding:0.45rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;}
+  .field input{width:100%;padding:0.45rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--ink);}
   .field input:focus{outline:2px solid var(--amber-light);border-color:var(--amber);}
-  button.log{margin-top:0.7rem;width:100%;background:var(--pine);color:var(--stone);border:none;border-radius:7px;padding:0.6rem;font-weight:600;font-size:0.85rem;cursor:pointer;transition:background-color 0.4s ease;}
+  button.log{margin-top:0.7rem;width:100%;background:var(--log-btn-bg);color:var(--log-btn-text);border:none;border-radius:7px;padding:0.6rem;font-weight:600;font-size:0.85rem;cursor:pointer;transition:background-color 0.4s ease;}
   button.log.log-confirmed{background:var(--emerald);}
   .date-row{margin-top:0.6rem;display:flex;flex-direction:column;align-items:stretch;}
   .date-row label{display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);margin-bottom:0.2rem;}
-  .date-row input{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;padding:0.45rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;}
+  .date-row input{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;padding:0.45rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--ink);}
   input[type="date"]{display:block !important;width:100% !important;max-width:100% !important;min-width:0 !important;box-sizing:border-box !important;-webkit-appearance:none !important;appearance:none !important;}
+  :root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.85);}
   input, select, textarea{font-size:16px !important;}
   button.log:active{background:var(--amber);color:#1B211C;}
   .hist-toggle{background:none;border:none;padding:0;margin-top:0.6rem;font-size:0.74rem;color:var(--amber);font-weight:600;text-decoration:underline;cursor:pointer;}
   .hist{display:none;margin-top:0.5rem;border-top:1px dashed var(--line);padding-top:0.5rem;}
   .hist.open{display:block;}
-  .hist-row{display:grid;grid-template-columns:70px 100px 54px 1fr;column-gap:0.5rem;align-items:baseline;font-size:0.76rem;padding:0.22rem 0;font-family:'IBM Plex Mono',monospace;color:var(--slate);border-bottom:1px solid #F0EDE2;}
+  .hist-row{display:grid;grid-template-columns:70px 100px 54px 1fr;column-gap:0.5rem;align-items:baseline;font-size:0.76rem;padding:0.22rem 0;font-family:var(--font-mono);color:var(--slate);border-bottom:1px solid var(--hairline);}
   .hist-session-label{font-size:0.62rem;color:var(--amber-light);}
   .hist-row:last-child{border-bottom:none;}
   .hist-row .exact{color:var(--ink);text-align:left;}
-  .hist-row.header{font-family:'IBM Plex Sans',sans-serif;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);font-weight:600;border-bottom:1px solid var(--line);padding-bottom:0.3rem;}
-  .hist-row.latest{background:#FBF1E1;border-radius:4px;padding-left:0.3rem;margin-left:-0.3rem;}
+  .hist-row.header{font-family:var(--font-body);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);font-weight:600;border-bottom:1px solid var(--line);padding-bottom:0.3rem;}
+  .hist-row.latest{background:var(--rec-bg);border-radius:4px;padding-left:0.3rem;margin-left:-0.3rem;}
   .hist-row.latest .exact{font-weight:600;}
-  .latest-tag{font-family:'IBM Plex Sans',sans-serif;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--amber);font-weight:700;}
+  .latest-tag{font-family:var(--font-body);font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--amber);font-weight:700;}
   .note{font-size:0.68rem;color:var(--amber);font-style:italic;margin-left:0.4rem;}
   .est{color:var(--amber-light);}
   .add-ex-row{display:flex;gap:0.4rem;margin-bottom:0.8rem;}
-  .add-ex-row input{flex:1;padding:0.4rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.85rem;}
-  .add-ex-row button{background:var(--pine);color:#fff;border:none;border-radius:6px;padding:0.4rem 0.8rem;font-size:0.8rem;}
+  .add-ex-row input{flex:1;padding:0.4rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.85rem;background:var(--input-bg);color:var(--ink);}
+  .add-ex-row button{background:var(--accent-2);color:#fff;border:none;border-radius:6px;padding:0.4rem 0.8rem;font-size:0.8rem;}
   .ov-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin-bottom:0.8rem;text-align:center;}
-  .ov-grid .n{font-family:'IBM Plex Mono',monospace;font-size:1.2rem;font-weight:600;}
+  .ov-grid .n{font-family:var(--font-mono);font-size:1.2rem;font-weight:600;}
   .ov-grid .l{font-size:0.68rem;color:var(--slate);}
   .bar-row{margin-bottom:0.55rem;}
   .bar-row .top{display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:0.2rem;}
-  .bar-track{height:6px;background:#EFEBDF;border-radius:3px;overflow:hidden;}
+  .bar-track{height:6px;background:var(--track-bg);border-radius:3px;overflow:hidden;}
   .bar-fill{height:100%;border-radius:3px;}
   .save-note{text-align:center;font-size:0.7rem;color:var(--slate);margin-top:1rem;}
   h3.section{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);margin:0 0 0.6rem;}
   .row-actions{display:inline-flex;gap:0.3rem;margin-left:0.4rem;}
   .icon-btn{background:none;border:none;color:var(--slate);font-size:0.78rem;cursor:pointer;padding:0 0.15rem;}
   .icon-btn:hover{color:var(--amber);}
-  .hist-edit-box{background:#F7F4EC;border:1px solid var(--line);border-radius:8px;padding:0.6rem;margin:0.3rem 0;}
-  .stretch-item{border-bottom:1px solid #F0EDE2;padding:0.55rem 0;}
+  .hist-edit-box{background:var(--panel-soft);border:1px solid var(--line);border-radius:8px;padding:0.6rem;margin:0.3rem 0;}
+  .stretch-item{border-bottom:1px solid var(--hairline);padding:0.55rem 0;}
   .stretch-item:last-child{border-bottom:none;}
   .stretch-row{display:flex;align-items:center;gap:0.5rem;}
   .stretch-check{display:flex;align-items:center;gap:0.5rem;flex:1;cursor:pointer;min-width:0;}
@@ -113,40 +145,45 @@
   .stretch-item.done .stretch-name{color:var(--slate);text-decoration:line-through;}
   .stretch-dose{font-size:0.72rem;color:var(--slate);white-space:nowrap;}
   .stretch-toggle{background:none;border:none;color:var(--amber);font-size:0.8rem;cursor:pointer;padding:0.2rem 0.4rem;flex-shrink:0;}
-  .stretch-detail{margin-top:0.4rem;padding:0.5rem 0.6rem;background:#F7F4EC;border-radius:8px;font-size:0.78rem;line-height:1.4;color:var(--ink);}
+  .stretch-detail{margin-top:0.4rem;padding:0.5rem 0.6rem;background:var(--panel-soft);border-radius:8px;font-size:0.78rem;line-height:1.4;color:var(--ink);}
   .stretch-detail p{margin:0 0 0.4rem;}
   .stretch-detail p:last-child{margin-bottom:0;}
   .stretch-variation{color:var(--slate);}
   .edit-actions{display:flex;gap:0.4rem;margin-top:0.5rem;}
-  .save-btn{background:var(--pine);color:#fff;border:none;border-radius:6px;padding:0.4rem 0.8rem;font-size:0.78rem;font-weight:600;cursor:pointer;}
-  .cancel-btn{background:#fff;border:1px solid var(--line);color:var(--slate);border-radius:6px;padding:0.4rem 0.8rem;font-size:0.78rem;cursor:pointer;}
-  .danger-btn{background:#B3261E;color:#fff;border:none;border-radius:6px;padding:0.3rem 0.6rem;font-size:0.76rem;font-weight:600;cursor:pointer;}
+  .save-btn{background:var(--accent-2);color:#fff;border:none;border-radius:6px;padding:0.4rem 0.8rem;font-size:0.78rem;font-weight:600;cursor:pointer;}
+  .cancel-btn{background:var(--surface);border:1px solid var(--line);color:var(--slate);border-radius:6px;padding:0.4rem 0.8rem;font-size:0.78rem;cursor:pointer;}
+  .danger-btn{background:var(--danger);color:#fff;border:none;border-radius:6px;padding:0.3rem 0.6rem;font-size:0.76rem;font-weight:600;cursor:pointer;}
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
   .cal-header div{text-align:center;font-size:0.6rem;color:var(--slate);font-weight:700;text-transform:uppercase;padding-bottom:0.3rem;}
   .cal-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;position:relative;}
   .cal-cell.empty{visibility:hidden;}
-  .cal-cell.has-session{cursor:pointer;background:#F7F4EC;}
-  .cal-cell.has-session:active{background:#F0EBDF;}
-  .cal-cell.today{box-shadow:inset 0 0 0 1.5px var(--pine);}
+  .cal-cell.has-session{cursor:pointer;background:var(--panel-soft);}
+  .cal-cell.has-session:active{background:var(--panel-soft-active);}
+  .cal-cell.today{box-shadow:inset 0 0 0 1.5px var(--accent-2);}
   .cal-cell.selected{box-shadow:inset 0 0 0 1.5px var(--amber);}
-  .cal-daynum{font-family:'IBM Plex Mono',monospace;font-size:0.66rem;color:var(--ink);}
+  .cal-daynum{font-family:var(--font-mono);font-size:0.66rem;color:var(--ink);}
   .cal-badge{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;border-radius:4px;color:#fff;font-size:0.58rem;font-weight:700;text-align:center;margin-top:1px;padding:0 2px;}
   .cal-detail{margin-top:0.7rem;padding-top:0.55rem;border-top:1px dashed var(--line);}
-  .session-row{display:grid;grid-template-columns:1fr 110px 34px;column-gap:0.5rem;align-items:baseline;font-size:0.78rem;padding:0.18rem 0;font-family:'IBM Plex Mono',monospace;color:var(--slate);}
-  .session-row span:first-child{color:var(--ink);font-family:'IBM Plex Sans',sans-serif;font-weight:500;}
+  .session-row{display:grid;grid-template-columns:1fr 110px 34px;column-gap:0.5rem;align-items:baseline;font-size:0.78rem;padding:0.18rem 0;font-family:var(--font-mono);color:var(--slate);}
+  .session-row span:first-child{color:var(--ink);font-family:var(--font-body);font-weight:500;}
   .session-row .exact{color:var(--ink);}
   .cal-legend{display:flex;gap:0.7rem;margin-top:0.7rem;font-size:0.68rem;color:var(--slate);flex-wrap:wrap;align-items:center;}
   .cal-legend span{display:flex;align-items:center;gap:0.25rem;}
-  .card.ski-mode{border-color:#1565C0;box-shadow:0 0 0 1px rgba(21,101,192,0.18);}
-  .ski-badge{display:inline-block;background:#1565C0;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
-  .ski-tempo-line{font-size:0.76rem;color:#0D47A1;background:#E3F0FC;border:1px solid #BBD9F5;border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
-  .card.knee-mode{border-color:#B3660A;box-shadow:0 0 0 1px rgba(179,102,10,0.18);}
-  .card.back-mode{border-color:#8C2F39;box-shadow:0 0 0 1px rgba(140,47,57,0.18);}
-  .knee-badge{display:inline-block;background:#B3660A;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
-  .back-badge{display:inline-block;background:#8C2F39;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
+  .card.ski-mode{border-color:var(--ski);box-shadow:0 0 0 1px rgba(21,101,192,0.18);}
+  .ski-badge{display:inline-block;background:var(--ski);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
+  .ski-tempo-line{font-size:0.76rem;color:var(--ski-text);background:var(--ski-bg);border:1px solid var(--ski-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
+  .card.knee-mode{border-color:var(--knee);box-shadow:0 0 0 1px rgba(179,102,10,0.18);}
+  .card.back-mode{border-color:var(--back);box-shadow:0 0 0 1px rgba(140,47,57,0.18);}
+  .knee-badge{display:inline-block;background:var(--knee);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
+  .back-badge{display:inline-block;background:var(--back);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
   .care-line{font-size:0.76rem;border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
-  .knee-care-line{color:#7A4A0A;background:#FFF3E0;border:1px solid #F0C889;}
-  .back-care-line{color:#6B1F26;background:#FBEAEA;border:1px solid #E3B3B8;}
+  .knee-care-line{color:var(--knee-text);background:var(--knee-bg);border:1px solid var(--knee-border);}
+  .back-care-line{color:var(--back-text);background:var(--back-bg);border:1px solid var(--back-border);}
+  .theme-toggle{position:relative;width:52px;height:28px;border-radius:999px;background:var(--line);flex-shrink:0;border:none;cursor:pointer;padding:0;transition:background 0.25s ease;}
+  .theme-toggle .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.25s ease;box-shadow:0 1px 3px rgba(0,0,0,0.3);}
+  .theme-toggle.on{background:linear-gradient(90deg,#ff2d95,#b967ff,#00f0ff);}
+  .theme-toggle.on .knob{left:27px;}
+  :root[data-theme="dark"] .pill.active{color:#050308;}
 </style>
 
 
@@ -613,7 +650,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // Bumped by hand with each shipped change - v23 picks up the count from this
 // file's git history (22 prior commits touching index.html at the time this
 // was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v24";
+const APP_VERSION = "v25";
 const APP_UPDATED = "Sep 17, 2026";
 
 // ---------- state ----------
@@ -646,6 +683,24 @@ const BACK_MODE_KEY = "strength-tracker-back-mode";
 let lowBackCareMode = (function(){
   try{ return window.localStorage.getItem(BACK_MODE_KEY) === "1"; }catch(e){ return false; }
 })();
+// Display preference only, not training data, so this stays local to the
+// device rather than syncing through upsert_settings like the modes above.
+const DARK_MODE_KEY = "strength-tracker-dark-mode";
+let darkMode = (function(){
+  try{ return window.localStorage.getItem(DARK_MODE_KEY) === "1"; }catch(e){ return false; }
+})();
+function applyTheme(){
+  document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+  const meta = document.querySelector('meta[name="color-scheme"]');
+  if(meta) meta.setAttribute("content", darkMode ? "dark" : "light");
+}
+applyTheme();
+function toggleDarkMode(){
+  darkMode = !darkMode;
+  try{ window.localStorage.setItem(DARK_MODE_KEY, darkMode ? "1" : "0"); }catch(e){}
+  applyTheme();
+  render();
+}
 
 function toggleSkiSeason(){
   skiSeasonMode = !skiSeasonMode;
@@ -1653,14 +1708,14 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
   // gridlines + y labels
   tickValues.forEach(v => {
     const y = yAt(v);
-    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#E7E2D6" stroke-width="1"/>`;
-    svg += `<text x="${padL-6}" y="${y+3}" font-size="8" fill="#78716C" text-anchor="end" font-family="IBM Plex Mono, monospace">${v}</text>`;
+    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--chart-grid)" stroke-width="1"/>`;
+    svg += `<text x="${padL-6}" y="${y+3}" font-size="8" fill="var(--chart-axis)" text-anchor="end" font-family="var(--font-mono)">${v}</text>`;
   });
 
   // solid line through actual points
   if(points.length > 1){
     const path = points.map((p,i) => `${i===0?'M':'L'}${xAt(i).toFixed(1)},${yAt(p.y).toFixed(1)}`).join(" ");
-    svg += `<path d="${path}" fill="none" stroke="#C2761A" stroke-width="2.5"/>`;
+    svg += `<path d="${path}" fill="none" stroke="var(--chart-line)" stroke-width="2.5"/>`;
   }
   // dots + x labels for actual points - deload gets a hollow red marker,
   // under 3 sets gets dark red, missed target reps gets red, extra reps/sets
@@ -1677,26 +1732,26 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     function labelWithHalo(text, color){
       const labelY = Math.max(padT + 7, yAt(p.y) - 8);
       const w = text.length * 4.6 + 3;
-      svg += `<rect x="${(xAt(i)-w/2).toFixed(1)}" y="${(labelY-6.5).toFixed(1)}" width="${w.toFixed(1)}" height="9" rx="2" fill="#FBFAF6" opacity="0.85"/>`;
-      svg += `<text x="${xAt(i).toFixed(1)}" y="${labelY.toFixed(1)}" font-size="7.5" fill="${color}" font-weight="700" text-anchor="middle" font-family="IBM Plex Mono, monospace">${text}</text>`;
+      svg += `<rect x="${(xAt(i)-w/2).toFixed(1)}" y="${(labelY-6.5).toFixed(1)}" width="${w.toFixed(1)}" height="9" rx="2" fill="var(--chart-label-halo)" opacity="0.85"/>`;
+      svg += `<text x="${xAt(i).toFixed(1)}" y="${labelY.toFixed(1)}" font-size="7.5" fill="${color}" font-weight="700" text-anchor="middle" font-family="var(--font-mono)">${text}</text>`;
     }
 
     if(isDeload){
-      svg += `<line x1="${xAt(i).toFixed(1)}" y1="${padT}" x2="${xAt(i).toFixed(1)}" y2="${H-padB}" stroke="#B3261E" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>`;
-      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="5" fill="#fff" stroke="#B3261E" stroke-width="2"><title>${titleText}</title></circle>`;
+      svg += `<line x1="${xAt(i).toFixed(1)}" y1="${padT}" x2="${xAt(i).toFixed(1)}" y2="${H-padB}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>`;
+      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="5" fill="var(--chart-white)" stroke="var(--danger)" stroke-width="2"><title>${titleText}</title></circle>`;
     } else if(isUnder){
-      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="#D32F2F"><title>${titleText}</title></circle>`;
-      labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "#D32F2F");
+      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="var(--chart-under)"><title>${titleText}</title></circle>`;
+      labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "var(--chart-under)");
     } else if(isMissed){
-      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="#6B1F1F"><title>${titleText}</title></circle>`;
-      labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "#6B1F1F");
+      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="var(--chart-missed)"><title>${titleText}</title></circle>`;
+      labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "var(--chart-missed)");
     } else if(isExtra){
-      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="#0B4F37"><title>${titleText}</title></circle>`;
-      labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "#0B4F37");
+      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="var(--chart-extra)"><title>${titleText}</title></circle>`;
+      labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "var(--chart-extra)");
     } else {
-      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="#C2761A"><title>${titleText}</title></circle>`;
+      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="var(--chart-line)"><title>${titleText}</title></circle>`;
     }
-    svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'#B3261E':'#78716C'}" text-anchor="middle" font-family="IBM Plex Mono, monospace">${isDeload?'D':p.entry.label}</text>`;
+    svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'var(--danger)':'var(--chart-axis)'}" text-anchor="middle" font-family="var(--font-mono)">${isDeload?'D':p.entry.label}</text>`;
   });
 
   // dashed projection segment
@@ -1704,10 +1759,10 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     const lastP = points[points.length-1];
     const x1 = xAt(points.length-1), y1 = yAt(lastP.y);
     const x2 = xAt(points.length), y2 = yAt(projY);
-    svg += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#C2761A" stroke-width="2" stroke-dasharray="5 4"/>`;
+    svg += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="var(--chart-line)" stroke-width="2" stroke-dasharray="5 4"/>`;
     const projLabel = ex.trackBy==="weight" ? `${suggestion.weight}lbs ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}` : ex.trackBy==="duration" ? `${suggestion.minutes} min` : repLabel(suggestion.sets,suggestion.reps,ex.unit);
-    svg += `<circle cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="4" fill="#fff" stroke="#C2761A" stroke-width="2"><title>Suggested next: ${projLabel}</title></circle>`;
-    svg += `<text x="${x2.toFixed(1)}" y="${H-4}" font-size="8" fill="#C2761A" text-anchor="middle" font-family="IBM Plex Mono, monospace">Next</text>`;
+    svg += `<circle cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="4" fill="var(--chart-white)" stroke="var(--chart-line)" stroke-width="2"><title>Suggested next: ${projLabel}</title></circle>`;
+    svg += `<text x="${x2.toFixed(1)}" y="${H-4}" font-size="8" fill="var(--chart-line)" text-anchor="middle" font-family="var(--font-mono)">Next</text>`;
   }
 
   svg += `</svg>`;
@@ -1739,7 +1794,7 @@ function getSessionsByDate(){
 
 const CAL_MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const CAL_DAY_LETTERS = { full:"F", upper:"U", lower:"L", extra:"E" };
-const CAL_DAY_COLORS = { full:"var(--pine)", upper:"var(--amber)", lower:"var(--emerald)", extra:"var(--slate)" };
+const CAL_DAY_COLORS = { full:"var(--accent-2)", upper:"var(--amber)", lower:"var(--emerald)", extra:"var(--slate)" };
 
 function prevMonth(){
   calendarMonth--;
@@ -1817,7 +1872,7 @@ function renderCalendar(){
         const ex = data[n];
         const entry = ex.entries.slice().reverse().find(e => e.date === calendarSelectedDate);
         if(entry){
-          html += `<div style="font-size:0.78rem;color:var(--slate);font-family:'IBM Plex Mono',monospace;">${n} - ${formatEntryValue(entry, ex)}</div>`;
+          html += `<div style="font-size:0.78rem;color:var(--slate);font-family:var(--font-mono);">${n} - ${formatEntryValue(entry, ex)}</div>`;
         }
       });
       html += `</div>`;
@@ -1833,9 +1888,9 @@ function renderCalendar(){
 
   const recovery = computeRecoveryReadiness();
   if(recovery){
-    const readinessColor = recovery.readiness >= 7 ? "var(--emerald)" : recovery.readiness >= 4 ? "var(--amber)" : "#B3261E";
+    const readinessColor = recovery.readiness >= 7 ? "var(--emerald)" : recovery.readiness >= 4 ? "var(--amber)" : "var(--danger)";
     html += `<p style="font-size:0.76rem;color:var(--slate);margin:0.6rem 0 0;padding-top:0.5rem;border-top:1px dashed var(--line);">
-      Recovery readiness: <b style="color:${readinessColor};font-family:'IBM Plex Mono',monospace;">${recovery.readiness}/10</b>
+      Recovery readiness: <b style="color:${readinessColor};font-family:var(--font-mono);">${recovery.readiness}/10</b>
       - ${recovery.daysSince} day${recovery.daysSince===1?'':'s'} rested${recovery.neededRestDays > 0 ? `, ~${recovery.neededRestDays} more suggested` : ', should be ready'}
     </p>`;
   }
@@ -1981,7 +2036,7 @@ function renderOverview(){
 
   let html = "";
   if(coachNotes){
-    html += `<div class="card" style="border-color:var(--amber-light);background:#FFFCF6;">
+    html += `<div class="card" style="border-color:var(--amber-light);background:var(--rec-bg);">
       <h3 class="section" style="color:var(--amber);">🎯 Coach's Notes</h3>
       <p style="font-size:0.85rem;line-height:1.5;color:var(--ink);margin:0;">${coachNotes}</p>
       ${renderLastSessionBreakdown()}
@@ -2038,7 +2093,7 @@ function renderOverview(){
       html += `<div style="margin-top:0.9rem;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
           <span style="font-weight:600;font-size:0.85rem;">${DAY_TITLES[day]}</span>
-          ${history.length ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.76rem;color:var(--slate);">${history[history.length-1].weight.toLocaleString()} lbs last session</span>` : ''}
+          ${history.length ? `<span style="font-family:var(--font-mono);font-size:0.76rem;color:var(--slate);">${history[history.length-1].weight.toLocaleString()} lbs last session</span>` : ''}
         </div>`;
       if(history.length){
         html += renderChart({ trackBy:"weight", entries: history }, null, false, "volume:" + day);
@@ -2059,7 +2114,7 @@ function renderOverview(){
       const width = Math.min(Math.abs(o.pct),100);
       const freq = frequencyLabel(data[o.name]);
       html += `<div class="bar-row">
-        <div class="top"><span style="font-weight:500;">${o.name}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:${color};">${o.pct>0?'+':''}${o.pct.toFixed(0)}% · ${o.firstVal}→${o.lastVal}${o.trackBy==='weight'?'lbs':' reps'}</span></div>
+        <div class="top"><span style="font-weight:500;">${o.name}</span><span style="font-family:var(--font-mono);font-size:0.72rem;color:${color};">${o.pct>0?'+':''}${o.pct.toFixed(0)}% · ${o.firstVal}→${o.lastVal}${o.trackBy==='weight'?'lbs':' reps'}</span></div>
         <div class="bar-track"><div class="bar-fill" style="width:${width}%;background:${color};"></div></div>
         ${freq ? `<div style="font-size:0.66rem;color:var(--slate);margin-top:0.15rem;">${freq}</div>` : ''}
       </div>`;
@@ -2073,7 +2128,7 @@ function renderOverview(){
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
         🎿 Squat, Bulgarian Split Squat, and Walking Lunge shift to lower rep targets with a slower eccentric tempo and more single-leg emphasis. Roughly Nov-March.
       </p>
-      <button class="tool-btn" onclick="toggleSkiSeason()" style="background:${skiSeasonMode ? '#1565C0' : ''};color:${skiSeasonMode ? '#fff' : ''};border-color:${skiSeasonMode ? '#1565C0' : ''};">
+      <button class="tool-btn" onclick="toggleSkiSeason()" style="background:${skiSeasonMode ? 'var(--ski)' : ''};color:${skiSeasonMode ? '#fff' : ''};border-color:${skiSeasonMode ? 'var(--ski)' : ''};">
         ${skiSeasonMode ? '🎿 Ski Season: ON' : '🎿 Ski Season: OFF'}
       </button>
     </div>
@@ -2081,7 +2136,7 @@ function renderOverview(){
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
         🦵 Squat, Bulgarian Split Squat, and Walking Lunge hold and cut load ~10% while your knee settles down. Everything else trains as normal.
       </p>
-      <button class="tool-btn" onclick="toggleKneeCareMode()" style="background:${kneeCareMode ? '#B3660A' : ''};color:${kneeCareMode ? '#fff' : ''};border-color:${kneeCareMode ? '#B3660A' : ''};">
+      <button class="tool-btn" onclick="toggleKneeCareMode()" style="background:${kneeCareMode ? 'var(--knee)' : ''};color:${kneeCareMode ? '#fff' : ''};border-color:${kneeCareMode ? 'var(--knee)' : ''};">
         ${kneeCareMode ? '🦵 Knee Care: ON' : '🦵 Knee Care: OFF'}
       </button>
     </div>
@@ -2089,7 +2144,7 @@ function renderOverview(){
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
         🩺 Squat, RDL, Barbell Row, and Kettlebell Swings hold and cut load ~10% while your lower back settles down. Everything else trains as normal.
       </p>
-      <button class="tool-btn" onclick="toggleLowBackCareMode()" style="background:${lowBackCareMode ? '#8C2F39' : ''};color:${lowBackCareMode ? '#fff' : ''};border-color:${lowBackCareMode ? '#8C2F39' : ''};">
+      <button class="tool-btn" onclick="toggleLowBackCareMode()" style="background:${lowBackCareMode ? 'var(--back)' : ''};color:${lowBackCareMode ? '#fff' : ''};border-color:${lowBackCareMode ? 'var(--back)' : ''};">
         ${lowBackCareMode ? '🩺 Low Back Care: ON' : '🩺 Low Back Care: OFF'}
       </button>
     </div>
@@ -2133,6 +2188,18 @@ function renderBackupSyncCard(){
     <input type="file" id="restore-input" accept="application/json" style="display:none" onchange="restoreData(event)">
   </div>`;
   html += `<p id="card-status" style="font-size:0.68rem;color:var(--slate);margin-top:0.5rem;"></p>`;
+
+  html += `<div style="border-top:1px dashed var(--line);padding-top:0.7rem;margin-top:0.7rem;">
+    <h3 class="section">Appearance</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.7rem;">
+      <div>
+        <div style="font-size:0.85rem;font-weight:600;">Neon Dark Mode</div>
+        <div style="font-size:0.68rem;color:var(--slate);margin-top:0.1rem;">80s high-contrast theme, everywhere in the app.</div>
+      </div>
+      <button class="theme-toggle${darkMode ? ' on' : ''}" onclick="toggleDarkMode()" aria-label="Toggle dark mode" aria-pressed="${darkMode}"><span class="knob"></span></button>
+    </div>
+  </div>`;
+
   html += `</div>`;
   return html;
 }
