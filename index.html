@@ -650,7 +650,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // Bumped by hand with each shipped change - v23 picks up the count from this
 // file's git history (22 prior commits touching index.html at the time this
 // was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v25";
+const APP_VERSION = "v26";
 const APP_UPDATED = "Sep 17, 2026";
 
 // ---------- state ----------
@@ -1334,25 +1334,40 @@ function renderExerciseCard(name, ex){
       let nextLabel;
       if(ex.trackBy === "weight"){
         nextLabel = `${suggestion.weight} lbs ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}`;
+        // When the prior session's actual reps beat the target, call that out by
+        // name with the real number instead of flattening it to a plain "hit
+        // target" - going over is a stronger, more specific signal than a bare hit.
+        const wentOverTarget = suggestion.hitTarget && !suggestion.deload && last.reps > suggestion.reps;
+        const actualAmt = ex.unit === "sec" ? `${last.reps} sec` : `${last.reps} reps`;
+        const targetAmt = ex.unit === "sec" ? `${suggestion.reps} sec` : `${suggestion.reps} reps`;
+        const hitLeadIn = wentOverTarget
+          ? `Went over target ${unitWord} last time (did ${actualAmt}, target is ${targetAmt})`
+          : `Hit target ${unitWord}`;
         if(suggestion.deload){
           msg = `Missed target ${unitWord} for ${suggestion.missStreak} sessions straight - that's a stall, not a bad day. Dropping ~15% to rebuild with clean reps.`;
         } else if(suggestion.noteConcern){
           msg = suggestion.hitTarget
-            ? `Hit target ${unitWord}, but last session's note flagged "${escapeHtml(suggestion.noteConcern)}" - holding weight here until that clears up before adding more load.`
+            ? `${hitLeadIn}, but last session's note flagged "${escapeHtml(suggestion.noteConcern)}" - holding weight here until that clears up before adding more load.`
             : `Missed target ${unitWord}, and last session's note flagged "${escapeHtml(suggestion.noteConcern)}" - hold weight and keep an eye on that.`;
         } else if(suggestion.careFlags && suggestion.careFlags.length){
           const flagLabel = suggestion.careFlags.map(f => f === "knee" ? "Knee Care" : "Low Back Care").join(" + ");
           msg = `${flagLabel} mode is on - cutting load ~10% and holding here while that settles down.`;
         } else if(suggestion.difficultyNote === "hard"){
-          msg = `Hit target ${unitWord}, but rated 9-10/10 - holding here until it feels more manageable.`;
+          msg = `${hitLeadIn}, but rated 9-10/10 - holding here until it feels more manageable.`;
         } else if(suggestion.difficultyNote === "easy"){
-          msg = `Hit target ${unitWord} and rated it easy - fast-tracking the increase.`;
+          msg = `${hitLeadIn} and rated it easy - fast-tracking the increase.`;
         } else if(suggestion.readyToProgress){
-          msg = ex.conservative
-            ? `Hit target ${unitWord} for ${suggestion.streak} sessions straight, progress it.`
-            : `Hit target ${unitWord} last time, progress the weight.`;
+          if(ex.conservative){
+            msg = wentOverTarget
+              ? `Hit target ${unitWord} for ${suggestion.streak} sessions straight, including ${actualAmt} last time (target is ${targetAmt}) - progress it.`
+              : `Hit target ${unitWord} for ${suggestion.streak} sessions straight, progress it.`;
+          } else {
+            msg = wentOverTarget
+              ? `Went over target ${unitWord} last time (did ${actualAmt}, target is ${targetAmt}), progress the weight.`
+              : `Hit target ${unitWord} last time, progress the weight.`;
+          }
         } else if(suggestion.hitTarget){
-          msg = `Hit target ${unitWord}, but only ${suggestion.streak} session${suggestion.streak>1?'s':''} at this weight - hold one more before adding.`;
+          msg = `${hitLeadIn}, but only ${suggestion.streak} session${suggestion.streak>1?'s':''} at this weight - hold one more before adding.`;
         } else {
           msg = `Missed target ${unitWord} last time, hold weight and chase it.`;
         }
