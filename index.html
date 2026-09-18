@@ -63,6 +63,8 @@
   .header-tools{display:flex;gap:0.4rem;margin-top:0.7rem;}
   .tool-btn{background:var(--surface);border:1px solid var(--line);color:var(--slate);font-size:0.72rem;font-weight:600;padding:0.4rem 0.7rem;border-radius:7px;cursor:pointer;}
   .tool-btn:disabled{opacity:0.4;cursor:default;}
+  .tool-btn.sync-btn-ok{background:var(--emerald);border-color:var(--emerald);color:var(--chart-white);}
+  .tool-btn.sync-btn-err{background:var(--danger);border-color:var(--danger);color:#fff;}
   .chart-quarter-nav{display:flex;align-items:center;justify-content:space-between;gap:0.4rem;margin-top:0.6rem;}
   .chart-quarter-label{font-size:0.7rem;color:var(--slate);font-weight:600;text-align:center;flex:1;}
   main{max-width:640px;margin:0 auto;padding:1rem 1rem 3rem;}
@@ -261,7 +263,9 @@ function renderSyncStatus(){
   } else if(typeof navigator !== "undefined" && navigator.onLine === false){
     el.textContent = pendingQueue.length ? `☁ Offline - ${pendingQueue.length} pending` : "☁ Offline";
   } else if(pendingQueue.length){
-    el.textContent = `☁ Syncing… ${pendingQueue.length} pending`;
+    el.textContent = lastFlushHadFailures
+      ? `⚠ ${pendingQueue.length} pending - having trouble syncing, tap Sync now`
+      : `☁ Syncing… ${pendingQueue.length} pending`;
   } else {
     el.textContent = "☁ Synced";
   }
@@ -343,7 +347,18 @@ async function ensureExerciseId(name){
   const { data: row, error } = await supabaseClient.from("exercises").select("id").eq("user_id", userId).eq("name", name).maybeSingle();
   if(error){ console.error(error); return null; }
   if(row){ exerciseIdCache[name] = row.id; return row.id; }
-  return null;
+  // No row yet for this exercise (e.g. a preset added to the app after the
+  // account's exercises were first pushed up). Create it now instead of
+  // leaving every entry for it permanently unable to resolve an exercise_id -
+  // that used to strand the whole sync queue behind it forever.
+  const ex = data[name];
+  if(!ex) return null;
+  const { data: created, error: createErr } = await supabaseClient.from("exercises")
+    .upsert({ ...exerciseToRow(ex), name, user_id: userId }, { onConflict: "user_id,name" })
+    .select("id").single();
+  if(createErr){ console.error(createErr); return null; }
+  exerciseIdCache[name] = created.id;
+  return created.id;
 }
 
 async function runOp(op){
@@ -386,33 +401,87 @@ async function runOp(op){
   return true;
 }
 
+// Kept across flush attempts (not reset per-call) so the sync status line
+// can tell "still working through the queue" apart from "stuck on
+// something that keeps failing," instead of just showing "Syncing..."
+// forever with no way to tell the two apart.
+let lastFlushHadFailures = false;
+
 async function flushQueue(){
-  if(flushing) return;
-  if(!currentSession) return;
-  if(typeof navigator !== "undefined" && navigator.onLine === false) return;
+  if(flushing) return { attempted: false, reason: "busy" };
+  if(!currentSession) return { attempted: false, reason: "signed-out" };
+  if(typeof navigator !== "undefined" && navigator.onLine === false) return { attempted: false, reason: "offline" };
   flushing = true;
-  let any = false;
+  let succeeded = 0, failed = 0;
   try{
-    while(pendingQueue.length){
-      const op = pendingQueue[0];
+    // Attempt every op currently queued exactly once per pass, instead of
+    // stopping at the first failure - a single op that can never succeed
+    // (e.g. referencing something that no longer exists) used to jam every
+    // other op behind it in the queue forever.
+    const snapshot = pendingQueue.slice();
+    const remaining = [];
+    for(const op of snapshot){
       let ok;
       try{ ok = await runOp(op); }catch(e){ console.error("sync op failed", op, e); ok = false; }
-      if(!ok) break;
-      pendingQueue.shift();
-      saveQueue();
-      any = true;
-      renderSyncStatus();
+      if(ok){ succeeded++; } else { failed++; remaining.push(op); }
     }
+    pendingQueue = remaining;
+    saveQueue();
   } finally {
     flushing = false;
   }
+  lastFlushHadFailures = failed > 0;
   let becameFullySynced = false;
   if(pendingQueue.length === 0){
     lastSyncedAt = new Date().toISOString();
     try{ window.localStorage.setItem(LAST_SYNC_KEY, lastSyncedAt); }catch(e){}
     becameFullySynced = true;
   }
-  if((any || becameFullySynced) && view === "overview") render();
+  renderSyncStatus();
+  if((succeeded || becameFullySynced) && view === "overview") render();
+  return { attempted: true, succeeded, failed, remaining: pendingQueue.length };
+}
+
+// Explicit press-the-button feedback for "Sync now", so it's never a
+// silent no-op: shows a busy state while in flight, then flashes either a
+// success or a "still stuck" confirmation instead of leaving the button
+// looking exactly the same whether it worked or not.
+async function manualSync(){
+  const originalText = "↻ Sync now";
+  const btnBefore = document.getElementById("sync-now-btn");
+  if(btnBefore){
+    btnBefore.disabled = true;
+    btnBefore.textContent = "Syncing…";
+    btnBefore.classList.remove("sync-btn-ok", "sync-btn-err");
+  }
+  const result = await flushQueue();
+  // flushQueue() may have called render() internally (it does whenever
+  // anything actually synced), which replaces the whole card's markup - so
+  // the button element from before the await may already be detached.
+  // Re-fetch it fresh rather than flashing feedback nobody will ever see.
+  const btn = document.getElementById("sync-now-btn");
+  if(!btn) return;
+  btn.disabled = false;
+  if(!result.attempted){
+    const label = result.reason === "offline" ? "⚠ You're offline" : result.reason === "signed-out" ? "⚠ Not signed in" : "⚠ Already syncing";
+    flashSyncButton(btn, label, false, originalText);
+    return;
+  }
+  if(result.remaining === 0){
+    flashSyncButton(btn, "✓ Synced", true, originalText);
+  } else {
+    flashSyncButton(btn, `⚠ ${result.remaining} still stuck`, false, originalText);
+  }
+}
+function flashSyncButton(btn, text, success, originalText){
+  btn.textContent = text;
+  btn.classList.toggle("sync-btn-ok", success);
+  btn.classList.toggle("sync-btn-err", !success);
+  if(window.__syncBtnFlashTimer) clearTimeout(window.__syncBtnFlashTimer);
+  window.__syncBtnFlashTimer = setTimeout(() => {
+    btn.textContent = originalText;
+    btn.classList.remove("sync-btn-ok", "sync-btn-err");
+  }, 2600);
 }
 
 async function pullRemoteAndMerge(){
@@ -650,7 +719,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // Bumped by hand with each shipped change - v23 picks up the count from this
 // file's git history (22 prior commits touching index.html at the time this
 // was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v26";
+const APP_VERSION = "v27";
 const APP_UPDATED = "Sep 17, 2026";
 
 // ---------- state ----------
@@ -2182,7 +2251,7 @@ function renderBackupSyncCard(){
     html += `<p style="font-size:0.72rem;color:var(--slate);margin:0 0 0.2rem;">☁ ${escapeHtml(currentSession.user.email)} · ${pending ? pending + " pending" : "synced"}</p>`;
     html += `<p style="font-size:0.64rem;color:var(--slate);margin:0 0 0.5rem;">Last synced: ${syncedLabel || "never yet"}</p>`;
     html += `<div class="header-tools" style="margin-bottom:0.6rem;">
-      <button class="tool-btn" onclick="flushQueue()">↻ Sync now</button>
+      <button class="tool-btn" id="sync-now-btn" onclick="manualSync()">↻ Sync now</button>
       <button class="tool-btn" onclick="signOutUser()">Sign out</button>
     </div>`;
   } else {
