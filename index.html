@@ -616,6 +616,26 @@ const LOW_BACK_CARE_TIP = {
   "Kettlebell Swings": "Consider a lighter bell or a hip thrust substitute to ease lower back load.",
 };
 
+// Every value ex.trackBy can ever hold. This list MUST stay in sync by hand
+// with the Postgres check constraint exercises_track_by_check on the
+// "exercises" table (Supabase project eixbpujqsectkstkqllz) - the two are
+// not connected by any code, only by a person (or Claude) remembering to
+// update both. Adding a new trackBy value below without also migrating
+// that constraint doesn't fail loudly: the app queues the sync op fine,
+// but the database rejects every attempt forever, and the only symptom is
+// a growing "pending" count with no error visible anywhere in the UI. This
+// exact bug shipped once already (the "checklist" type for stretch/core
+// routines) and took real user data getting stuck to catch. The
+// VALID_TRACK_BY_VALUES check in the Playwright suite (test2.js) asserts
+// every trackBy actually used in EXERCISE_DEFAULTS/SEED appears in this
+// list, so a typo or a forgotten entry here fails the regression run - but
+// nothing catches a value that's in this list while the database migration
+// was simply never written. Always pair a new entry here with:
+//   alter table public.exercises drop constraint exercises_track_by_check;
+//   alter table public.exercises add constraint exercises_track_by_check
+//     check (track_by = any (array[...ALL values here...]));
+const VALID_TRACK_BY_VALUES = ["weight", "duration", "reps", "checklist"];
+
 // Built-in exercises that shouldn't default to weight/sets/reps when first
 // created - cardio work is logged by time, distance, and incline instead.
 const EXERCISE_DEFAULTS = {
@@ -689,6 +709,16 @@ const CHECKLIST_ROUTINES = {
     ],
   },
 };
+// One-time startup guard: if a new trackBy value ever gets added to
+// EXERCISE_DEFAULTS without updating VALID_TRACK_BY_VALUES (and the
+// matching database constraint), fail loudly in the console the moment the
+// app loads instead of surfacing only as a silently stuck sync queue days
+// later. Whoever is testing a new exercise type would see this immediately.
+Object.entries(EXERCISE_DEFAULTS).forEach(([exName, preset]) => {
+  if(preset.trackBy && !VALID_TRACK_BY_VALUES.includes(preset.trackBy)){
+    console.error(`"${exName}" uses trackBy "${preset.trackBy}", which is not in VALID_TRACK_BY_VALUES and almost certainly is not allowed by the exercises_track_by_check database constraint either - cloud sync for this exercise will fail silently. Add it to both VALID_TRACK_BY_VALUES and the database constraint.`);
+  }
+});
 // Fields that are safe to backfill onto an exercise that already existed
 // locally before this default existed: purely additive metadata that never
 // reinterprets anything already logged (unlike trackBy/trackDistance, which
@@ -719,7 +749,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // Bumped by hand with each shipped change - v23 picks up the count from this
 // file's git history (22 prior commits touching index.html at the time this
 // was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v27";
+const APP_VERSION = "v28";
 const APP_UPDATED = "Sep 17, 2026";
 
 // ---------- state ----------
