@@ -394,6 +394,12 @@ async function runOp(op){
     if(error) throw error;
     return true;
   }
+  if(op.type === "delete_exercise"){
+    const { error } = await supabaseClient.from("exercises").delete().eq("user_id", userId).eq("name", op.payload.name);
+    if(error) throw error;
+    delete exerciseIdCache[op.payload.name];
+    return true;
+  }
   if(op.type === "upsert_settings"){
     const { error } = await supabaseClient.from("user_settings").upsert({
       user_id: userId,
@@ -534,6 +540,11 @@ async function pullRemoteAndMerge(){
     preseasonMode = !!settingsRow.preseason_mode;
     try{ window.localStorage.setItem(PRESEASON_MODE_KEY, preseasonMode ? "1" : "0"); }catch(e){}
   }
+
+  // Catches a legacy "Box Jump (Step Down)"/"Slow Step-Down" row pulled
+  // down from the cloud (e.g. a second device, or the delete_exercise op
+  // from a prior migration hadn't synced yet) before it gets rendered.
+  migrateLegacyBoxJumpNames();
 
   persist();
   render();
@@ -784,18 +795,56 @@ function backfillExerciseDefaults(){
     }
   });
 }
+
+// One-time cleanup for the Box Jumps merge (v31): "Box Jump (Step Down)"
+// and "Slow Step-Down" used to be two separate exercises with their own
+// logged history. Renaming them in DAY_ORDER/EXERCISE_DEFAULTS alone would
+// leave any already-logged entries stranded under their old exercise
+// names - allDayNames() no longer lists those names, so they'd keep
+// showing up forever as orphaned "custom" pills instead of disappearing.
+// This merges their entries into "Box Jumps" (creating it if needed,
+// preserving every logged set) and queues the old exercise row for
+// deletion so a future pullRemoteAndMerge() doesn't resurrect it.
+const LEGACY_BOX_JUMP_NAMES = ["Box Jump (Step Down)", "Slow Step-Down"];
+function migrateLegacyBoxJumpNames(){
+  let changed = false;
+  LEGACY_BOX_JUMP_NAMES.forEach(oldName => {
+    const oldEx = data[oldName];
+    if(!oldEx) return;
+    if(!data["Box Jumps"]) data["Box Jumps"] = newExerciseShell("Box Jumps");
+    const target = data["Box Jumps"];
+    const existingIds = new Set(target.entries.map(e => e.clientId).filter(Boolean));
+    oldEx.entries.forEach(e => {
+      if(!e.clientId || !existingIds.has(e.clientId)){
+        target.entries.push(e);
+        enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: "Box Jumps", clientId: e.clientId } });
+      }
+    });
+    target.entries.sort((a,b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    target.entries.forEach((e,i) => { e.label = "S" + (i+1); });
+    delete data[oldName];
+    enqueueOp({ id: genId(), type: "delete_exercise", payload: { name: oldName } });
+    changed = true;
+  });
+  if(changed){
+    enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name: "Box Jumps" } });
+    persist();
+  }
+  return changed;
+}
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
 // Bumped by hand with each shipped change - v23 picks up the count from this
 // file's git history (22 prior commits touching index.html at the time this
 // was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v31";
+const APP_VERSION = "v32";
 const APP_UPDATED = "Sep 17, 2026";
 
 // ---------- state ----------
 let data = loadSaved() || JSON.parse(JSON.stringify(SEED));
 ensureClientIds();
 backfillExerciseDefaults();
+migrateLegacyBoxJumpNames();
 let view = "full";
 let selected = DAY_ORDER.full[0];
 let calendarYear = new Date().getFullYear();
