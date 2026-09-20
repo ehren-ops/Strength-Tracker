@@ -29,6 +29,7 @@
     --ski:#1565C0; --ski-bg:#E3F0FC; --ski-border:#BBD9F5; --ski-text:#0D47A1;
     --knee:#B3660A; --knee-bg:#FFF3E0; --knee-border:#F0C889; --knee-text:#7A4A0A;
     --back:#8C2F39; --back-bg:#FBEAEA; --back-border:#E3B3B8; --back-text:#6B1F26;
+    --preseason:#6A3FA0; --preseason-bg:#F1E8FB; --preseason-border:#D9C4EF; --preseason-text:#4A2570;
     --font-display:'Fjalla One',sans-serif; --font-body:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
   }
   :root[data-theme="dark"]{
@@ -48,6 +49,7 @@
     --ski:#b967ff; --ski-bg:rgba(185,103,255,0.12); --ski-border:#b967ff; --ski-text:#e0c8ff;
     --knee:#fee440; --knee-bg:rgba(254,228,64,0.12); --knee-border:#fee440; --knee-text:#fee440;
     --back:#ff3860; --back-bg:rgba(255,56,96,0.12); --back-border:#ff3860; --back-text:#ff8fa3;
+    --preseason:#00f0ff; --preseason-bg:rgba(0,240,255,0.12); --preseason-border:#00f0ff; --preseason-text:#9be8ff;
     --font-display:'Orbitron',sans-serif; --font-body:'Rajdhani',sans-serif; --font-mono:'Share Tech Mono',monospace;
   }
   *{box-sizing:border-box;}
@@ -178,6 +180,10 @@
   .card.back-mode{border-color:var(--back);box-shadow:0 0 0 1px rgba(140,47,57,0.18);}
   .knee-badge{display:inline-block;background:var(--knee);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
   .back-badge{display:inline-block;background:var(--back);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
+  .card.preseason-mode{border-color:var(--preseason);box-shadow:0 0 0 1px rgba(106,63,160,0.18);}
+  .preseason-badge{display:inline-block;background:var(--preseason);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
+  .preseason-line{font-size:0.76rem;color:var(--preseason-text);background:var(--preseason-bg);border:1px solid var(--preseason-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
+  .preseason-line + .preseason-line{margin-top:-0.35rem;}
   .care-line{font-size:0.76rem;border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
   .knee-care-line{color:var(--knee-text);background:var(--knee-bg);border:1px solid var(--knee-border);}
   .back-care-line{color:var(--back-text);background:var(--back-bg);border:1px solid var(--back-border);}
@@ -394,6 +400,7 @@ async function runOp(op){
       ski_season_mode: skiSeasonMode,
       knee_care_mode: kneeCareMode,
       low_back_care_mode: lowBackCareMode,
+      preseason_mode: preseasonMode,
     }, { onConflict: "user_id" });
     if(error) throw error;
     return true;
@@ -523,6 +530,10 @@ async function pullRemoteAndMerge(){
     lowBackCareMode = settingsRow.low_back_care_mode;
     try{ window.localStorage.setItem(BACK_MODE_KEY, lowBackCareMode ? "1" : "0"); }catch(e){}
   }
+  if(settingsRow && window.localStorage.getItem(PRESEASON_MODE_KEY) === null){
+    preseasonMode = !!settingsRow.preseason_mode;
+    try{ window.localStorage.setItem(PRESEASON_MODE_KEY, preseasonMode ? "1" : "0"); }catch(e){}
+  }
 
   persist();
   render();
@@ -590,10 +601,18 @@ const SEED = {
 
 };
 
+// Preseason additions (exercises with preseason:true in EXERCISE_DEFAULTS)
+// sit permanently at the end of these lists rather than being conditionally
+// shown/hidden/reordered by preseasonMode - only their badges/notes/target
+// reps react to the toggle. Position 0 of each list is also the exercise
+// shown by default when you open that tab, so power work is deliberately
+// NOT placed first here even though it's meant to happen first in the
+// session - that sequencing is communicated via each exercise's "do this
+// first" badge/note instead, so opening Full Body still lands on Squat.
 const DAY_ORDER = {
-  full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension"],
-  upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension"],
-  lower: ["Squat","RDL","Bulgarian Split Squat","Kettlebell Swings","Walking Lunge","Standing Calf Raise"],
+  full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Box Jump (Step Down)","Lateral Lunge","Standing Calf Raise","Trap Bar Jump"],
+  upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam","Copenhagen Plank","Farmer's Carry"],
+  lower: ["Squat","RDL","Bulgarian Split Squat","Kettlebell Swings","Walking Lunge","Standing Calf Raise","Slow Step-Down","Seated Calf Raise","Skater Bound","Spanish Squat"],
   extra: ["Farmer's Carry","Zone 2 Ride","Incline Treadmill Walk","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","5-Minute Core Routine"],
 };
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
@@ -602,12 +621,15 @@ const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
 // Fixed classification, not user-editable per exercise - no need for these
 // to live on the exercise object or round-trip through Supabase like the
 // ski-season fields do.
-const KNEE_SENSITIVE_EXERCISES = new Set(["Squat", "Bulgarian Split Squat", "Walking Lunge"]);
+const KNEE_SENSITIVE_EXERCISES = new Set(["Squat", "Bulgarian Split Squat", "Walking Lunge", "Box Jump (Step Down)", "Slow Step-Down", "Skater Bound"]);
 const LOW_BACK_SENSITIVE_EXERCISES = new Set(["Squat", "RDL", "Barbell Row", "Kettlebell Swings"]);
 const KNEE_CARE_TIP = {
   "Squat": "Consider a shallower squat depth or a box squat to reduce knee flexion range.",
   "Bulgarian Split Squat": "Consider less rear-foot elevation or a shorter range to ease knee flexion.",
   "Walking Lunge": "Consider a shorter step length or reduced depth to ease knee flexion.",
+  "Box Jump (Step Down)": "Consider a lower box or landing more softly to ease knee load.",
+  "Slow Step-Down": "Consider a lower box or a slower, more controlled tempo if the knee flares.",
+  "Skater Bound": "Consider a smaller lateral range or skip the stick-landing hold if the knee flares.",
 };
 const LOW_BACK_CARE_TIP = {
   "Squat": "Consider a lighter load or reduced depth to ease spinal load.",
@@ -641,13 +663,27 @@ const VALID_TRACK_BY_VALUES = ["weight", "duration", "reps", "checklist"];
 const EXERCISE_DEFAULTS = {
   "Zone 2 Ride": { trackBy: "duration", trackDistance: true, trackSpeed: true },
   "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true, trackSpeed: true },
-  "Squat": { targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell" },
+  "Squat": {
+    targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell",
+    preseason: true, targetRepsPreseason: 5, preseasonTempo: "4 sec lowering, 95-110 lb (~65-70% of current) - lighter on purpose while the knee settles",
+  },
   "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec eccentric descent per leg" },
   "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec controlled descent each step" },
   "Bench Press": { equipment: "barbell" },
   "RDL": { equipment: "barbell" },
   "Barbell Row": { equipment: "barbell" },
-  "Farmer's Carry": { unit: "sec", targetReps: 40 },
+  "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb - keep building load here." },
+  "Kettlebell Swings": { preseason: true, preseasonNote: "Power work - do this first, before the rest of today's lifts. 4x10, 35 lb building to 53 lb." },
+  "Standing Calf Raise": { preseason: true, preseasonNote: "Add load by holding dumbbells (45-95 lb) if you want it heavier - staying bodyweight-tracked here to protect your logged history." },
+  "Box Jump (Step Down)": { trackBy: "reps", targetReps: 3, preseason: true, preseasonNote: "4x3, 12-18 in box. Step down - do not jump down. Stop the set if speed drops." },
+  "Med Ball Slam": { trackBy: "weight", targetReps: 6, preseason: true, preseasonNote: "3x6, 10-15 lb. Stop the set if speed drops." },
+  "Lateral Lunge": { trackBy: "weight", targetReps: 8, preseason: true, preseasonNote: "3x8 per side, bodyweight up to 30 lb DB." },
+  "Copenhagen Plank": { trackBy: "reps", unit: "sec", targetReps: 20, preseason: true, preseasonNote: "3x20 sec per side - adductor work, knee-protective." },
+  "Slow Step-Down": { trackBy: "reps", targetReps: 8, preseason: true, preseasonNote: "3x8 per side, 3 sec lowering off a 12-18 in box. Should ease within a set - if knee pain increases instead, stop and get it looked at." },
+  "Seated Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15 - soleus specific, matters for boot control." },
+  "Trap Bar Jump": { trackBy: "weight", targetReps: 3, preseason: true, preseasonWeek3: true, preseasonNote: "4x3 @ 95-135 lb. Stop the set if speed drops." },
+  "Skater Bound": { trackBy: "reps", targetReps: 4, preseason: true, preseasonWeek3: true, preseasonNote: "3x4 per side - stick each landing for 2 sec." },
+  "Spanish Squat": { trackBy: "reps", targetReps: 10, preseason: true, preseasonWeek3: true, preseasonNote: "3x10, banded, 3 sec hold." },
   "Thoracic Spine Stretch": { trackBy: "checklist" },
   "Hip Stretch": { trackBy: "checklist" },
   "Leg Stretch": { trackBy: "checklist" },
@@ -723,7 +759,7 @@ Object.entries(EXERCISE_DEFAULTS).forEach(([exName, preset]) => {
 // locally before this default existed: purely additive metadata that never
 // reinterprets anything already logged (unlike trackBy/trackDistance, which
 // would misrepresent already-logged weight/sets/reps entries if changed).
-const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed"];
+const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
 }
@@ -749,7 +785,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // Bumped by hand with each shipped change - v23 picks up the count from this
 // file's git history (22 prior commits touching index.html at the time this
 // was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v28";
+const APP_VERSION = "v29";
 const APP_UPDATED = "Sep 17, 2026";
 
 // ---------- state ----------
@@ -781,6 +817,10 @@ let kneeCareMode = (function(){
 const BACK_MODE_KEY = "strength-tracker-back-mode";
 let lowBackCareMode = (function(){
   try{ return window.localStorage.getItem(BACK_MODE_KEY) === "1"; }catch(e){ return false; }
+})();
+const PRESEASON_MODE_KEY = "strength-tracker-preseason-mode";
+let preseasonMode = (function(){
+  try{ return window.localStorage.getItem(PRESEASON_MODE_KEY) === "1"; }catch(e){ return false; }
 })();
 // Display preference only, not training data, so this stays local to the
 // device rather than syncing through upsert_settings like the modes above.
@@ -819,8 +859,15 @@ function toggleLowBackCareMode(){
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
   render();
 }
+function togglePreseasonMode(){
+  preseasonMode = !preseasonMode;
+  try{ window.localStorage.setItem(PRESEASON_MODE_KEY, preseasonMode ? "1" : "0"); }catch(e){}
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  render();
+}
 
 function effectiveTargetReps(ex){
+  if(preseasonMode && ex.targetRepsPreseason) return ex.targetRepsPreseason;
   return (skiSeasonMode && ex.targetRepsSki) ? ex.targetRepsSki : (ex.targetReps || 8);
 }
 
@@ -930,7 +977,11 @@ function showCelebration(msg){
 // numbered), so it's excluded entirely.
 function checkCoreWorkoutComplete(day){
   if(day !== "full" && day !== "upper" && day !== "lower") return;
-  const coreList = DAY_ORDER[day];
+  // Preseason additions only count toward "complete" while the toggle that
+  // introduced them is actually on - otherwise turning Preseason Prep off
+  // would retroactively make every day harder to finish by requiring
+  // exercises that are no longer part of the current program.
+  const coreList = DAY_ORDER[day].filter(name => preseasonMode || !(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseason));
   if(!coreList.every(name => isLoggedToday(name))) return;
   const today = todayISO();
   if(celebratedToday[day] === today) return;
@@ -1390,9 +1441,10 @@ function renderExerciseCard(name, ex){
   const skiActive = skiSeasonMode && !!ex.targetRepsSki;
   const kneeActive = kneeCareMode && KNEE_SENSITIVE_EXERCISES.has(name);
   const backActive = lowBackCareMode && LOW_BACK_SENSITIVE_EXERCISES.has(name);
+  const preseasonActive = preseasonMode && !!ex.preseason;
 
-  let html = `<div class="card${skiActive ? ' ski-mode' : ''}${kneeActive ? ' knee-mode' : ''}${backActive ? ' back-mode' : ''}">`;
-  html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}</h2>`;
+  let html = `<div class="card${skiActive ? ' ski-mode' : ''}${kneeActive ? ' knee-mode' : ''}${backActive ? ' back-mode' : ''}${preseasonActive ? ' preseason-mode' : ''}">`;
+  html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}${preseasonActive ? '<span class="preseason-badge">🏔️ Preseason</span>' : ''}</h2>`;
   if(kneeActive && KNEE_CARE_TIP[name]){
     html += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
   }
@@ -1404,6 +1456,12 @@ function renderExerciseCard(name, ex){
   }
   if(skiActive && ex.skiTempo){
     html += `<div class="ski-tempo-line">Tempo: ${ex.skiTempo} - target reps shifted to ${ex.targetRepsSki} for ski season</div>`;
+  }
+  if(preseasonActive && ex.preseasonTempo){
+    html += `<div class="preseason-line">Tempo: ${ex.preseasonTempo} - target reps shifted to ${ex.targetRepsPreseason} for preseason prep</div>`;
+  }
+  if(preseasonActive && ex.preseasonNote){
+    html += `<div class="preseason-line">${ex.preseasonNote}${ex.preseasonWeek3 ? ' <b>Add from week 3.</b>' : ''}</div>`;
   }
 
   if(!hasEntries){
@@ -2244,6 +2302,14 @@ function renderOverview(){
       </p>
       <button class="tool-btn" onclick="toggleSkiSeason()" style="background:${skiSeasonMode ? 'var(--ski)' : ''};color:${skiSeasonMode ? '#fff' : ''};border-color:${skiSeasonMode ? 'var(--ski)' : ''};">
         ${skiSeasonMode ? '🎿 Ski Season: ON' : '🎿 Ski Season: OFF'}
+      </button>
+    </div>
+    <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
+      <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
+        🏔️ Adds power/explosive, frontal plane, eccentric quad, and loaded calf accessories to your existing Full/Upper/Lower days for the ~7-10 week ramp into ski season. Independent of Ski Season mode above - run either or both. Power work goes first in the session, after warmup and before the heavy lifts; stop a power set the moment speed drops, it's not conditioning. Leave 48+ hours between a 1,000+ ft MTB climb and a Full Body or Lower Body day, and skip power work entirely the day after a big climb.
+      </p>
+      <button class="tool-btn" onclick="togglePreseasonMode()" style="background:${preseasonMode ? 'var(--preseason)' : ''};color:${preseasonMode ? '#fff' : ''};border-color:${preseasonMode ? 'var(--preseason)' : ''};">
+        ${preseasonMode ? '🏔️ Preseason Prep: ON' : '🏔️ Preseason Prep: OFF'}
       </button>
     </div>
     <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
