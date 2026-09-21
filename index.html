@@ -111,6 +111,12 @@
   :root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.85);}
   input, select, textarea{font-size:16px !important;}
   button.log:active{background:var(--amber);color:#1B211C;}
+  .rest-start-btn{margin-top:0.5rem;width:100%;background:var(--surface);border:1.5px solid var(--amber);color:var(--amber);border-radius:7px;padding:0.55rem;font-weight:600;font-size:0.82rem;cursor:pointer;}
+  .rest-start-btn:active{background:var(--amber);color:#fff;}
+  .rest-timer-badge{position:fixed;top:calc(env(safe-area-inset-top) + 10px);right:12px;z-index:60;padding:0.45rem 0.9rem;border-radius:999px;font-family:var(--font-mono);font-weight:700;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);cursor:pointer;user-select:none;color:#fff;letter-spacing:0.02em;}
+  .rest-timer-badge.running{background:var(--amber);}
+  .rest-timer-badge.done{background:var(--danger);animation:rest-timer-pulse 1s ease-in-out infinite;}
+  @keyframes rest-timer-pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
   .hist-toggle{background:none;border:none;padding:0;margin-top:0.6rem;font-size:0.74rem;color:var(--amber);font-weight:600;text-decoration:underline;cursor:pointer;}
   .hist{display:none;margin-top:0.5rem;border-top:1px dashed var(--line);padding-top:0.5rem;}
   .hist.open{display:block;}
@@ -199,6 +205,7 @@
 </head>
 <body>
 <div id="celebration-banner" class="celebration-banner" hidden></div>
+<div id="rest-timer-badge" class="rest-timer-badge" hidden onclick="handleRestTimerBadgeTap()"></div>
 <header>
   <h1 id="page-title">Full Body</h1>
   <p id="page-sub">Tap a day, log your sets, watch progress build.</p>
@@ -850,7 +857,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // Bumped by hand with each shipped change - v23 picks up the count from this
 // file's git history (22 prior commits touching index.html at the time this
 // was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v34";
+const APP_VERSION = "v35";
 const APP_UPDATED = "Sep 17, 2026";
 
 // ---------- state ----------
@@ -904,6 +911,18 @@ function toggleDarkMode(){
   darkMode = !darkMode;
   try{ window.localStorage.setItem(DARK_MODE_KEY, darkMode ? "1" : "0"); }catch(e){}
   applyTheme();
+  render();
+}
+
+// Also a local display/UX preference, not training data - no cloud sync.
+const REST_TIMER_ENABLED_KEY = "strength-tracker-rest-timer-enabled";
+let restTimerEnabled = (function(){
+  try{ return window.localStorage.getItem(REST_TIMER_ENABLED_KEY) === "1"; }catch(e){ return false; }
+})();
+function toggleRestTimerEnabled(){
+  restTimerEnabled = !restTimerEnabled;
+  try{ window.localStorage.setItem(REST_TIMER_ENABLED_KEY, restTimerEnabled ? "1" : "0"); }catch(e){}
+  if(!restTimerEnabled) clearRestTimer();
   render();
 }
 
@@ -1144,12 +1163,99 @@ function estimate1RM(weight, reps){
   return Math.round(weight * (1 + reps / 30));
 }
 
-function restTimeFor(ex){
+// Single source of truth for both the human-readable rest range shown in
+// the "Next:" recommendation and the numeric seconds the rest timer uses -
+// keeping these as two independently-edited copies is exactly the kind of
+// drift that let a stale weight number survive a text-only fix earlier.
+function restBucketFor(ex){
   const tr = effectiveTargetReps(ex);
-  if(tr <= 6) return "2.5–3 min";
-  if(tr <= 10) return "90 sec";
-  if(tr <= 15) return "60–75 sec";
-  return "45–60 sec";
+  if(tr <= 6) return { minSec: 150, maxSec: 180, label: "2.5–3 min" };
+  if(tr <= 10) return { minSec: 90, maxSec: 90, label: "90 sec" };
+  if(tr <= 15) return { minSec: 60, maxSec: 75, label: "60–75 sec" };
+  return { minSec: 45, maxSec: 60, label: "45–60 sec" };
+}
+function restTimeFor(ex){
+  return restBucketFor(ex).label;
+}
+
+// ---------- rest timer ----------
+// Ephemeral, in-memory only (not persisted across reload) - a countdown
+// that survived a refresh would show a stale number with no way to know
+// how much real time had actually passed.
+let restTimer = null; // { exerciseName, choices, choiceIndex, remainingSec, phase: "running"|"done", intervalId }
+
+function restTimerChoicesFor(name){
+  const bucket = restBucketFor(data[name]);
+  const raw = [60, 90, bucket.maxSec];
+  return raw.filter((sec, i) => raw.indexOf(sec) === i); // de-dupe, keep order
+}
+
+function startRestTimer(name){
+  clearRestTimer();
+  const bucket = restBucketFor(data[name]);
+  restTimer = {
+    exerciseName: name,
+    choices: restTimerChoicesFor(name),
+    choiceIndex: -1, // -1 = the plain recommended default, before any manual override
+    remainingSec: bucket.minSec,
+    phase: "running",
+    intervalId: setInterval(tickRestTimer, 1000),
+  };
+  renderRestTimerBadge();
+}
+
+function tickRestTimer(){
+  if(!restTimer || restTimer.phase !== "running") return;
+  restTimer.remainingSec -= 1;
+  if(restTimer.remainingSec <= 0){
+    restTimer.remainingSec = 0;
+    restTimer.phase = "done";
+    clearInterval(restTimer.intervalId);
+    try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
+  }
+  renderRestTimerBadge();
+}
+
+// Tapping the badge mid-countdown cycles 60 / 90 / this exercise's own
+// upper limit, restarting the countdown at the newly picked time. Tapping
+// the finished (red) badge just dismisses it.
+function handleRestTimerBadgeTap(){
+  if(!restTimer) return;
+  if(restTimer.phase === "done"){ clearRestTimer(); renderRestTimerBadge(); return; }
+  restTimer.choiceIndex = (restTimer.choiceIndex + 1) % restTimer.choices.length;
+  restTimer.remainingSec = restTimer.choices[restTimer.choiceIndex];
+  renderRestTimerBadge();
+}
+
+function clearRestTimer(){
+  if(restTimer && restTimer.intervalId) clearInterval(restTimer.intervalId);
+  restTimer = null;
+  renderRestTimerBadge();
+}
+
+// Updates only the fixed badge element directly, deliberately bypassing
+// the app's normal full render() - re-rendering the whole page every
+// second would blow away focus/cursor position in whatever field the
+// user is mid-typing into while resting.
+function renderRestTimerBadge(){
+  const el = document.getElementById("rest-timer-badge");
+  if(!el) return;
+  if(!restTimer){
+    el.hidden = true;
+    el.className = "rest-timer-badge";
+    el.textContent = "";
+    return;
+  }
+  el.hidden = false;
+  if(restTimer.phase === "done"){
+    el.className = "rest-timer-badge done";
+    el.textContent = "Rest over";
+  } else {
+    const m = Math.floor(restTimer.remainingSec / 60);
+    const s = restTimer.remainingSec % 60;
+    el.className = "rest-timer-badge running";
+    el.textContent = `${m}:${String(s).padStart(2, "0")}`;
+  }
 }
 
 function calcVolume(entry, ex){
@@ -1814,6 +1920,9 @@ function renderForm(name, ex){
     <input type="date" id="f-date" value="${todayISO()}">
   </div>`;
   html += `<button class="log" onclick="logEntry()">Log set</button>`;
+  if(restTimerEnabled && ex.trackBy !== "duration"){
+    html += `<button type="button" class="rest-start-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')">⏱ Start Rest (${restTimeFor(ex)})</button>`;
+  }
   return html;
 }
 
@@ -2451,6 +2560,13 @@ function renderBackupSyncCard(){
 
   html += `<div style="border-top:1px dashed var(--line);padding-top:0.7rem;margin-top:0.7rem;">
     <h3 class="section">Appearance</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.7rem;padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
+      <div>
+        <div style="font-size:0.85rem;font-weight:600;">Rest Timer</div>
+        <div style="font-size:0.68rem;color:var(--slate);margin-top:0.1rem;">Adds a "Start Rest" button that counts down in a badge at the top of the app - tap it to cycle 60 sec / 90 sec / this exercise's own upper limit.</div>
+      </div>
+      <button class="theme-toggle${restTimerEnabled ? ' on' : ''}" onclick="toggleRestTimerEnabled()" aria-label="Toggle rest timer" aria-pressed="${restTimerEnabled}"><span class="knob"></span></button>
+    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:0.7rem;">
       <div>
         <div style="font-size:0.85rem;font-weight:600;">Neon Dark Mode</div>
