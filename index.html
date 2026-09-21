@@ -621,15 +621,17 @@ const SEED = {
 // visually moves to the front of the pill row when preseasonMode is on
 // (see getDisplayOrder) - opening a tab should still land on the main lift.
 // Preseason day mapping: Lower Body = squat day, Upper Body = upper day,
-// Full Body = hinge day (RDL already lives there). Box Jumps/Lateral
-// Lunge/Trap Bar Jump go with Lower Body; Kettlebell Swings/Seated Calf
-// Raise/Skater Bound/Spanish Squat go with Full Body. Box Jumps is shared
-// across Lower Body and Full Body (like Squat/RDL) rather than being two
-// separate exercises - the step-down eccentric detail lives in its note.
+// Full Body = hinge day (RDL already lives there). Lateral Lunge/Trap Bar
+// Jump go with Lower Body; Kettlebell Swings (hinge-pattern power move)/
+// Seated Calf Raise/Skater Bound/Spanish Squat go with Full Body only -
+// each day gets one signature power move, not a duplicate across days.
+// Box Jumps is the one exception, shared across Lower Body and Full Body
+// (like Squat/RDL) rather than being two separate exercises - the
+// step-down eccentric detail for its Full Body variant lives in its note.
 const DAY_ORDER = {
   full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Kettlebell Swings","Box Jumps","Seated Calf Raise","Skater Bound","Spanish Squat"],
   upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam","Copenhagen Plank","Farmer's Carry"],
-  lower: ["Squat","RDL","Bulgarian Split Squat","Kettlebell Swings","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump"],
+  lower: ["Squat","RDL","Bulgarian Split Squat","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump"],
   extra: ["Farmer's Carry","Zone 2 Ride","Incline Treadmill Walk","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","5-Minute Core Routine"],
 };
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
@@ -681,7 +683,7 @@ const EXERCISE_DEFAULTS = {
   "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true, trackSpeed: true },
   "Squat": {
     targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell",
-    preseason: true, targetRepsPreseason: 5, preseasonTempo: "4 sec lowering, 95-110 lb (~65-70% of current) - lighter on purpose while the knee settles",
+    preseason: true, targetRepsPreseason: 5, preseasonTempo: "4 sec lowering, 95-110 lb (~65-70% of current)",
   },
   "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec eccentric descent per leg" },
   "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec controlled descent each step" },
@@ -691,10 +693,10 @@ const EXERCISE_DEFAULTS = {
   "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb - keep building load here." },
   "Kettlebell Swings": { preseason: true, preseasonPower: true, preseasonNote: "Power work - do this first, before the rest of today's lifts. 4x10, 35 lb building to 53 lb." },
   "Standing Calf Raise": { preseason: true, preseasonNote: "Add load by holding dumbbells (45-95 lb) if you want it heavier - staying bodyweight-tracked here to protect your logged history." },
-  "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down - do not jump down. Stop the set if speed drops. On Full Body, swap in a slow 3 sec step-down off the box instead - should ease within a set, and if knee pain increases instead, stop and get it looked at." },
+  "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down - do not jump down. Stop the set if speed drops. On Full Body, swap in a slow 3 sec step-down off the box instead." },
   "Med Ball Slam": { trackBy: "weight", targetReps: 6, preseason: true, preseasonPower: true, preseasonNote: "3x6, 10-15 lb. Stop the set if speed drops." },
   "Lateral Lunge": { trackBy: "weight", targetReps: 8, preseason: true, preseasonNote: "3x8 per side, bodyweight up to 30 lb DB." },
-  "Copenhagen Plank": { trackBy: "reps", unit: "sec", targetReps: 20, preseason: true, preseasonNote: "3x20 sec per side - adductor work, knee-protective." },
+  "Copenhagen Plank": { trackBy: "reps", unit: "sec", targetReps: 20, preseason: true, preseasonNote: "3x20 sec per side - adductor work." },
   "Seated Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15 - soleus specific, matters for boot control." },
   "Trap Bar Jump": { trackBy: "weight", targetReps: 3, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "4x3 @ 95-135 lb. Stop the set if speed drops." },
   "Skater Bound": { trackBy: "reps", targetReps: 4, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "3x4 per side - stick each landing for 2 sec." },
@@ -837,7 +839,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // Bumped by hand with each shipped change - v23 picks up the count from this
 // file's git history (22 prior commits touching index.html at the time this
 // was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v32";
+const APP_VERSION = "v33";
 const APP_UPDATED = "Sep 17, 2026";
 
 // ---------- state ----------
