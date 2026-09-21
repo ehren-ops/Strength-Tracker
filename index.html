@@ -683,7 +683,7 @@ const EXERCISE_DEFAULTS = {
   "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true, trackSpeed: true },
   "Squat": {
     targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell",
-    preseason: true, targetRepsPreseason: 5, preseasonTempo: "4 sec lowering, 95-110 lb (~65-70% of current)",
+    preseason: true, targetRepsPreseason: 5, preseasonTempo: "4 sec lowering",
   },
   "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec eccentric descent per leg" },
   "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec controlled descent each step" },
@@ -777,6 +777,15 @@ Object.entries(EXERCISE_DEFAULTS).forEach(([exName, preset]) => {
 // reinterprets anything already logged (unlike trackBy/trackDistance, which
 // would misrepresent already-logged weight/sets/reps entries if changed).
 const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower"];
+// These preseason fields are pure app-authored copy: never synced to
+// Supabase (see exerciseToRow, which has no preseason_* columns) and
+// never user-editable through any UI. Unlike the rest of BACKFILL_KEYS,
+// which protect real logged/synced state by only filling in a value the
+// first time it's missing, these should always mirror EXERCISE_DEFAULTS -
+// otherwise a later wording or number edit (e.g. dropping a knee-specific
+// load reduction once the knee wasn't an issue anymore) would silently
+// never reach anyone who already had the exercise locally.
+const ALWAYS_SYNC_KEYS = ["preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
 }
@@ -786,7 +795,9 @@ function backfillExerciseDefaults(){
     if(!ex) return;
     let changed = false;
     BACKFILL_KEYS.forEach(key => {
-      if(preset[key] !== undefined && ex[key] === undefined){
+      if(preset[key] === undefined) return;
+      const shouldSet = ALWAYS_SYNC_KEYS.includes(key) ? ex[key] !== preset[key] : ex[key] === undefined;
+      if(shouldSet){
         ex[key] = preset[key];
         changed = true;
       }
@@ -839,7 +850,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // Bumped by hand with each shipped change - v23 picks up the count from this
 // file's git history (22 prior commits touching index.html at the time this
 // was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v33";
+const APP_VERSION = "v34";
 const APP_UPDATED = "Sep 17, 2026";
 
 // ---------- state ----------
