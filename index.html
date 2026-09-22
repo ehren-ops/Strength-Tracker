@@ -75,6 +75,8 @@
   .pill{flex:0 0 auto;font-size:0.7rem;padding:0.35rem 0.6rem;border-radius:7px;font-weight:500;cursor:pointer;background:var(--surface);border:1px solid var(--line);color:var(--slate);white-space:nowrap;}
   .pill-add{font-weight:700;padding:0.35rem 0.65rem;color:var(--amber);border-color:var(--amber-light);}
   .pill.active{background:var(--amber);border-color:var(--amber);color:#fff;}
+  .pill.preseason-pill{background:var(--preseason-bg);border-color:var(--preseason-border);color:var(--preseason-text);}
+  .pill.preseason-pill.active{background:var(--preseason);border-color:var(--preseason);color:#fff;}
   .pill.logged-today:not(.active){opacity:0.55;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:0.7rem;}
   .ex-name{font-family:var(--font-display);font-size:1.1rem;text-transform:uppercase;color:var(--accent-2);margin:0 0 0.6rem;}
@@ -104,9 +106,9 @@
   .field input:focus{outline:2px solid var(--amber-light);border-color:var(--amber);}
   button.log{margin-top:0.7rem;width:100%;background:var(--log-btn-bg);color:var(--log-btn-text);border:none;border-radius:7px;padding:0.6rem;font-weight:600;font-size:0.85rem;cursor:pointer;transition:background-color 0.4s ease;}
   button.log.log-confirmed{background:var(--emerald);}
-  .date-row{margin-top:0.6rem;display:flex;flex-direction:column;align-items:stretch;}
-  .date-row label{display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);margin-bottom:0.2rem;}
-  .date-row input{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;padding:0.45rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--ink);}
+  .date-log-row{margin-top:0.6rem;display:flex;gap:0.5rem;align-items:flex-end;}
+  .date-log-row .field{flex:1 1 140px;min-width:0;}
+  .date-log-row button.log{flex:1 1 auto;width:auto;min-width:0;margin-top:0;}
   input[type="date"]{display:block !important;width:100% !important;max-width:100% !important;min-width:0 !important;box-sizing:border-box !important;-webkit-appearance:none !important;appearance:none !important;}
   :root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.85);}
   input, select, textarea{font-size:16px !important;}
@@ -198,6 +200,7 @@
   .theme-toggle.on{background:linear-gradient(90deg,#ff2d95,#b967ff,#00f0ff);}
   .theme-toggle.on .knob{left:27px;}
   :root[data-theme="dark"] .pill.active{color:#050308;}
+  :root[data-theme="dark"] .pill.preseason-pill.active{color:#050308;}
 </style>
 
 
@@ -628,18 +631,19 @@ const SEED = {
 // visually moves to the front of the pill row when preseasonMode is on
 // (see getDisplayOrder) - opening a tab should still land on the main lift.
 // Preseason day mapping: Lower Body = squat day, Upper Body = upper day,
-// Full Body = hinge day (RDL already lives there). Lateral Lunge/Trap Bar
-// Jump go with Lower Body; Kettlebell Swings (hinge-pattern power move)/
-// Seated Calf Raise/Skater Bound/Spanish Squat go with Full Body only -
-// each day gets one signature power move, not a duplicate across days.
-// Box Jumps is the one exception, shared across Lower Body and Full Body
-// (like Squat/RDL) rather than being two separate exercises - the
-// step-down eccentric detail for its Full Body variant lives in its note.
+// Full Body = hinge day (RDL already lives there). Each addition is
+// grouped by movement pattern with that day's main lift, not just spread
+// evenly across days: Box Jumps/Trap Bar Jump/Skater Bound/Spanish Squat
+// (all quad-dominant/squat-pattern) and Lateral Lunge (frontal-plane) go
+// with Lower Body; Kettlebell Swings (hip-hinge, mirrors RDL) and Seated
+// Calf Raise go with Full Body; Med Ball Slam and Farmer's Carry go with
+// Upper Body. Copenhagen Plank (hip adductor) has no upper-body
+// connection, so it lives on Extra instead of a lift day.
 const DAY_ORDER = {
-  full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Kettlebell Swings","Box Jumps","Seated Calf Raise","Skater Bound","Spanish Squat"],
-  upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam","Copenhagen Plank","Farmer's Carry"],
-  lower: ["Squat","RDL","Bulgarian Split Squat","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump"],
-  extra: ["Farmer's Carry","Zone 2 Ride","Incline Treadmill Walk","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","5-Minute Core Routine"],
+  full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Kettlebell Swings","Seated Calf Raise"],
+  upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam","Farmer's Carry"],
+  lower: ["Squat","RDL","Bulgarian Split Squat","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat"],
+  extra: ["Farmer's Carry","Zone 2 Ride","Incline Treadmill Walk","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","5-Minute Core Routine","Copenhagen Plank"],
 };
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
 const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
@@ -700,7 +704,7 @@ const EXERCISE_DEFAULTS = {
   "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb - keep building load here." },
   "Kettlebell Swings": { preseason: true, preseasonPower: true, preseasonNote: "Power work - do this first, before the rest of today's lifts. 4x10, 35 lb building to 53 lb." },
   "Standing Calf Raise": { preseason: true, preseasonNote: "Add load by holding dumbbells (45-95 lb) if you want it heavier - staying bodyweight-tracked here to protect your logged history." },
-  "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down - do not jump down. Stop the set if speed drops. On Full Body, swap in a slow 3 sec step-down off the box instead." },
+  "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down - do not jump down. Stop the set if speed drops. If you need it gentler, swap in a slow 3 sec step-down off the box instead." },
   "Med Ball Slam": { trackBy: "weight", targetReps: 6, preseason: true, preseasonPower: true, preseasonNote: "3x6, 10-15 lb. Stop the set if speed drops." },
   "Lateral Lunge": { trackBy: "weight", targetReps: 8, preseason: true, preseasonNote: "3x8 per side, bodyweight up to 30 lb DB." },
   "Copenhagen Plank": { trackBy: "reps", unit: "sec", targetReps: 20, preseason: true, preseasonNote: "3x20 sec per side - adductor work." },
@@ -860,7 +864,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v37";
+const APP_VERSION = "v38";
 const APP_UPDATED = "Sep 22, 2026";
 
 // ---------- state ----------
@@ -1568,7 +1572,15 @@ function renderDay(day){
   let html = `<div class="pill-row" id="pill-scroll">`;
   list.forEach((name, i) => {
     const loggedToday = isLoggedToday(name);
-    html += `<div class="pill ${selected===name?'active':''}${loggedToday?' logged-today':''}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')">${(day !== "extra" && i < DAY_ORDER[day].length) ? (i+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
+    // Preseason-flagged exercises get a light purple pill so they're
+    // visible at a glance in the row, and a darker solid purple instead
+    // of the usual amber when they're also the selected/active pill.
+    const isPreseasonPill = preseasonMode && !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseason);
+    const pillClasses = ['pill'];
+    if(isPreseasonPill) pillClasses.push('preseason-pill');
+    if(selected===name) pillClasses.push('active');
+    if(loggedToday) pillClasses.push('logged-today');
+    html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')">${(day !== "extra" && i < DAY_ORDER[day].length) ? (i+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
   });
   html += `<div class="pill pill-add" onclick="toggleAddExercise()">+</div></div>`;
   html += `<div id="add-ex-row" style="display:none" class="add-ex-row">
@@ -1996,11 +2008,10 @@ function renderForm(name, ex){
     <div class="field" style="flex:0 0 68px;"><label>RPE / 10</label><input type="number" inputmode="numeric" id="f-difficulty" min="1" max="10" value="7"></div>
     <div class="field" style="flex:1 1 140px;"><label>Note</label><input type="text" id="f-note" placeholder="${ex.trackBy==='duration' ? 'e.g. easy spin' : 'e.g. felt heavy'}"></div>
   </div>`;
-  html += `<div class="date-row">
-    <label>Date</label>
-    <input type="date" id="f-date" value="${todayISO()}">
+  html += `<div class="date-log-row">
+    <div class="field"><label>Date</label><input type="date" id="f-date" value="${todayISO()}"></div>
+    <button class="log" onclick="logEntry()">Log set</button>
   </div>`;
-  html += `<button class="log" onclick="logEntry()">Log set</button>`;
   if(restTimerEnabled && ex.trackBy !== "duration"){
     html += `<button type="button" class="rest-start-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')">⏱ Start Rest (${restTimeFor(ex)})</button>`;
   }
