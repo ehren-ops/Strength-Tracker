@@ -854,11 +854,14 @@ function migrateLegacyBoxJumpNames(){
 }
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
-// Bumped by hand with each shipped change - v23 picks up the count from this
-// file's git history (22 prior commits touching index.html at the time this
-// was added), so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v35";
-const APP_UPDATED = "Sep 17, 2026";
+// Both bumped BY HAND with every shipped change - neither is derived from
+// git, so nothing enforces it and both have drifted before (APP_UPDATED
+// sat on "Sep 17, 2026" across several version bumps because only
+// APP_VERSION was part of the habit). v23 picked up its count from this
+// file's git history (22 prior commits touching index.html at the time),
+// so it keeps counting forward rather than restarting at v1.
+const APP_VERSION = "v36";
+const APP_UPDATED = "Sep 22, 2026";
 
 // ---------- state ----------
 let data = loadSaved() || JSON.parse(JSON.stringify(SEED));
@@ -922,7 +925,8 @@ let restTimerEnabled = (function(){
 function toggleRestTimerEnabled(){
   restTimerEnabled = !restTimerEnabled;
   try{ window.localStorage.setItem(REST_TIMER_ENABLED_KEY, restTimerEnabled ? "1" : "0"); }catch(e){}
-  if(!restTimerEnabled) clearRestTimer();
+  if(restTimerEnabled) requestRestTimerNotificationPermission();
+  else clearRestTimer();
   render();
 }
 
@@ -1190,7 +1194,17 @@ function restTimerChoicesFor(name){
   return raw.filter((sec, i) => raw.indexOf(sec) === i); // de-dupe, keep order
 }
 
+// Pressing "Start Rest" again while a timer is already running for THIS
+// exercise doesn't restart it from scratch - it advances through the same
+// 60 / 90 / upper-limit cycle the floating badge uses, then one more
+// press past the end removes the timer entirely. That covers "I tapped
+// it by accident" without needing a separate cancel control: just keep
+// pressing the button you already pressed.
 function startRestTimer(name){
+  if(restTimer && restTimer.exerciseName === name && restTimer.phase === "running"){
+    advanceRestTimer();
+    return;
+  }
   clearRestTimer();
   const bucket = restBucketFor(data[name]);
   restTimer = {
@@ -1211,20 +1225,59 @@ function tickRestTimer(){
     restTimer.remainingSec = 0;
     restTimer.phase = "done";
     clearInterval(restTimer.intervalId);
-    try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
+    notifyRestOver();
   }
   renderRestTimerBadge();
 }
 
-// Tapping the badge mid-countdown cycles 60 / 90 / this exercise's own
-// upper limit, restarting the countdown at the newly picked time. Tapping
-// the finished (red) badge just dismisses it.
+// The Vibration API is spec'd to silently no-op whenever the document
+// isn't visible (backgrounded tab, screen locked, another app in front),
+// so a plain navigator.vibrate() call can't be the "isn't open" case at
+// all - only a system Notification can surface anything then, and only if
+// permission was already granted and the browser/OS actually supports it
+// (no support in iOS Safari home-screen web apps as of this writing, since
+// that requires a push subscription and a server to trigger it - a closed
+// app can't wake itself up with client-side code alone). This does the
+// best available thing in each case rather than silently doing nothing.
+function notifyRestOver(){
+  if(document.visibilityState === "visible"){
+    try{ if(navigator.vibrate) navigator.vibrate([200, 100, 200]); }catch(e){}
+    return;
+  }
+  try{
+    if(typeof Notification !== "undefined" && Notification.permission === "granted"){
+      new Notification("Rest over", { body: "Time to get back to it.", vibrate: [200, 100, 200], tag: "rest-timer" });
+    }
+  }catch(e){}
+}
+
+function requestRestTimerNotificationPermission(){
+  try{
+    if(typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission();
+  }catch(e){}
+}
+
+// Shared by the floating badge tap and by re-pressing "Start Rest" while
+// already running: advance to the next 60/90/upper-limit choice, or - once
+// the cycle is exhausted - remove the timer outright.
+function advanceRestTimer(){
+  if(!restTimer) return;
+  const nextIndex = restTimer.choiceIndex + 1;
+  if(nextIndex >= restTimer.choices.length){
+    clearRestTimer();
+    return;
+  }
+  restTimer.choiceIndex = nextIndex;
+  restTimer.remainingSec = restTimer.choices[nextIndex];
+  renderRestTimerBadge();
+}
+
+// Tapping the finished (red) badge just dismisses it; tapping a running
+// badge advances/cancels via the same logic the main button uses.
 function handleRestTimerBadgeTap(){
   if(!restTimer) return;
-  if(restTimer.phase === "done"){ clearRestTimer(); renderRestTimerBadge(); return; }
-  restTimer.choiceIndex = (restTimer.choiceIndex + 1) % restTimer.choices.length;
-  restTimer.remainingSec = restTimer.choices[restTimer.choiceIndex];
-  renderRestTimerBadge();
+  if(restTimer.phase === "done"){ clearRestTimer(); return; }
+  advanceRestTimer();
 }
 
 function clearRestTimer(){
@@ -2131,11 +2184,31 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
 }
 
 // ---------- overview ----------
+const DAY_GROUP_KEYS = ["full","upper","lower","extra"];
+// How much a logged exercise should count as evidence for a given day
+// type. An exercise that lives on only one day list (e.g. Walking Lunge,
+// Lower Body only) is strong, distinctive evidence; one shared across
+// several lists (e.g. Squat/RDL, on both Full Body and Lower Body, or
+// Farmer's Carry, on both Upper Body and Extra) doesn't discriminate
+// between them and should count for proportionally less. Raw overlap
+// counts previously let Full Body's broad roster (which overlaps with
+// almost everything) win ties it shouldn't, and let a single shared
+// exercise like Farmer's Carry outweigh a day with no other logged
+// exercises at all.
+function daySpecificityWeight(name){
+  const memberships = DAY_GROUP_KEYS.filter(d => DAY_ORDER[d].includes(name)).length;
+  return memberships > 0 ? 1 / memberships : 0;
+}
 function guessDayForNames(names){
-  let best = null, bestOverlap = 0;
-  ["full","upper","lower","extra"].forEach(d => {
-    const overlap = DAY_ORDER[d].filter(n => names.includes(n)).length;
-    if(overlap > bestOverlap){ bestOverlap = overlap; best = d; }
+  let best = null, bestScore = 0;
+  DAY_GROUP_KEYS.forEach(d => {
+    const score = names.reduce((sum, n) => sum + (DAY_ORDER[d].includes(n) ? daySpecificityWeight(n) : 0), 0);
+    // "Extra" wins ties outright (>=) rather than only strictly beating the
+    // leader (>) - a one-off exercise that only moonlights in a muscle
+    // group (like Farmer's Carry) should read as an off-day Extra session
+    // by default, not as whichever group it happens to also belong to.
+    const wins = d === "extra" ? score >= bestScore : score > bestScore;
+    if(score > 0 && wins){ bestScore = score; best = d; }
   });
   return best;
 }
@@ -2517,7 +2590,6 @@ function renderOverview(){
         ${lowBackCareMode ? '🩺 Low Back Care: ON' : '🩺 Low Back Care: OFF'}
       </button>
     </div>
-    <p style="font-size:0.64rem;color:var(--slate);margin:0.7rem 0 0;font-style:italic;">Knee and Low Back Care adjust training load only - not a substitute for a PT or doctor's evaluation.</p>
   </div>`;
 
   html += renderBackupSyncCard();
