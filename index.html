@@ -860,7 +860,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v36";
+const APP_VERSION = "v37";
 const APP_UPDATED = "Sep 22, 2026";
 
 // ---------- state ----------
@@ -1186,7 +1186,21 @@ function restTimeFor(ex){
 // Ephemeral, in-memory only (not persisted across reload) - a countdown
 // that survived a refresh would show a stale number with no way to know
 // how much real time had actually passed.
-let restTimer = null; // { exerciseName, choices, choiceIndex, remainingSec, phase: "running"|"done", intervalId }
+//
+// Tracked by an absolute endAt timestamp rather than a per-second
+// decrementing counter, on purpose: browsers throttle or fully suspend
+// setInterval in a backgrounded tab (locked screen, another app in
+// front), so a counter that only ever decrements when a tick actually
+// fires drifts behind or freezes outright while the app isn't open. Wall-
+// clock math doesn't have that problem - Date.now() keeps moving whether
+// or not any JS ran in between, so remaining time is always computed
+// fresh from endAt instead of trusted from the last tick. The interval
+// still drives the visible countdown while the tab is open; the
+// visibilitychange listener below (see checkRestTimerCompletion) is what
+// catches the "the whole rest already elapsed while you were away"
+// case the instant you come back, rather than waiting on a tick that may
+// have been suspended the entire time you were gone.
+let restTimer = null; // { exerciseName, choices, choiceIndex, endAt, phase: "running"|"done", intervalId }
 
 function restTimerChoicesFor(name){
   const bucket = restBucketFor(data[name]);
@@ -1211,7 +1225,7 @@ function startRestTimer(name){
     exerciseName: name,
     choices: restTimerChoicesFor(name),
     choiceIndex: -1, // -1 = the plain recommended default, before any manual override
-    remainingSec: bucket.minSec,
+    endAt: Date.now() + bucket.minSec * 1000,
     phase: "running",
     intervalId: setInterval(tickRestTimer, 1000),
   };
@@ -1219,16 +1233,28 @@ function startRestTimer(name){
 }
 
 function tickRestTimer(){
+  checkRestTimerCompletion();
+}
+
+// The one place that transitions a running timer to "done" - called both
+// by the regular 1-second interval (while the app is open) and by the
+// visibilitychange listener (the moment the app is reopened or
+// foregrounded again). Comparing against the wall clock rather than a
+// counter makes this safe to call from either place, or both: it only
+// ever fires the completion side effects (vibrate/notify) once, since
+// phase is no longer "running" the second time either caller checks.
+function checkRestTimerCompletion(){
   if(!restTimer || restTimer.phase !== "running") return;
-  restTimer.remainingSec -= 1;
-  if(restTimer.remainingSec <= 0){
-    restTimer.remainingSec = 0;
+  if(Date.now() >= restTimer.endAt){
     restTimer.phase = "done";
     clearInterval(restTimer.intervalId);
     notifyRestOver();
   }
   renderRestTimerBadge();
 }
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "visible") checkRestTimerCompletion();
+});
 
 // The Vibration API is spec'd to silently no-op whenever the document
 // isn't visible (backgrounded tab, screen locked, another app in front),
@@ -1268,7 +1294,8 @@ function advanceRestTimer(){
     return;
   }
   restTimer.choiceIndex = nextIndex;
-  restTimer.remainingSec = restTimer.choices[nextIndex];
+  restTimer.endAt = Date.now() + restTimer.choices[nextIndex] * 1000;
+  restTimer.phase = "running";
   renderRestTimerBadge();
 }
 
@@ -1304,8 +1331,9 @@ function renderRestTimerBadge(){
     el.className = "rest-timer-badge done";
     el.textContent = "Rest over";
   } else {
-    const m = Math.floor(restTimer.remainingSec / 60);
-    const s = restTimer.remainingSec % 60;
+    const remainingSec = Math.max(0, Math.ceil((restTimer.endAt - Date.now()) / 1000));
+    const m = Math.floor(remainingSec / 60);
+    const s = remainingSec % 60;
     el.className = "rest-timer-badge running";
     el.textContent = `${m}:${String(s).padStart(2, "0")}`;
   }
