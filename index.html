@@ -97,7 +97,10 @@
   .rec-desc b{font-family:var(--font-mono);}
   .progression-btn{display:inline-block;background:var(--surface);border:1px solid var(--line);color:var(--slate);font-size:0.72rem;font-weight:600;padding:0.4rem 0.7rem;border-radius:7px;cursor:pointer;}
   .progression-btn:active{background:var(--panel-soft);}
-  .action-row{display:flex;gap:0.8rem;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:0.7rem;}
+  .rest-action-btn{background:var(--surface);border:1.5px solid var(--amber);color:var(--amber);font-size:0.72rem;font-weight:600;padding:0.4rem 0.5rem;border-radius:7px;cursor:pointer;}
+  .rest-action-btn:active{background:var(--amber);color:#fff;}
+  .action-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;align-items:center;margin-top:0.7rem;}
+  .action-row .tool-btn, .action-row .progression-btn, .action-row .rest-action-btn{width:100%;display:block;margin:0;}
   svg.chart{width:100%;height:150px;display:block;margin-top:0.6rem;}
   .form-row{display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;}
   .field{flex:1 1 60px;}
@@ -115,7 +118,7 @@
   button.log:active{background:var(--amber);color:#1B211C;}
   .rest-start-btn{margin-top:0.5rem;width:100%;background:var(--surface);border:1.5px solid var(--amber);color:var(--amber);border-radius:7px;padding:0.55rem;font-weight:600;font-size:0.82rem;cursor:pointer;}
   .rest-start-btn:active{background:var(--amber);color:#fff;}
-  .rest-timer-badge{position:fixed;top:calc(env(safe-area-inset-top) + 10px);right:12px;z-index:60;padding:0.45rem 0.9rem;border-radius:999px;font-family:var(--font-mono);font-weight:700;font-size:1rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);cursor:pointer;user-select:none;color:#fff;letter-spacing:0.02em;}
+  .rest-timer-badge{position:fixed;top:calc(env(safe-area-inset-top) + 10px);right:12px;z-index:60;padding:0.6rem 1.2rem;border-radius:999px;font-family:var(--font-mono);font-weight:700;font-size:2rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);cursor:pointer;user-select:none;color:#fff;letter-spacing:0.02em;}
   .rest-timer-badge.running{background:var(--amber);}
   .rest-timer-badge.done{background:var(--danger);animation:rest-timer-pulse 1s ease-in-out infinite;}
   @keyframes rest-timer-pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
@@ -703,7 +706,7 @@ const EXERCISE_DEFAULTS = {
   "Barbell Row": { equipment: "barbell" },
   "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb - keep building load here." },
   "Kettlebell Swings": { preseason: true, preseasonPower: true, preseasonNote: "Power work - do this first, before the rest of today's lifts. 4x10, 35 lb building to 53 lb." },
-  "Standing Calf Raise": { preseason: true, preseasonNote: "Add load by holding dumbbells (45-95 lb) if you want it heavier - staying bodyweight-tracked here to protect your logged history." },
+  "Standing Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15, load as needed (dumbbells 45-95 lb, barbell 115-225 lb)." },
   "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down - do not jump down. Stop the set if speed drops. If you need it gentler, swap in a slow 3 sec step-down off the box instead." },
   "Med Ball Slam": { trackBy: "weight", targetReps: 6, preseason: true, preseasonPower: true, preseasonNote: "3x6, 10-15 lb. Stop the set if speed drops." },
   "Lateral Lunge": { trackBy: "weight", targetReps: 8, preseason: true, preseasonNote: "3x8 per side, bodyweight up to 30 lb DB." },
@@ -1204,12 +1207,19 @@ function restTimeFor(ex){
 // catches the "the whole rest already elapsed while you were away"
 // case the instant you come back, rather than waiting on a tick that may
 // have been suspended the entire time you were gone.
-let restTimer = null; // { exerciseName, choices, choiceIndex, endAt, phase: "running"|"done", intervalId }
+let restTimer = null; // { exerciseName, choices, choiceIndex, endAt, phase: "running"|"done", intervalId, revertedFromDone }
+let lastRestTimerChoiceIndex = null; // save the choice index when timer ends, to allow revert on tap
 
 function restTimerChoicesFor(name){
   const bucket = restBucketFor(data[name]);
-  const raw = [60, 90, bucket.maxSec];
-  return raw.filter((sec, i) => raw.indexOf(sec) === i); // de-dupe, keep order
+  // First choice: 60 sec unless exercise recommends lower
+  const firstChoice = bucket.minSec < 60 ? bucket.minSec : 60;
+  const raw = [firstChoice];
+  // Add 90 if it fits in the range and isn't already there
+  if(90 > firstChoice && 90 <= bucket.maxSec) raw.push(90);
+  // Add maxSec if it's not already there
+  if(bucket.maxSec > firstChoice && bucket.maxSec !== (raw[raw.length - 1] || firstChoice)) raw.push(bucket.maxSec);
+  return raw.filter((sec, i) => raw.indexOf(sec) === i);
 }
 
 // Pressing "Start Rest" again while a timer is already running for THIS
@@ -1250,6 +1260,8 @@ function tickRestTimer(){
 function checkRestTimerCompletion(){
   if(!restTimer || restTimer.phase !== "running") return;
   if(Date.now() >= restTimer.endAt){
+    lastRestTimerChoiceIndex = restTimer.choiceIndex;
+    restTimer.revertedFromDone = false;
     restTimer.phase = "done";
     clearInterval(restTimer.intervalId);
     notifyRestOver();
@@ -1303,11 +1315,38 @@ function advanceRestTimer(){
   renderRestTimerBadge();
 }
 
-// Tapping the finished (red) badge just dismisses it; tapping a running
-// badge advances/cancels via the same logic the main button uses.
+// Tapping the finished (red) badge: first tap reverts to the previous timer value,
+// second tap clears it. Tapping a running badge advances/cancels via the same logic the main button uses.
 function handleRestTimerBadgeTap(){
   if(!restTimer) return;
-  if(restTimer.phase === "done"){ clearRestTimer(); return; }
+  if(restTimer.phase === "done"){
+    if(!restTimer.revertedFromDone && lastRestTimerChoiceIndex != null){
+      // First tap: try to revert to a previous choice
+      // If started at -1 (recommended), go to 0 (first choice);
+      // otherwise go back one step
+      const prevIndex = lastRestTimerChoiceIndex === -1 ? 0 : lastRestTimerChoiceIndex - 1;
+      if(prevIndex >= 0 && prevIndex < restTimer.choices.length){
+        // Go to a prior choice in the array
+        restTimer.choiceIndex = prevIndex;
+        restTimer.endAt = Date.now() + restTimer.choices[prevIndex] * 1000;
+        restTimer.phase = "running";
+        restTimer.revertedFromDone = true;
+        if(restTimer.intervalId) clearInterval(restTimer.intervalId);
+        restTimer.intervalId = setInterval(tickRestTimer, 1000);
+        renderRestTimerBadge();
+        return;
+      }
+    }
+    // Second tap or no valid revert: clear it
+    clearRestTimer();
+    return;
+  }
+  if(restTimer.revertedFromDone){
+    // User tapped while in reverted state (running but came from done),
+    // so the next tap should clear instead of advancing
+    clearRestTimer();
+    return;
+  }
   advanceRestTimer();
 }
 
@@ -1985,8 +2024,11 @@ function renderForm(name, ex){
   let html = "";
   if(ex.entries.length){
     html += `<div class="action-row">`;
-    html += `<button type="button" class="tool-btn" onclick="repeatLast('${name.replace(/'/g,"\\'")}')">↻ Same as last time</button>`;
+    html += `<button type="button" class="tool-btn" onclick="repeatLast('${name.replace(/'/g,"\\'")}')">↻ Repeat set</button>`;
     html += renderProgressionToggle(name, ex);
+    if(restTimerEnabled && ex.trackBy !== "duration"){
+      html += `<button type="button" class="rest-action-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')">⏱ ${restTimeFor(ex)}</button>`;
+    }
     html += `</div>`;
   }
   html += `<div class="form-row">`;
@@ -2012,9 +2054,6 @@ function renderForm(name, ex){
     <div class="field"><label>Date</label><input type="date" id="f-date" value="${todayISO()}"></div>
     <button class="log" onclick="logEntry()">Log set</button>
   </div>`;
-  if(restTimerEnabled && ex.trackBy !== "duration"){
-    html += `<button type="button" class="rest-start-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')">⏱ Start Rest (${restTimeFor(ex)})</button>`;
-  }
   return html;
 }
 
