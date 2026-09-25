@@ -80,6 +80,7 @@
   .pill.logged-today:not(.active){opacity:0.55;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:0.7rem;}
   .ex-name{font-family:var(--font-display);font-size:1.1rem;text-transform:uppercase;color:var(--accent-2);margin:0 0 0.6rem;}
+  .ex-name-row{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;margin:0 0 0.6rem;flex-wrap:wrap;}
   .big-val{font-family:var(--font-mono);font-size:1.7rem;font-weight:600;}
   .delta{font-family:var(--font-mono);font-size:0.82rem;font-weight:600;}
   .delta-line{font-family:var(--font-mono);font-size:0.78rem;font-weight:600;margin-top:0.2rem;}
@@ -100,7 +101,8 @@
   .rest-action-btn{background:var(--surface);border:1.5px solid var(--amber);color:var(--amber);font-size:0.72rem;font-weight:600;padding:0.4rem 0.5rem;border-radius:7px;cursor:pointer;}
   .rest-action-btn:active{background:var(--amber);color:#fff;}
   .action-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;align-items:center;margin-top:0.7rem;}
-  .action-row .tool-btn, .action-row .progression-btn, .action-row .rest-action-btn{width:100%;display:block;margin:0;}
+  .action-row .tool-btn, .action-row .progression-btn, .action-row .rest-action-btn, .action-row .action-btn-spacer{width:100%;display:block;margin:0;}
+  .action-btn-spacer{background:none;border:1.5px solid transparent;color:transparent;font-size:0.72rem;font-weight:600;padding:0.4rem 0.5rem;border-radius:7px;visibility:hidden;pointer-events:none;}
   svg.chart{width:100%;height:150px;display:block;margin-top:0.6rem;}
   .form-row{display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;}
   .field{flex:1 1 60px;}
@@ -118,7 +120,7 @@
   button.log:active{background:var(--amber);color:#1B211C;}
   .rest-start-btn{margin-top:0.5rem;width:100%;background:var(--surface);border:1.5px solid var(--amber);color:var(--amber);border-radius:7px;padding:0.55rem;font-weight:600;font-size:0.82rem;cursor:pointer;}
   .rest-start-btn:active{background:var(--amber);color:#fff;}
-  .rest-timer-badge{position:fixed;top:calc(env(safe-area-inset-top) + 10px);right:12px;z-index:60;padding:0.6rem 1.2rem;border-radius:999px;font-family:var(--font-mono);font-weight:700;font-size:2rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);cursor:pointer;user-select:none;color:#fff;letter-spacing:0.02em;}
+  .rest-timer-badge{position:fixed;top:calc(env(safe-area-inset-top) + 10px);right:12px;z-index:60;padding:0.6rem 1.2rem;border-radius:999px;font-family:var(--font-mono);font-weight:700;font-size:1.7rem;box-shadow:0 2px 10px rgba(0,0,0,0.3);cursor:pointer;user-select:none;color:#fff;letter-spacing:0.02em;}
   .rest-timer-badge.running{background:var(--amber);}
   .rest-timer-badge.done{background:var(--danger);animation:rest-timer-pulse 1s ease-in-out infinite;}
   @keyframes rest-timer-pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
@@ -646,7 +648,7 @@ const DAY_ORDER = {
   full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Kettlebell Swings","Seated Calf Raise"],
   upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam","Farmer's Carry"],
   lower: ["Squat","RDL","Bulgarian Split Squat","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat"],
-  extra: ["Farmer's Carry","Zone 2 Ride","Incline Treadmill Walk","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","5-Minute Core Routine","Copenhagen Plank"],
+  extra: ["Farmer's Carry","Zone 2 Ride","Incline Treadmill Walk","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","5-Minute Core Routine","Copenhagen Plank","Dead Hang"],
 };
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
 const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
@@ -704,6 +706,7 @@ const EXERCISE_DEFAULTS = {
   "Bench Press": { equipment: "barbell" },
   "RDL": { equipment: "barbell" },
   "Barbell Row": { equipment: "barbell" },
+  "Back Extension": { trackBy: "weight", autoloadLastReps: true },
   "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb - keep building load here." },
   "Kettlebell Swings": { preseason: true, preseasonPower: true, preseasonNote: "Power work - do this first, before the rest of today's lifts. 4x10, 35 lb building to 53 lb." },
   "Standing Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15, load as needed (dumbbells 45-95 lb, barbell 115-225 lb)." },
@@ -711,6 +714,7 @@ const EXERCISE_DEFAULTS = {
   "Med Ball Slam": { trackBy: "weight", targetReps: 6, preseason: true, preseasonPower: true, preseasonNote: "3x6, 10-15 lb. Stop the set if speed drops." },
   "Lateral Lunge": { trackBy: "weight", targetReps: 8, preseason: true, preseasonNote: "3x8 per side, bodyweight up to 30 lb DB." },
   "Copenhagen Plank": { trackBy: "reps", unit: "sec", targetReps: 20, preseason: true, preseasonNote: "3x20 sec per side - adductor work." },
+  "Dead Hang": { trackBy: "reps", unit: "sec", targetReps: 45 },
   "Seated Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15 - soleus specific, matters for boot control." },
   "Trap Bar Jump": { trackBy: "weight", targetReps: 3, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "4x3 @ 95-135 lb. Stop the set if speed drops." },
   "Skater Bound": { trackBy: "reps", targetReps: 4, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "3x4 per side - stick each landing for 2 sec." },
@@ -790,7 +794,7 @@ Object.entries(EXERCISE_DEFAULTS).forEach(([exName, preset]) => {
 // locally before this default existed: purely additive metadata that never
 // reinterprets anything already logged (unlike trackBy/trackDistance, which
 // would misrepresent already-logged weight/sets/reps entries if changed).
-const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower"];
+const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps"];
 // These preseason fields are pure app-authored copy: never synced to
 // Supabase (see exerciseToRow, which has no preseason_* columns) and
 // never user-editable through any UI. Unlike the rest of BACKFILL_KEYS,
@@ -799,7 +803,7 @@ const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "target
 // otherwise a later wording or number edit (e.g. dropping a knee-specific
 // load reduction once the knee wasn't an issue anymore) would silently
 // never reach anyone who already had the exercise locally.
-const ALWAYS_SYNC_KEYS = ["preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower"];
+const ALWAYS_SYNC_KEYS = ["preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
 }
@@ -888,6 +892,7 @@ let openStretchItems = {};
 let chartQuarterOffset = {};
 let editingKey = null;
 let deletingKey = null;
+let deletingExercise = null;
 let editing1RM = null;
 const SKI_MODE_KEY = "strength-tracker-ski-mode";
 let skiSeasonMode = (function(){
@@ -1073,11 +1078,11 @@ function showCelebration(msg){
 // numbered), so it's excluded entirely.
 function checkCoreWorkoutComplete(day){
   if(day !== "full" && day !== "upper" && day !== "lower") return;
-  // Preseason additions only count toward "complete" while the toggle that
-  // introduced them is actually on - otherwise turning Preseason Prep off
-  // would retroactively make every day harder to finish by requiring
-  // exercises that are no longer part of the current program.
-  const coreList = DAY_ORDER[day].filter(name => preseasonMode || !(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseason));
+  // DAY_ORDER is the fixed, always-numbered roster for this day - every name
+  // in it is a main lift regardless of preseason/ski/care-mode toggles (those
+  // only reorder pills or adjust prescriptions, never add/remove exercises -
+  // see getDisplayOrder). So toggle state must never affect this list.
+  const coreList = DAY_ORDER[day];
   if(!coreList.every(name => isLoggedToday(name))) return;
   const today = todayISO();
   if(celebratedToday[day] === today) return;
@@ -1321,14 +1326,16 @@ function handleRestTimerBadgeTap(){
   if(!restTimer) return;
   if(restTimer.phase === "done"){
     if(!restTimer.revertedFromDone && lastRestTimerChoiceIndex != null){
-      // First tap: try to revert to a previous choice
-      // If started at -1 (recommended), go to 0 (first choice);
-      // otherwise go back one step
-      const prevIndex = lastRestTimerChoiceIndex === -1 ? 0 : lastRestTimerChoiceIndex - 1;
-      if(prevIndex >= 0 && prevIndex < restTimer.choices.length){
-        // Go to a prior choice in the array
-        restTimer.choiceIndex = prevIndex;
-        restTimer.endAt = Date.now() + restTimer.choices[prevIndex] * 1000;
+      // First tap: restart with the SAME duration that just finished,
+      // not a shorter/earlier one - "prior timer countdown time" means
+      // the one that had been counting down, not a step back in the cycle.
+      const idx = lastRestTimerChoiceIndex;
+      const durationSec = idx === -1
+        ? restBucketFor(data[restTimer.exerciseName]).minSec
+        : restTimer.choices[idx];
+      if(durationSec != null){
+        restTimer.choiceIndex = idx;
+        restTimer.endAt = Date.now() + durationSec * 1000;
         restTimer.phase = "running";
         restTimer.revertedFromDone = true;
         if(restTimer.intervalId) clearInterval(restTimer.intervalId);
@@ -1443,13 +1450,15 @@ function computeSuggestion(ex, name){
   const increment = ex.increment || 5;
 
   if(ex.trackBy === "weight"){
-    // Streak of same-weight sessions (for progression), most recent first
-    let streak = 0, allHit = true;
+    // Consecutive-hit streak at the current weight, most recent first -
+    // stops at the first missed rep target OR the first different weight.
+    // An old miss must not permanently block progression once you're back
+    // to hitting the target consistently at this same weight.
+    let streak = 0;
     for(let i = ex.entries.length - 1; i >= 0; i--){
-      if(ex.entries[i].weight === last.weight){
-        streak++;
-        if(ex.entries[i].reps < targetReps) allHit = false;
-      } else break;
+      const e = ex.entries[i];
+      if(e.weight !== last.weight || e.reps < targetReps) break;
+      streak++;
     }
 
     // Separately: how many *consecutive* misses at this same weight, most
@@ -1503,7 +1512,7 @@ function computeSuggestion(ex, name){
 
     const requiredStreak = ex.conservative ? 2 : 1;
     const hitTarget = last.reps >= targetReps;
-    let readyToProgress = streak >= requiredStreak && allHit;
+    let readyToProgress = streak >= requiredStreak;
     let difficultyNote = null;
 
     if(last.difficulty){
@@ -1664,7 +1673,7 @@ function render1RMInline(name, ex, last){
 }
 
 function renderProgressionToggle(name, ex){
-  if(ex.trackBy !== "weight") return "";
+  if(ex.trackBy !== "weight") return `<button class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;
   return `<button class="progression-btn" onclick="toggleConservative('${name.replace(/'/g,"\\'")}')">
     Progression: ${ex.conservative ? "Conservative" : "Standard"}
   </button>`;
@@ -1761,8 +1770,20 @@ function renderExerciseCard(name, ex){
   const backActive = lowBackCareMode && LOW_BACK_SENSITIVE_EXERCISES.has(name);
   const preseasonActive = preseasonMode && !!ex.preseason;
 
+  const isCustom = !allDayNames().includes(name);
+
   let html = `<div class="card${skiActive ? ' ski-mode' : ''}${kneeActive ? ' knee-mode' : ''}${backActive ? ' back-mode' : ''}${preseasonActive ? ' preseason-mode' : ''}">`;
-  html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}${preseasonActive ? '<span class="preseason-badge">🏔️ Preseason</span>' : ''}</h2>`;
+  if(isCustom && deletingExercise === name){
+    html += `<div class="ex-name-row">
+      <span style="color:var(--slate);font-size:0.85rem;">Delete "${escapeHtml(name)}" and all its logged history?</span>
+      <span class="row-actions">
+        <button class="danger-btn" onclick="confirmDeleteExercise('${name.replace(/'/g,"\\'")}')">Yes, delete</button>
+        <button class="cancel-btn" onclick="cancelDeleteExercise()">Cancel</button>
+      </span>
+    </div>`;
+  } else {
+    html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}${preseasonActive ? '<span class="preseason-badge">🏔️ Preseason</span>' : ''}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>`;
+  }
   if(kneeActive && KNEE_CARE_TIP[name]){
     html += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
   }
@@ -1965,6 +1986,17 @@ function cancelEdit(){ editingKey = null; render(); }
 function startDelete(name, idx){ deletingKey = name + "|" + idx; editingKey = null; render(); }
 function cancelDelete(){ deletingKey = null; render(); }
 
+function startDeleteExercise(name){ deletingExercise = name; render(); }
+function cancelDeleteExercise(){ deletingExercise = null; render(); }
+function confirmDeleteExercise(name){
+  delete data[name];
+  deletingExercise = null;
+  if(selected === name) selected = (view !== "overview" && DAY_ORDER[view] && DAY_ORDER[view].length) ? DAY_ORDER[view][0] : null;
+  persist();
+  enqueueOp({ id: genId(), type: "delete_exercise", payload: { name } });
+  render();
+}
+
 function saveEditEntry(name, idx){
   const ex = data[name];
   const entry = ex.entries[idx];
@@ -2028,14 +2060,17 @@ function renderForm(name, ex){
     html += renderProgressionToggle(name, ex);
     if(restTimerEnabled && ex.trackBy !== "duration"){
       html += `<button type="button" class="rest-action-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')">⏱ ${restTimeFor(ex)}</button>`;
+    } else {
+      html += `<button type="button" class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;
     }
     html += `</div>`;
   }
   html += `<div class="form-row">`;
+  const repsDefault = (ex.autoloadLastReps && ex.entries.length) ? ex.entries[ex.entries.length - 1].reps : effectiveTargetReps(ex);
   if(ex.trackBy === "weight"){
     html += `<div class="field"><label>Weight</label><input type="number" inputmode="decimal" id="f-weight"></div>`;
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="3"></div>`;
-    html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${effectiveTargetReps(ex)}"></div>`;
+    html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   } else if(ex.trackBy === "duration"){
     html += `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="f-minutes"></div>`;
     if(ex.trackDistance) html += `<div class="field"><label>Miles</label><input type="number" inputmode="decimal" step="0.1" id="f-distance"></div>`;
@@ -2043,7 +2078,7 @@ function renderForm(name, ex){
     if(ex.trackIncline) html += `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="f-incline"></div>`;
   } else {
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="3"></div>`;
-    html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${effectiveTargetReps(ex)}"></div>`;
+    html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   }
   html += `</div>`;
   html += `<div class="form-row">
