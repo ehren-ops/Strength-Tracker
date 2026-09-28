@@ -30,6 +30,10 @@
     --knee:#B3660A; --knee-bg:#FFF3E0; --knee-border:#F0C889; --knee-text:#7A4A0A;
     --back:#8C2F39; --back-bg:#FBEAEA; --back-border:#E3B3B8; --back-text:#6B1F26;
     --preseason:#6A3FA0; --preseason-bg:#F1E8FB; --preseason-border:#D9C4EF; --preseason-text:#4A2570;
+    --cat-strength:#4A5568; --cat-strength-bg:#EAEDF0; --cat-strength-border:#C7CFD9; --cat-strength-text:#333F4C;
+    --cat-cardio:#C2447D; --cat-cardio-bg:#FBEAF2; --cat-cardio-border:#F0C4DC; --cat-cardio-text:#8C2F5C;
+    --cat-core:#1B8A7A; --cat-core-bg:#E3F5F2; --cat-core-border:#B8E3DC; --cat-core-text:#0F5C51;
+    --cat-stretch:#6B8E4E; --cat-stretch-bg:#EEF3E6; --cat-stretch-border:#CFE0BB; --cat-stretch-text:#4A6134;
     --font-display:'Fjalla One',sans-serif; --font-body:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
   }
   :root[data-theme="dark"]{
@@ -50,6 +54,10 @@
     --knee:#fee440; --knee-bg:rgba(254,228,64,0.12); --knee-border:#fee440; --knee-text:#fee440;
     --back:#ff3860; --back-bg:rgba(255,56,96,0.12); --back-border:#ff3860; --back-text:#ff8fa3;
     --preseason:#00f0ff; --preseason-bg:rgba(0,240,255,0.12); --preseason-border:#00f0ff; --preseason-text:#9be8ff;
+    --cat-strength:#3B9EFF; --cat-strength-bg:rgba(59,158,255,0.12); --cat-strength-border:#3B9EFF; --cat-strength-text:#9DCBFF;
+    --cat-cardio:#FF6A00; --cat-cardio-bg:rgba(255,106,0,0.12); --cat-cardio-border:#FF6A00; --cat-cardio-text:#FFB37A;
+    --cat-core:#39FF6A; --cat-core-bg:rgba(57,255,106,0.12); --cat-core-border:#39FF6A; --cat-core-text:#A8FFC0;
+    --cat-stretch:#2DD4BF; --cat-stretch-bg:rgba(45,212,191,0.12); --cat-stretch-border:#2DD4BF; --cat-stretch-text:#99F6EC;
     --font-display:'Orbitron',sans-serif; --font-body:'Rajdhani',sans-serif; --font-mono:'Share Tech Mono',monospace;
   }
   *{box-sizing:border-box;}
@@ -77,6 +85,14 @@
   .pill.active{background:var(--amber);border-color:var(--amber);color:#fff;}
   .pill.preseason-pill{background:var(--preseason-bg);border-color:var(--preseason-border);color:var(--preseason-text);}
   .pill.preseason-pill.active{background:var(--preseason);border-color:var(--preseason);color:#fff;}
+  .pill.cat-strength{background:var(--cat-strength-bg);border-color:var(--cat-strength-border);color:var(--cat-strength-text);}
+  .pill.cat-strength.active{background:var(--cat-strength);border-color:var(--cat-strength);color:#fff;}
+  .pill.cat-cardio{background:var(--cat-cardio-bg);border-color:var(--cat-cardio-border);color:var(--cat-cardio-text);}
+  .pill.cat-cardio.active{background:var(--cat-cardio);border-color:var(--cat-cardio);color:#fff;}
+  .pill.cat-core{background:var(--cat-core-bg);border-color:var(--cat-core-border);color:var(--cat-core-text);}
+  .pill.cat-core.active{background:var(--cat-core);border-color:var(--cat-core);color:#fff;}
+  .pill.cat-stretch{background:var(--cat-stretch-bg);border-color:var(--cat-stretch-border);color:var(--cat-stretch-text);}
+  .pill.cat-stretch.active{background:var(--cat-stretch);border-color:var(--cat-stretch);color:#fff;}
   .pill.logged-today:not(.active){opacity:0.55;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:0.7rem;}
   .ex-name{font-family:var(--font-display);font-size:1.1rem;text-transform:uppercase;color:var(--accent-2);margin:0 0 0.6rem;}
@@ -206,6 +222,10 @@
   .theme-toggle.on .knob{left:27px;}
   :root[data-theme="dark"] .pill.active{color:#050308;}
   :root[data-theme="dark"] .pill.preseason-pill.active{color:#050308;}
+  :root[data-theme="dark"] .pill.cat-strength.active,
+  :root[data-theme="dark"] .pill.cat-cardio.active,
+  :root[data-theme="dark"] .pill.cat-core.active,
+  :root[data-theme="dark"] .pill.cat-stretch.active{color:#050308;}
 </style>
 
 
@@ -648,10 +668,29 @@ const DAY_ORDER = {
   full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Kettlebell Swings","Seated Calf Raise"],
   upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam","Farmer's Carry"],
   lower: ["Squat","RDL","Bulgarian Split Squat","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat"],
-  extra: ["Farmer's Carry","Zone 2 Ride","Incline Treadmill Walk","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","5-Minute Core Routine","Copenhagen Plank","Dead Hang"],
+  // Grouped by type - strength, then cardio, then core, then stretches -
+  // rather than the order they were added in, so the row reads as sections
+  // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
+  extra: ["Farmer's Carry","Dead Hang","Zone 2 Ride","Incline Treadmill Walk","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch"],
 };
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
 const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
+
+// Only used to color-code Extra's pill row into visual sections (strength /
+// cardio / core / stretch) - purely cosmetic grouping, not a gating flag
+// like preseason/ski/knee/back, so it doesn't touch trackBy or sync.
+const EXTRA_CATEGORY = {
+  "Farmer's Carry": "strength",
+  "Dead Hang": "strength",
+  "Zone 2 Ride": "cardio",
+  "Incline Treadmill Walk": "cardio",
+  "5-Minute Core Routine": "core",
+  "Copenhagen Plank": "core",
+  "Thoracic Spine Stretch": "stretch",
+  "Hip Stretch": "stretch",
+  "Leg Stretch": "stretch",
+  "Full Body Stretch": "stretch",
+};
 
 // Fixed classification, not user-editable per exercise - no need for these
 // to live on the exercise object or round-trip through Supabase like the
@@ -1626,6 +1665,7 @@ function renderDay(day){
     const isPreseasonPill = preseasonMode && !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseason);
     const pillClasses = ['pill'];
     if(isPreseasonPill) pillClasses.push('preseason-pill');
+    if(day === "extra" && EXTRA_CATEGORY[name]) pillClasses.push('cat-' + EXTRA_CATEGORY[name]);
     if(selected===name) pillClasses.push('active');
     if(loggedToday) pillClasses.push('logged-today');
     html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')">${(day !== "extra" && i < DAY_ORDER[day].length) ? (i+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
