@@ -66,7 +66,12 @@
   header h1{font-family:var(--font-display);font-weight:400;letter-spacing:0.03em;font-size:1.7rem;margin:0 0 0.2rem;text-transform:uppercase;}
   header p{margin:0;color:var(--header-muted);font-size:0.85rem;}
   .sync-status{margin-top:0.4rem !important;font-size:0.68rem !important;color:var(--sync-muted) !important;font-family:var(--font-mono);}
-  .celebration-banner{position:fixed;top:0;left:0;right:0;z-index:50;background:var(--emerald);color:var(--chart-white);text-align:center;padding:calc(0.7rem + env(safe-area-inset-top)) 1rem 0.7rem;font-weight:700;font-size:0.9rem;box-shadow:0 2px 10px rgba(0,0,0,0.25);}
+  .celebration-banner{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:var(--emerald);color:var(--chart-white);text-align:center;padding:2rem;overflow:hidden;opacity:1;transition:opacity 0.6s ease;}
+  .celebration-banner[hidden]{display:none;}
+  .celebration-banner.fade-out{opacity:0;}
+  .celebration-message{position:relative;z-index:2;font-family:var(--font-display);font-size:1.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;max-width:85%;text-shadow:0 2px 10px rgba(0,0,0,0.3);}
+  .confetti-piece{position:absolute;top:-24px;width:10px;height:16px;opacity:0.95;border-radius:2px;will-change:transform,opacity;animation:confetti-fall linear forwards;}
+  @keyframes confetti-fall{0%{transform:translateY(0) rotate(0deg);opacity:1;}100%{transform:translateY(115vh) rotate(720deg);opacity:0.85;}}
   .tabs{display:flex;gap:0.35rem;margin-top:0.9rem;flex-wrap:wrap;}
   .tab{flex:1;min-width:64px;display:flex;align-items:center;justify-content:center;text-align:center;padding:0.5rem 0.3rem;border-radius:7px;background:var(--tab-bg);border:1px solid var(--tab-border);color:var(--header-muted);font-size:0.74rem;font-weight:600;cursor:pointer;}
   .tab.active{background:var(--amber);border-color:var(--amber);color:#1B211C;}
@@ -125,6 +130,8 @@
   .field label{display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);margin-bottom:0.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .field input{width:100%;padding:0.45rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--ink);}
   .field input:focus{outline:2px solid var(--amber-light);border-color:var(--amber);}
+  .field input.field-error{border-color:var(--danger);animation:field-error-flash 0.3s ease 2;}
+  @keyframes field-error-flash{0%,100%{box-shadow:0 0 0 0 transparent;}50%{box-shadow:0 0 0 3px var(--danger);}}
   button.log{margin-top:0.7rem;width:100%;background:var(--log-btn-bg);color:var(--log-btn-text);border:none;border-radius:7px;padding:0.6rem;font-weight:600;font-size:0.85rem;cursor:pointer;transition:background-color 0.4s ease;}
   button.log.log-confirmed{background:var(--emerald);}
   .date-log-row{margin-top:0.6rem;display:flex;gap:0.5rem;align-items:flex-end;}
@@ -1102,13 +1109,49 @@ let celebratedToday = (function(){
   try{ return JSON.parse(window.localStorage.getItem(CELEBRATED_KEY)) || {}; }catch(e){ return {}; }
 })();
 
+const CONFETTI_COLORS = ['#FFC107','#FF5252','#40C4FF','#69F0AE','#E040FB','#FFFFFF'];
+function spawnConfetti(container, count){
+  const frag = document.createDocumentFragment();
+  for(let i = 0; i < count; i++){
+    const piece = document.createElement("div");
+    piece.className = "confetti-piece";
+    piece.style.left = (Math.random() * 100) + "%";
+    piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+    piece.style.animationDuration = (2.2 + Math.random() * 1.6) + "s";
+    piece.style.animationDelay = (Math.random() * 0.5) + "s";
+    frag.appendChild(piece);
+  }
+  container.appendChild(frag);
+}
+
+// Full-screen takeover rather than a thin top banner: this is a "you're
+// done for the day" moment, not a routine status toast, so it earns
+// briefly blocking the whole screen. Confetti pieces are plain divs with a
+// CSS fall animation rather than a canvas - cheap enough for ~60 pieces and
+// needs no library. Held fully visible for 3s, then fades out over 0.6s to
+// match the CSS transition, and the DOM is cleared after so old confetti
+// can't linger under the next celebration.
 function showCelebration(msg){
   const el = document.getElementById("celebration-banner");
   if(!el) return;
-  el.textContent = msg;
-  el.hidden = false;
   if(window.__celebrationTimer) clearTimeout(window.__celebrationTimer);
-  window.__celebrationTimer = setTimeout(() => { el.hidden = true; }, 4000);
+  if(window.__celebrationFadeTimer) clearTimeout(window.__celebrationFadeTimer);
+  el.innerHTML = "";
+  el.classList.remove("fade-out");
+  const messageEl = document.createElement("div");
+  messageEl.className = "celebration-message";
+  messageEl.textContent = msg;
+  el.appendChild(messageEl);
+  spawnConfetti(el, 60);
+  el.hidden = false;
+  window.__celebrationTimer = setTimeout(() => {
+    el.classList.add("fade-out");
+    window.__celebrationFadeTimer = setTimeout(() => {
+      el.hidden = true;
+      el.innerHTML = "";
+      el.classList.remove("fade-out");
+    }, 650);
+  }, 3000);
 }
 
 // Only the numbered, built-in exercises for full/upper/lower count as "core" -
@@ -2828,6 +2871,19 @@ function addExercise(){
 function cssId(name){ return name.replace(/[^a-z0-9]/gi,"-"); }
 function escapeHtml(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+// Briefly flashes a required-but-empty input red instead of silently
+// refusing to log - re-triggers the CSS animation even on a second miss in
+// a row by removing and re-adding the class on the next frame.
+function flashFieldError(el){
+  if(!el) return;
+  el.classList.remove("field-error");
+  el.focus();
+  requestAnimationFrame(() => {
+    el.classList.add("field-error");
+    setTimeout(() => el.classList.remove("field-error"), 900);
+  });
+}
+
 function logEntry(){
   const ex = data[selected];
   const dateEl = document.getElementById("f-date");
@@ -2838,7 +2894,7 @@ function logEntry(){
   let entry;
   if(ex.trackBy === "duration"){
     const minutesEl = document.getElementById("f-minutes");
-    if(!minutesEl || !minutesEl.value) return;
+    if(!minutesEl || !minutesEl.value){ flashFieldError(minutesEl); return; }
     entry = {
       clientId: genId(),
       label: "S" + (ex.entries.length + 1),
@@ -2870,7 +2926,7 @@ function logEntry(){
     const reps = Number(repsEl.value) || effectiveTargetReps(ex);
     const weight = isBodyweight ? 0 : Number(weightEl.value);
 
-    if(!isBodyweight && !weightEl.value) return;
+    if(!isBodyweight && !weightEl.value){ flashFieldError(weightEl); return; }
 
     entry = {
       clientId: genId(),
