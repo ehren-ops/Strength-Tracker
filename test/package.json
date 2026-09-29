@@ -1,0 +1,12 @@
+{
+  "name": "strength-tracker-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright regression suite for index.html - no build step, mocks Supabase in-browser.",
+  "scripts": {
+    "test": "node app.test.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}
