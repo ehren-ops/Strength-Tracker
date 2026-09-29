@@ -874,11 +874,11 @@ async function main(){
   console.log('=== 40: Preseason Prep toggle lives next to Ski Season, is independent, and persists ===');
   await page.click('.tab:has-text("Overview")');
   if(await page.locator('button:has-text("Preseason Prep: OFF"), button:has-text("Preseason Prep: ON")').count() !== 1) throw new Error('expected a Preseason Prep toggle in Training Modifiers');
-  const preseasonStateBefore = await page.evaluate(() => preseasonMode);
+  const preseasonStateBefore = await page.evaluate(() => modes.preseason);
   if(preseasonStateBefore) throw new Error('expected Preseason Prep to start OFF');
   await page.click('button:has-text("Preseason Prep: OFF")');
   await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'preseason toggle sync');
-  const preseasonStateAfter = await page.evaluate(() => preseasonMode);
+  const preseasonStateAfter = await page.evaluate(() => modes.preseason);
   if(!preseasonStateAfter) throw new Error('expected Preseason Prep to turn ON after clicking it');
   const preseasonStored = await page.evaluate(() => localStorage.getItem('strength-tracker-preseason-mode'));
   if(preseasonStored !== '1') throw new Error('expected the preseason toggle to persist to localStorage');
@@ -967,7 +967,7 @@ async function main(){
   // alongside their Preseason badge here - this checks the two badge
   // systems stack correctly, not a fresh "before/after" toggle. Both now
   // live on Lower Body (the squat day) after the movement-pattern regroup.
-  const kneeCareCurrentlyOn = await page.evaluate(() => kneeCareMode);
+  const kneeCareCurrentlyOn = await page.evaluate(() => modes.knee);
   if(!kneeCareCurrentlyOn) throw new Error('expected Knee Care mode to already be on from an earlier scenario');
   await page.click('.tab:has-text("Lower Body")');
   await page.locator('.pill').filter({ hasText: /Skater Bound/ }).click();
@@ -984,7 +984,7 @@ async function main(){
   console.log('OK: week-3 exercises are labeled rather than hidden, and Knee Care badges stack correctly on new exercises');
 
   console.log('=== 44: modifier toggles (preseason, etc.) never change which exercises gate the core-workout-complete banner ===');
-  const preseasonIsOnBefore44 = await page.evaluate(() => preseasonMode);
+  const preseasonIsOnBefore44 = await page.evaluate(() => modes.preseason);
   if(!preseasonIsOnBefore44) throw new Error('expected Preseason Prep to still be on entering this scenario');
   const coreListWithPreseasonOn = await page.evaluate(() => DAY_ORDER.upper);
   if(!coreListWithPreseasonOn.includes('Med Ball Slam')) throw new Error('expected Med Ball Slam to always count toward the Upper Body core list');

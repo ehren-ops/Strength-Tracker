@@ -210,14 +210,17 @@
   .cal-legend{display:flex;gap:0.7rem;margin-top:0.7rem;font-size:0.68rem;color:var(--slate);flex-wrap:wrap;align-items:center;}
   .cal-legend span{display:flex;align-items:center;gap:0.25rem;}
   .card.ski-mode{border-color:var(--ski);box-shadow:0 0 0 1px rgba(21,101,192,0.18);}
-  .ski-badge{display:inline-block;background:var(--ski);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
-  .ski-tempo-line{font-size:0.76rem;color:var(--ski-text);background:var(--ski-bg);border:1px solid var(--ski-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
   .card.knee-mode{border-color:var(--knee);box-shadow:0 0 0 1px rgba(179,102,10,0.18);}
   .card.back-mode{border-color:var(--back);box-shadow:0 0 0 1px rgba(140,47,57,0.18);}
-  .knee-badge{display:inline-block;background:var(--knee);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
-  .back-badge{display:inline-block;background:var(--back);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
   .card.preseason-mode{border-color:var(--preseason);box-shadow:0 0 0 1px rgba(106,63,160,0.18);}
-  .preseason-badge{display:inline-block;background:var(--preseason);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
+  /* Shared shape for all four mode badges - only the background differs
+     per mode, so each class below is just a one-line color override. */
+  .ski-badge, .knee-badge, .back-badge, .preseason-badge{display:inline-block;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
+  .ski-badge{background:var(--ski);}
+  .knee-badge{background:var(--knee);}
+  .back-badge{background:var(--back);}
+  .preseason-badge{background:var(--preseason);}
+  .ski-tempo-line{font-size:0.76rem;color:var(--ski-text);background:var(--ski-bg);border:1px solid var(--ski-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
   .preseason-line{font-size:0.76rem;color:var(--preseason-text);background:var(--preseason-bg);border:1px solid var(--preseason-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
   .preseason-line + .preseason-line{margin-top:-0.35rem;}
   .care-line{font-size:0.76rem;border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
@@ -445,10 +448,7 @@ async function runOp(op){
   if(op.type === "upsert_settings"){
     const { error } = await supabaseClient.from("user_settings").upsert({
       user_id: userId,
-      ski_season_mode: skiSeasonMode,
-      knee_care_mode: kneeCareMode,
-      low_back_care_mode: lowBackCareMode,
-      preseason_mode: preseasonMode,
+      ...Object.fromEntries(MODE_DEFS.map(m => [m.column, modes[m.key]])),
     }, { onConflict: "user_id" });
     if(error) throw error;
     return true;
@@ -566,22 +566,12 @@ async function pullRemoteAndMerge(){
   });
 
   const { data: settingsRow } = await supabaseClient.from("user_settings").select("*").eq("user_id", userId).maybeSingle();
-  if(settingsRow && window.localStorage.getItem(SKI_MODE_KEY) === null){
-    skiSeasonMode = settingsRow.ski_season_mode;
-    try{ window.localStorage.setItem(SKI_MODE_KEY, skiSeasonMode ? "1" : "0"); }catch(e){}
-  }
-  if(settingsRow && window.localStorage.getItem(KNEE_MODE_KEY) === null){
-    kneeCareMode = settingsRow.knee_care_mode;
-    try{ window.localStorage.setItem(KNEE_MODE_KEY, kneeCareMode ? "1" : "0"); }catch(e){}
-  }
-  if(settingsRow && window.localStorage.getItem(BACK_MODE_KEY) === null){
-    lowBackCareMode = settingsRow.low_back_care_mode;
-    try{ window.localStorage.setItem(BACK_MODE_KEY, lowBackCareMode ? "1" : "0"); }catch(e){}
-  }
-  if(settingsRow && window.localStorage.getItem(PRESEASON_MODE_KEY) === null){
-    preseasonMode = !!settingsRow.preseason_mode;
-    try{ window.localStorage.setItem(PRESEASON_MODE_KEY, preseasonMode ? "1" : "0"); }catch(e){}
-  }
+  MODE_DEFS.forEach(m => {
+    if(settingsRow && window.localStorage.getItem(m.storageKey) === null){
+      modes[m.key] = !!settingsRow[m.column];
+      try{ window.localStorage.setItem(m.storageKey, modes[m.key] ? "1" : "0"); }catch(e){}
+    }
+  });
 
   persist();
   render();
@@ -651,11 +641,11 @@ const SEED = {
 
 // Preseason additions (exercises with preseason:true in EXERCISE_DEFAULTS)
 // sit permanently at the end of these lists rather than being conditionally
-// shown/hidden by preseasonMode - only their badges/notes/target reps react
+// shown/hidden by modes.preseason - only their badges/notes/target reps react
 // to the toggle. Position 0 of each list is also the exercise shown by
 // default when you open that tab, so power work is deliberately NOT placed
 // first here even though it's meant to happen first in the session and
-// visually moves to the front of the pill row when preseasonMode is on
+// visually moves to the front of the pill row when modes.preseason is on
 // (see getDisplayOrder) - opening a tab should still land on the main lift.
 // Preseason day mapping: Lower Body = squat day, Upper Body = upper day,
 // Full Body = hinge day (RDL already lives there). Each addition is
@@ -898,22 +888,27 @@ let editingKey = null;
 let deletingKey = null;
 let deletingExercise = null;
 let editing1RM = null;
-const SKI_MODE_KEY = "strength-tracker-ski-mode";
-let skiSeasonMode = (function(){
-  try{ return window.localStorage.getItem(SKI_MODE_KEY) === "1"; }catch(e){ return false; }
-})();
-const KNEE_MODE_KEY = "strength-tracker-knee-mode";
-let kneeCareMode = (function(){
-  try{ return window.localStorage.getItem(KNEE_MODE_KEY) === "1"; }catch(e){ return false; }
-})();
-const BACK_MODE_KEY = "strength-tracker-back-mode";
-let lowBackCareMode = (function(){
-  try{ return window.localStorage.getItem(BACK_MODE_KEY) === "1"; }catch(e){ return false; }
-})();
-const PRESEASON_MODE_KEY = "strength-tracker-preseason-mode";
-let preseasonMode = (function(){
-  try{ return window.localStorage.getItem(PRESEASON_MODE_KEY) === "1"; }catch(e){ return false; }
-})();
+// Data-driven table for the four "training modifier" toggles, instead of a
+// separate variable/init/toggle/cloud-merge/settings-row block per mode -
+// see toggleMode() below, the cloud-settings merge in pullRemoteAndMerge(),
+// and the settings row built in runOp()'s upsert_settings handler, which
+// all loop over this same list instead of repeating themselves per mode.
+// This only unifies that identical on/off/persist/sync bookkeeping - each
+// mode's actual EFFECT (what it does while active) still lives entirely
+// separately: KNEE_SENSITIVE_EXERCISES/KNEE_CARE_TIP for knee, its back
+// equivalents, targetRepsSki/skiTempo for ski, and the preseason* fields
+// on individual exercises for preseason.
+const MODE_DEFS = [
+  { key: "ski", storageKey: "strength-tracker-ski-mode", column: "ski_season_mode" },
+  { key: "knee", storageKey: "strength-tracker-knee-mode", column: "knee_care_mode" },
+  { key: "back", storageKey: "strength-tracker-back-mode", column: "low_back_care_mode" },
+  { key: "preseason", storageKey: "strength-tracker-preseason-mode", column: "preseason_mode" },
+];
+const modes = {};
+MODE_DEFS.forEach(m => {
+  try{ modes[m.key] = window.localStorage.getItem(m.storageKey) === "1"; }
+  catch(e){ modes[m.key] = false; }
+});
 // Display preference only, not training data, so this stays local to the
 // device rather than syncing through upsert_settings like the modes above.
 const DARK_MODE_KEY = "strength-tracker-dark-mode";
@@ -946,34 +941,17 @@ function toggleRestTimerEnabled(){
   render();
 }
 
-function toggleSkiSeason(){
-  skiSeasonMode = !skiSeasonMode;
-  try{ window.localStorage.setItem(SKI_MODE_KEY, skiSeasonMode ? "1" : "0"); }catch(e){}
-  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
-  render();
-}
-function toggleKneeCareMode(){
-  kneeCareMode = !kneeCareMode;
-  try{ window.localStorage.setItem(KNEE_MODE_KEY, kneeCareMode ? "1" : "0"); }catch(e){}
-  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
-  render();
-}
-function toggleLowBackCareMode(){
-  lowBackCareMode = !lowBackCareMode;
-  try{ window.localStorage.setItem(BACK_MODE_KEY, lowBackCareMode ? "1" : "0"); }catch(e){}
-  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
-  render();
-}
-function togglePreseasonMode(){
-  preseasonMode = !preseasonMode;
-  try{ window.localStorage.setItem(PRESEASON_MODE_KEY, preseasonMode ? "1" : "0"); }catch(e){}
+function toggleMode(key){
+  const def = MODE_DEFS.find(m => m.key === key);
+  modes[key] = !modes[key];
+  try{ window.localStorage.setItem(def.storageKey, modes[key] ? "1" : "0"); }catch(e){}
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
   render();
 }
 
 function effectiveTargetReps(ex){
-  if(preseasonMode && ex.targetRepsPreseason) return ex.targetRepsPreseason;
-  return (skiSeasonMode && ex.targetRepsSki) ? ex.targetRepsSki : (ex.targetReps || 8);
+  if(modes.preseason && ex.targetRepsPreseason) return ex.targetRepsPreseason;
+  return (modes.ski && ex.targetRepsSki) ? ex.targetRepsSki : (ex.targetReps || 8);
 }
 
 function loadSaved(){
@@ -1532,8 +1510,8 @@ function computeSuggestion(ex, name){
     // read - while active on a flagged exercise, always hold and proactively
     // trim load rather than waiting for a miss streak like a normal deload.
     const careFlags = [];
-    if(kneeCareMode && KNEE_SENSITIVE_EXERCISES.has(name)) careFlags.push("knee");
-    if(lowBackCareMode && LOW_BACK_SENSITIVE_EXERCISES.has(name)) careFlags.push("back");
+    if(modes.knee && KNEE_SENSITIVE_EXERCISES.has(name)) careFlags.push("knee");
+    if(modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name)) careFlags.push("back");
     if(careFlags.length){
       const careWeight = Math.round((last.weight * 0.90) / 2.5) * 2.5;
       return {
@@ -1645,7 +1623,7 @@ function switchView(v){
 // anything else that depends on stable positions.
 function getDisplayOrder(day){
   const order = DAY_ORDER[day];
-  if(!preseasonMode) return order;
+  if(!modes.preseason) return order;
   const isPower = name => !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseasonPower);
   const power = order.filter(isPower);
   if(!power.length) return order;
@@ -1663,7 +1641,7 @@ function renderDay(day){
     // Preseason-flagged exercises get a light purple pill so they're
     // visible at a glance in the row, and a darker solid purple instead
     // of the usual amber when they're also the selected/active pill.
-    const isPreseasonPill = preseasonMode && !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseason);
+    const isPreseasonPill = modes.preseason && !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseason);
     const pillClasses = ['pill'];
     if(isPreseasonPill) pillClasses.push('preseason-pill');
     if(day === "extra" && EXTRA_CATEGORY[name]) pillClasses.push('cat-' + EXTRA_CATEGORY[name]);
@@ -1806,10 +1784,10 @@ function renderExerciseCard(name, ex){
   const last = hasEntries ? ex.entries[ex.entries.length-1] : null;
   const first = hasEntries ? ex.entries[0] : null;
   const suggestion = computeSuggestion(ex, name);
-  const skiActive = skiSeasonMode && !!ex.targetRepsSki;
-  const kneeActive = kneeCareMode && KNEE_SENSITIVE_EXERCISES.has(name);
-  const backActive = lowBackCareMode && LOW_BACK_SENSITIVE_EXERCISES.has(name);
-  const preseasonActive = preseasonMode && !!ex.preseason;
+  const skiActive = modes.ski && !!ex.targetRepsSki;
+  const kneeActive = modes.knee && KNEE_SENSITIVE_EXERCISES.has(name);
+  const backActive = modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name);
+  const preseasonActive = modes.preseason && !!ex.preseason;
 
   const isCustom = !allDayNames().includes(name);
 
@@ -2551,13 +2529,13 @@ function generateCoachNotes(){
   if(!missed.length && !concerns.length && hitCount === total){
     sentences.push(increased.length ? `Clean session across the board - nothing to dial back here.` : `Solid and consistent - everything landed, nothing urgent to change.`);
   }
-  if(skiSeasonMode && (dayGuess === "lower" || dayGuess === "full")){
+  if(modes.ski && (dayGuess === "lower" || dayGuess === "full")){
     sentences.push(`🎿 Ski season is on - keep leaning into single-leg work and a controlled lowering phase on squat/split squat/lunge.`);
   }
-  if(kneeCareMode){
+  if(modes.knee){
     sentences.push(`🦵 Knee care mode is on - squat, Bulgarian split squat, and walking lunge are holding at a lighter load.`);
   }
-  if(lowBackCareMode){
+  if(modes.back){
     sentences.push(`🩺 Low back care mode is on - squat, RDL, barbell row, and kettlebell swings are holding at a lighter load.`);
   }
 
@@ -2716,32 +2694,32 @@ function renderOverview(){
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
         🎿 Squat, Bulgarian Split Squat, and Walking Lunge shift to lower rep targets with a slower eccentric tempo and more single-leg emphasis. Roughly Nov-March.
       </p>
-      <button class="tool-btn" onclick="toggleSkiSeason()" style="background:${skiSeasonMode ? 'var(--ski)' : ''};color:${skiSeasonMode ? '#fff' : ''};border-color:${skiSeasonMode ? 'var(--ski)' : ''};">
-        ${skiSeasonMode ? '🎿 Ski Season: ON' : '🎿 Ski Season: OFF'}
+      <button class="tool-btn" onclick="toggleMode('ski')" style="background:${modes.ski ? 'var(--ski)' : ''};color:${modes.ski ? '#fff' : ''};border-color:${modes.ski ? 'var(--ski)' : ''};">
+        ${modes.ski ? '🎿 Ski Season: ON' : '🎿 Ski Season: OFF'}
       </button>
     </div>
     <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
         🏔️ Adds power/explosive, frontal plane, eccentric quad, and loaded calf accessories to your existing Full/Upper/Lower days for the ~7-10 week ramp into ski season. Independent of Ski Season mode above - run either or both. Power work goes first in the session, after warmup and before the heavy lifts; stop a power set the moment speed drops, it's not conditioning.
       </p>
-      <button class="tool-btn" onclick="togglePreseasonMode()" style="background:${preseasonMode ? 'var(--preseason)' : ''};color:${preseasonMode ? '#fff' : ''};border-color:${preseasonMode ? 'var(--preseason)' : ''};">
-        ${preseasonMode ? '🏔️ Preseason Prep: ON' : '🏔️ Preseason Prep: OFF'}
+      <button class="tool-btn" onclick="toggleMode('preseason')" style="background:${modes.preseason ? 'var(--preseason)' : ''};color:${modes.preseason ? '#fff' : ''};border-color:${modes.preseason ? 'var(--preseason)' : ''};">
+        ${modes.preseason ? '🏔️ Preseason Prep: ON' : '🏔️ Preseason Prep: OFF'}
       </button>
     </div>
     <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
         🦵 Squat, Bulgarian Split Squat, and Walking Lunge hold and cut load ~10% while your knee settles down. Everything else trains as normal.
       </p>
-      <button class="tool-btn" onclick="toggleKneeCareMode()" style="background:${kneeCareMode ? 'var(--knee)' : ''};color:${kneeCareMode ? '#fff' : ''};border-color:${kneeCareMode ? 'var(--knee)' : ''};">
-        ${kneeCareMode ? '🦵 Knee Care: ON' : '🦵 Knee Care: OFF'}
+      <button class="tool-btn" onclick="toggleMode('knee')" style="background:${modes.knee ? 'var(--knee)' : ''};color:${modes.knee ? '#fff' : ''};border-color:${modes.knee ? 'var(--knee)' : ''};">
+        ${modes.knee ? '🦵 Knee Care: ON' : '🦵 Knee Care: OFF'}
       </button>
     </div>
     <div>
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
         🩺 Squat, RDL, Barbell Row, and Kettlebell Swings hold and cut load ~10% while your lower back settles down. Everything else trains as normal.
       </p>
-      <button class="tool-btn" onclick="toggleLowBackCareMode()" style="background:${lowBackCareMode ? 'var(--back)' : ''};color:${lowBackCareMode ? '#fff' : ''};border-color:${lowBackCareMode ? 'var(--back)' : ''};">
-        ${lowBackCareMode ? '🩺 Low Back Care: ON' : '🩺 Low Back Care: OFF'}
+      <button class="tool-btn" onclick="toggleMode('back')" style="background:${modes.back ? 'var(--back)' : ''};color:${modes.back ? '#fff' : ''};border-color:${modes.back ? 'var(--back)' : ''};">
+        ${modes.back ? '🩺 Low Back Care: ON' : '🩺 Low Back Care: OFF'}
       </button>
     </div>
   </div>`;
