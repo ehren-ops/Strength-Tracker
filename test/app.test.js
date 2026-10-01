@@ -939,10 +939,10 @@ async function main(){
   // Day mapping: Lower Body = squat day (Box Jumps/Lateral Lunge/Trap Bar
   // Jump/Skater Bound/Spanish Squat - all quad-dominant/squat-pattern work
   // now lives here, not spread across days), Upper Body = upper day (Med
-  // Ball Slam/Farmer's Carry), Full Body = hinge day (Kettlebell Swings,
-  // the one exercise that actually mirrors RDL's hip-hinge pattern, plus
-  // Seated Calf Raise). Copenhagen Plank (hip adductor, no upper-body
-  // connection) moved to Extra instead of Upper Body.
+  // Ball Slam), Full Body = hinge day (Kettlebell Swings, the one exercise
+  // that actually mirrors RDL's hip-hinge pattern, plus Seated Calf Raise).
+  // Copenhagen Plank (hip adductor, no upper-body connection) moved to
+  // Extra instead of Upper Body.
   await page.click('.tab:has-text("Overview")');
   await page.click('.tab:has-text("Full Body")');
   const landingExName = await page.evaluate(() => selected);
@@ -1171,8 +1171,8 @@ async function main(){
   console.log('OK: a real Lower Body session with several Full-Body-shared lifts still classifies as Lower Body, not Full Body');
 
   const farmerCarryAloneGuess = await page.evaluate(() => guessDayForNames(["Farmer's Carry"]));
-  if(farmerCarryAloneGuess !== 'extra') throw new Error('expected a day with only Farmer\'s Carry logged (shared between Upper Body and Extra) to default to extra, got: ' + farmerCarryAloneGuess);
-  console.log('OK: Farmer\'s Carry logged alone defaults to Extra rather than Upper Body');
+  if(farmerCarryAloneGuess !== 'extra') throw new Error('expected a day with only Farmer\'s Carry logged (Extra-only exercise) to default to extra, got: ' + farmerCarryAloneGuess);
+  console.log('OK: Farmer\'s Carry logged alone defaults to Extra');
 
   const realUpperGuess = await page.evaluate(() => guessDayForNames(['Bench Press','Barbell Row','Face Pulls','Bicep Curl','Tricep Pushdown']));
   if(realUpperGuess !== 'upper') throw new Error('expected a real Upper Body session to still classify as upper, got: ' + realUpperGuess);
@@ -1458,6 +1458,57 @@ async function main(){
   const errorCardText = await page.locator('.card').first().textContent();
   if(!errorCardText.includes('Edge Functions')) throw new Error('expected setup instructions pointing at Supabase Edge Function secrets, got: ' + errorCardText);
   console.log('OK: a missing-key error surfaces setup instructions instead of a generic "try again" message');
+
+  console.log('=== 61: the core-workout-complete banner fires for Upper Body and Lower Body too, not just Full Body ===');
+  // Scenario 26 only ever exercised Full Body end to end - Upper Body and
+  // Lower Body had no direct "does the banner actually fire" coverage,
+  // which is exactly how Farmer's Carry silently sitting on both
+  // DAY_ORDER.upper and DAY_ORDER.extra went unnoticed (it made Upper
+  // Body's banner require an 11th exercise that read, visually, like an
+  // Extra-day accessory). Logs every current item in each list fresh and
+  // confirms the banner actually appears for both.
+  async function fillAndLog(page, name){
+    const trackBy = await page.evaluate((n) => data[n] ? data[n].trackBy : newExerciseShell(n).trackBy, name);
+    if(trackBy === 'weight') await page.fill('#f-weight', '50');
+    else if(trackBy === 'duration') await page.fill('#f-minutes', '20');
+    await page.click('button.log:has-text("Log set")');
+  }
+  await page.evaluate(() => {
+    celebratedToday.upper = null;
+    celebratedToday.lower = null;
+    try{ localStorage.setItem('strength-tracker-celebrated', JSON.stringify(celebratedToday)); }catch(e){}
+  });
+
+  await page.click('.tab:has-text("Upper Body")');
+  await sleep(150);
+  const upperList = await page.evaluate(() => DAY_ORDER.upper);
+  if(upperList.includes("Farmer's Carry")) throw new Error('expected Farmer\'s Carry to no longer be required on Upper Body');
+  for(const name of upperList){
+    await page.locator('.pill').filter({ hasText: new RegExp('\\.\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($| )') }).first().click();
+    await sleep(80);
+    await fillAndLog(page, name);
+    await sleep(80);
+  }
+  await sleep(200);
+  let upperLowerBannerHidden = await page.evaluate(() => document.getElementById('celebration-banner').hidden);
+  let upperLowerBannerText = await page.evaluate(() => document.getElementById('celebration-banner').textContent);
+  if(upperLowerBannerHidden || !upperLowerBannerText.includes('Upper Body complete')) throw new Error('expected the Upper Body celebration banner to fire once every current Upper Body exercise is logged, got hidden=' + upperLowerBannerHidden + ' text=' + upperLowerBannerText);
+  console.log('OK: Upper Body banner fires with its current (Farmer\'s-Carry-free) exercise list');
+
+  await page.click('.tab:has-text("Lower Body")');
+  await sleep(150);
+  const lowerList = await page.evaluate(() => DAY_ORDER.lower);
+  for(const name of lowerList){
+    await page.locator('.pill').filter({ hasText: new RegExp('\\.\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($| )') }).first().click();
+    await sleep(80);
+    await fillAndLog(page, name);
+    await sleep(80);
+  }
+  await sleep(200);
+  upperLowerBannerHidden = await page.evaluate(() => document.getElementById('celebration-banner').hidden);
+  upperLowerBannerText = await page.evaluate(() => document.getElementById('celebration-banner').textContent);
+  if(upperLowerBannerHidden || !upperLowerBannerText.includes('Lower Body complete')) throw new Error('expected the Lower Body celebration banner to fire once every Lower Body exercise is logged, got hidden=' + upperLowerBannerHidden + ' text=' + upperLowerBannerText);
+  console.log('OK: Lower Body banner fires too - all three main muscle-group days confirmed working');
 
   console.log('\nALL SCENARIOS PASSED');
   await browser.close();

@@ -653,12 +653,17 @@ const SEED = {
 // evenly across days: Box Jumps/Trap Bar Jump/Skater Bound/Spanish Squat
 // (all quad-dominant/squat-pattern) and Lateral Lunge (frontal-plane) go
 // with Lower Body; Kettlebell Swings (hip-hinge, mirrors RDL) and Seated
-// Calf Raise go with Full Body; Med Ball Slam and Farmer's Carry go with
-// Upper Body. Copenhagen Plank (hip adductor) has no upper-body
-// connection, so it lives on Extra instead of a lift day.
+// Calf Raise go with Full Body; Med Ball Slam goes with Upper Body.
+// Copenhagen Plank (hip adductor) has no upper-body connection, so it
+// lives on Extra instead of a lift day. Farmer's Carry originally lived on
+// both Upper Body and Extra - every name in a day's list is a required,
+// always-numbered "main lift" for that day's completion banner (see
+// checkCoreWorkoutComplete), so being on two lists made it silently
+// required on Upper Body while reading, visually, like an Extra accessory.
+// Dropped from Upper Body for that reason; it still lives on Extra.
 const DAY_ORDER = {
   full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Kettlebell Swings","Seated Calf Raise"],
-  upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam","Farmer's Carry"],
+  upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
   lower: ["Squat","RDL","Bulgarian Split Squat","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat"],
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
@@ -2319,14 +2324,12 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
 const DAY_GROUP_KEYS = ["full","upper","lower","extra"];
 // How much a logged exercise should count as evidence for a given day
 // type. An exercise that lives on only one day list (e.g. Walking Lunge,
-// Lower Body only) is strong, distinctive evidence; one shared across
-// several lists (e.g. Squat/RDL, on both Full Body and Lower Body, or
-// Farmer's Carry, on both Upper Body and Extra) doesn't discriminate
-// between them and should count for proportionally less. Raw overlap
-// counts previously let Full Body's broad roster (which overlaps with
-// almost everything) win ties it shouldn't, and let a single shared
-// exercise like Farmer's Carry outweigh a day with no other logged
-// exercises at all.
+// Lower Body only, or Farmer's Carry, Extra only) is strong, distinctive
+// evidence; one shared across several lists (e.g. Squat/RDL, on both Full
+// Body and Lower Body) doesn't discriminate between them and should count
+// for proportionally less. Raw overlap counts previously let Full Body's
+// broad roster (which overlaps with almost everything) win ties it
+// shouldn't.
 function daySpecificityWeight(name){
   const memberships = DAY_GROUP_KEYS.filter(d => DAY_ORDER[d].includes(name)).length;
   return memberships > 0 ? 1 / memberships : 0;
@@ -2336,9 +2339,9 @@ function guessDayForNames(names){
   DAY_GROUP_KEYS.forEach(d => {
     const score = names.reduce((sum, n) => sum + (DAY_ORDER[d].includes(n) ? daySpecificityWeight(n) : 0), 0);
     // "Extra" wins ties outright (>=) rather than only strictly beating the
-    // leader (>) - a one-off exercise that only moonlights in a muscle
-    // group (like Farmer's Carry) should read as an off-day Extra session
-    // by default, not as whichever group it happens to also belong to.
+    // leader (>) - a one-off exercise that happens to also moonlight in a
+    // muscle group's list should read as an off-day Extra session by
+    // default, not as whichever group it happens to also belong to.
     const wins = d === "extra" ? score >= bestScore : score > bestScore;
     if(score > 0 && wins){ bestScore = score; best = d; }
   });
