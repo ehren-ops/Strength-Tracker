@@ -1446,6 +1446,19 @@ async function main(){
   if(await page.locator('text=Mock breakdown headline').count() !== 1) throw new Error('expected clicking the collapsed header to reveal the cached content');
   console.log('OK: clicking the collapsed header reveals the cached content without re-generating');
 
+  console.log('=== 60: a fresh deployment with no ANTHROPIC_API_KEY set shows setup instructions, not a dead-end retry message ===');
+  // Overrides the context-level mock above just for this page - simulates
+  // what anyone else pulling this repo and standing up their own Supabase
+  // project sees before they've added the secret.
+  await page.route('**/functions/v1/workout-breakdown', route => {
+    route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'anthropic_key_not_configured' }) });
+  });
+  await page.click('button:has-text("Regenerate")');
+  await waitForText(page, '.card', t => t.includes('ANTHROPIC_API_KEY'), 5000, 'missing-key error message');
+  const errorCardText = await page.locator('.card').first().textContent();
+  if(!errorCardText.includes('Edge Functions')) throw new Error('expected setup instructions pointing at Supabase Edge Function secrets, got: ' + errorCardText);
+  console.log('OK: a missing-key error surfaces setup instructions instead of a generic "try again" message');
+
   console.log('\nALL SCENARIOS PASSED');
   await browser.close();
 }

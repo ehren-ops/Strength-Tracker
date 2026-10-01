@@ -2606,7 +2606,14 @@ async function generateFullAiBreakdown(){
     saveAiBreakdowns();
     aiBreakdownExpanded[lastDate] = true;
   }catch(e){
-    aiBreakdownError = "Couldn't generate a breakdown right now - try again in a moment.";
+    // A fresh deployment (anyone else pulling this repo and standing up
+    // their own Supabase project) won't have ANTHROPIC_API_KEY set yet -
+    // the edge function reports that specific error rather than a generic
+    // failure, so surface setup instructions instead of "try again," which
+    // would just fail forever with no way for them to know why.
+    aiBreakdownError = e.message === "anthropic_key_not_configured"
+      ? "This needs an Anthropic API key configured on your Supabase project. Add ANTHROPIC_API_KEY under Project Settings → Edge Functions → Secrets - see supabase/functions/workout-breakdown/README.md for details."
+      : "Couldn't generate a breakdown right now - try again in a moment.";
   }finally{
     aiBreakdownLoading = false;
     render();
