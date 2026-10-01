@@ -2542,6 +2542,127 @@ function generateCoachNotes(){
   return sentences.join(" ");
 }
 
+// ---------- full AI breakdown (on-demand, cached, not re-generated automatically) ----------
+// Keyed by session date so each day's breakdown is generated once and then
+// stays put - reopening the app or re-rendering never re-fires the call.
+// Purely a local convenience cache, not training data, so it isn't synced.
+const AI_BREAKDOWN_KEY = "strength-tracker-ai-breakdowns";
+let aiBreakdowns = (function(){
+  try{ return JSON.parse(window.localStorage.getItem(AI_BREAKDOWN_KEY)) || {}; }catch(e){ return {}; }
+})();
+function saveAiBreakdowns(){
+  try{ window.localStorage.setItem(AI_BREAKDOWN_KEY, JSON.stringify(aiBreakdowns)); }catch(e){}
+}
+let aiBreakdownExpanded = {};
+let aiBreakdownLoading = false;
+let aiBreakdownError = null;
+
+// Builds the compact session summary sent to the workout-breakdown edge
+// function - only the one session's data plus a short recent-history trend
+// per exercise, not the full training history, to keep the request small
+// and keep the model from reasoning about anything not actually in view.
+function buildWorkoutBreakdownPayload(lastDate){
+  const exercises = [];
+  Object.entries(data).forEach(([name, ex]) => {
+    if(ex.trackBy === "checklist") return;
+    const idx = ex.entries.findIndex(e => e.date === lastDate);
+    if(idx === -1) return;
+    const entry = ex.entries[idx];
+    const recentHistory = ex.entries.slice(Math.max(0, idx - 4), idx).map(e => formatEntryValue(e, ex) + (e.difficulty ? ` @RPE ${e.difficulty}` : ""));
+    exercises.push({
+      name,
+      value: formatEntryValue(entry, ex),
+      targetHit: ex.trackBy === "weight" ? entry.reps >= (ex.targetReps || 8) : null,
+      difficulty: entry.difficulty ?? null,
+      note: entry.note || null,
+      recentHistory,
+    });
+  });
+  const dayGuess = guessDayForNames(exercises.map(e => e.name));
+  return {
+    date: lastDate,
+    dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Last session",
+    modes: { ski: modes.ski, knee: modes.knee, back: modes.back, preseason: modes.preseason },
+    exercises,
+  };
+}
+
+async function generateFullAiBreakdown(){
+  const lastDate = getLastSessionDate();
+  if(!lastDate) return;
+  aiBreakdownLoading = true;
+  aiBreakdownError = null;
+  render();
+  try{
+    const payload = buildWorkoutBreakdownPayload(lastDate);
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/workout-breakdown`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session: payload }),
+    });
+    const body = await res.json().catch(() => null);
+    if(!res.ok || !body || !body.breakdown) throw new Error((body && body.error) || `request failed (${res.status})`);
+    aiBreakdowns[lastDate] = body.breakdown;
+    saveAiBreakdowns();
+    aiBreakdownExpanded[lastDate] = true;
+  }catch(e){
+    aiBreakdownError = "Couldn't generate a breakdown right now - try again in a moment.";
+  }finally{
+    aiBreakdownLoading = false;
+    render();
+  }
+}
+
+function toggleAiBreakdownExpanded(date){
+  aiBreakdownExpanded[date] = !aiBreakdownExpanded[date];
+  render();
+}
+
+function renderAiBreakdownList(title, items){
+  if(!items || !items.length) return "";
+  return `<div style="margin-top:0.5rem;">
+    <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.04em;font-weight:700;color:var(--slate);margin-bottom:0.25rem;">${title}</div>
+    <ul style="margin:0;padding-left:1.1rem;font-size:0.82rem;line-height:1.45;color:var(--ink);">
+      ${items.map(i => `<li>${escapeHtml(i)}</li>`).join("")}
+    </ul>
+  </div>`;
+}
+
+function renderAiBreakdownSection(lastDate){
+  const cached = aiBreakdowns[lastDate];
+
+  if(!cached){
+    return `<div style="margin-top:0.6rem;padding-top:0.5rem;border-top:1px dashed var(--line);">
+      <button class="tool-btn" onclick="generateFullAiBreakdown()" ${aiBreakdownLoading ? "disabled" : ""}>
+        ${aiBreakdownLoading ? "🤖 Generating…" : "🤖 Full AI Breakdown"}
+      </button>
+      ${aiBreakdownError ? `<div style="font-size:0.74rem;color:var(--danger);margin-top:0.4rem;">${escapeHtml(aiBreakdownError)}</div>` : ""}
+    </div>`;
+  }
+
+  const expanded = !!aiBreakdownExpanded[lastDate];
+  let html = `<div style="margin-top:0.6rem;padding-top:0.5rem;border-top:1px dashed var(--line);">
+    <div onclick="toggleAiBreakdownExpanded('${lastDate}')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:var(--slate);">
+      <span>🤖 Full AI Breakdown</span>
+      <span style="color:var(--amber);font-weight:600;">${expanded ? "Hide ▲" : "Show ▼"}</span>
+    </div>`;
+  if(expanded){
+    html += `<div style="margin-top:0.4rem;">
+      <p style="font-size:0.85rem;line-height:1.5;color:var(--ink);margin:0;">${escapeHtml(cached.headline || "")}</p>
+      ${renderAiBreakdownList("What went well", cached.wentWell)}
+      ${renderAiBreakdownList("What didn't go great", cached.notGreat)}
+      ${renderAiBreakdownList("How to improve", cached.howToImprove)}
+      ${renderAiBreakdownList("Be mindful of next time", cached.mindfulNextTime)}
+      <button class="tool-btn" style="margin-top:0.6rem;" onclick="generateFullAiBreakdown()" ${aiBreakdownLoading ? "disabled" : ""}>
+        ${aiBreakdownLoading ? "🤖 Regenerating…" : "↻ Regenerate"}
+      </button>
+      ${aiBreakdownError ? `<div style="font-size:0.74rem;color:var(--danger);margin-top:0.4rem;">${escapeHtml(aiBreakdownError)}</div>` : ""}
+    </div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
 function renderLastSessionBreakdown(){
   const lastDate = getLastSessionDate();
   if(!lastDate) return "";
@@ -2606,6 +2727,7 @@ function renderOverview(){
       <h3 class="section" style="color:var(--amber);">🎯 Coach's Notes</h3>
       <p style="font-size:0.85rem;line-height:1.5;color:var(--ink);margin:0;">${coachNotes}</p>
       ${renderLastSessionBreakdown()}
+      ${renderAiBreakdownSection(getLastSessionDate())}
     </div>`;
   }
 

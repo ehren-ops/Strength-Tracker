@@ -51,6 +51,29 @@ async function main(){
     route.fulfill({ path: path.join(__dirname, 'mock-supabase.js'), contentType: 'application/javascript' })
   );
   await context.route('https://fonts.googleapis.com/**', route => route.abort());
+  // The real workout-breakdown edge function costs real money and needs a
+  // live Anthropic key, neither of which belong in a test run - mocked here
+  // so scenario 59 can verify the button/cache/collapse behavior without
+  // ever making a real call. aiBreakdownCallCount lets that scenario assert
+  // it's called exactly once per explicit click, never automatically.
+  let aiBreakdownCallCount = 0;
+  await context.route('**/functions/v1/workout-breakdown', route => {
+    aiBreakdownCallCount++;
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        breakdown: {
+          headline: 'Mock breakdown headline for test verification.',
+          wentWell: ['Mock went-well item.'],
+          notGreat: ['Mock not-great item.'],
+          howToImprove: ['Mock improve item.'],
+          mindfulNextTime: ['Mock mindful item.'],
+        },
+        generatedAt: new Date().toISOString(),
+      }),
+    });
+  });
   const page = await context.newPage();
   page.on('pageerror', err => console.log('[pageerror]', err.message));
 
@@ -1395,6 +1418,33 @@ async function main(){
   const isGoneAfterFade = await page.evaluate(() => document.getElementById('celebration-banner').hidden);
   if(!isGoneAfterFade) throw new Error('expected the overlay to be fully hidden once the fade-out transition completes');
   console.log('OK: overlay is hidden and cleaned up once the fade-out completes');
+
+  console.log('=== 59: Full AI Breakdown button generates once, then stays cached and collapsible ===');
+  await page.click('.tab:has-text("Overview")');
+  await sleep(150);
+  if(await page.locator('button:has-text("Full AI Breakdown")').count() !== 1) throw new Error('expected a Full AI Breakdown button in Coach\'s Notes before any breakdown is generated');
+  await page.click('button:has-text("Full AI Breakdown")');
+  await waitForText(page, '.card', t => t.includes('Mock breakdown headline'), 5000, 'AI breakdown generation');
+  if(await page.locator('text=Mock went-well item.').count() !== 1) throw new Error('expected the wentWell item to render');
+  if(await page.locator('text=Mock not-great item.').count() !== 1) throw new Error('expected the notGreat item to render');
+  if(await page.locator('text=Mock improve item.').count() !== 1) throw new Error('expected the howToImprove item to render');
+  if(await page.locator('text=Mock mindful item.').count() !== 1) throw new Error('expected the mindfulNextTime item to render');
+  if(aiBreakdownCallCount !== 1) throw new Error('expected exactly one call to the breakdown function, got ' + aiBreakdownCallCount);
+  console.log('OK: clicking Full AI Breakdown calls the function once and renders all four sections plus a headline');
+
+  await page.reload();
+  await waitForText(page, '#sync-status', t => t.includes('Not signed in') || t.includes('Synced'), 10000, 'reload after generating AI breakdown');
+  await page.click('.tab:has-text("Overview")');
+  await sleep(150);
+  if(await page.locator('text=🤖 Full AI Breakdown').count() !== 1) throw new Error('expected the cached breakdown\'s collapsible header to persist across reload');
+  if(await page.locator('text=Mock breakdown headline').count() !== 0) throw new Error('expected the cached breakdown to be collapsed by default, not auto-expanded, after reload');
+  if(aiBreakdownCallCount !== 1) throw new Error('expected reload to reuse the cached breakdown, not call the function again, got ' + aiBreakdownCallCount + ' total calls');
+  console.log('OK: cached breakdown persists across reload, collapsed by default, with no re-fetch');
+
+  await page.click('text=🤖 Full AI Breakdown');
+  await sleep(150);
+  if(await page.locator('text=Mock breakdown headline').count() !== 1) throw new Error('expected clicking the collapsed header to reveal the cached content');
+  console.log('OK: clicking the collapsed header reveals the cached content without re-generating');
 
   console.log('\nALL SCENARIOS PASSED');
   await browser.close();
