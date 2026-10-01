@@ -1510,6 +1510,39 @@ async function main(){
   if(upperLowerBannerHidden || !upperLowerBannerText.includes('Lower Body complete')) throw new Error('expected the Lower Body celebration banner to fire once every Lower Body exercise is logged, got hidden=' + upperLowerBannerHidden + ' text=' + upperLowerBannerText);
   console.log('OK: Lower Body banner fires too - all three main muscle-group days confirmed working');
 
+  console.log('=== 62: AI breakdowns sync to the ai_breakdowns table and restore onto a wiped phone ===');
+  // The cloud copy is what outlive's strength-sync reads, so one generated
+  // breakdown shows up in both apps without a second AI call.
+  await page.click('.tab:has-text("Overview")');
+  await sleep(150);
+  if(!(await page.textContent('#sync-status')).includes('Synced')){
+    await page.fill('#auth-email', EMAIL);
+    await page.fill('#auth-password', PASSWORD);
+    await page.click('button:has-text("Sign In")');
+  }
+  await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'breakdown sync');
+  const localBreakdownDates = await page.evaluate(() => Object.keys(aiBreakdowns));
+  if(!localBreakdownDates.length) throw new Error('expected a cached breakdown from scenario 59 to exist locally');
+  const cloudBreakdowns = await page.evaluate(() => JSON.parse(sessionStorage.getItem('__mock_supabase_db__')).ai_breakdowns || []);
+  const cloudRow = cloudBreakdowns.find(r => r.session_date === localBreakdownDates[0]);
+  if(!cloudRow || !cloudRow.breakdown.headline.startsWith('Mock breakdown headline')) throw new Error('expected the breakdown to be saved to the ai_breakdowns table, got: ' + JSON.stringify(cloudBreakdowns));
+  if('generatedAt' in cloudRow.breakdown || !cloudRow.generated_at) throw new Error('expected generatedAt stored in its own generated_at column, not inside the breakdown JSON');
+  console.log('OK: breakdown saved to the cloud ai_breakdowns table');
+
+  const callsBeforeRestore = aiBreakdownCallCount;
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await waitForText(page, '#sync-status', t => t.includes('Not signed in'), 5000, 'after wipe reload (breakdowns)');
+  await page.click('.tab:has-text("Overview")');
+  await page.fill('#auth-email', EMAIL);
+  await page.fill('#auth-password', PASSWORD);
+  await page.click('button:has-text("Sign In")');
+  await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'post-wipe breakdown restore');
+  const restoredBreakdown = await page.evaluate((d) => aiBreakdowns[d], localBreakdownDates[0]);
+  if(!restoredBreakdown || !restoredBreakdown.headline.startsWith('Mock breakdown headline')) throw new Error('expected the breakdown to be restored from the cloud after a wipe, got: ' + JSON.stringify(restoredBreakdown));
+  if(aiBreakdownCallCount !== callsBeforeRestore) throw new Error('expected restore to come from the cloud, not a new AI call');
+  console.log('OK: breakdown restored from the cloud onto a wiped phone with no new AI call');
+
   console.log('\nALL SCENARIOS PASSED');
   await browser.close();
 }

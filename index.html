@@ -453,6 +453,19 @@ async function runOp(op){
     if(error) throw error;
     return true;
   }
+  if(op.type === "upsert_breakdown"){
+    const b = aiBreakdowns[op.payload.date];
+    if(!b) return true;
+    const { generatedAt, ...breakdown } = b;
+    const { error } = await supabaseClient.from("ai_breakdowns").upsert({
+      user_id: userId,
+      session_date: op.payload.date,
+      breakdown,
+      generated_at: generatedAt || new Date().toISOString(),
+    }, { onConflict: "user_id,session_date" });
+    if(error) throw error;
+    return true;
+  }
   return true;
 }
 
@@ -573,6 +586,16 @@ async function pullRemoteAndMerge(){
     }
   });
 
+  const { data: breakdownRows, error: bdErr } = await supabaseClient.from("ai_breakdowns").select("*").eq("user_id", userId);
+  if(bdErr) console.error(bdErr);
+  (breakdownRows || []).forEach(r => {
+    const local = aiBreakdowns[r.session_date];
+    if(!local || (local.generatedAt || "") < r.generated_at){
+      aiBreakdowns[r.session_date] = { ...r.breakdown, generatedAt: r.generated_at };
+    }
+  });
+  saveAiBreakdowns();
+
   persist();
   render();
 }
@@ -587,6 +610,9 @@ function reconcileAllToQueue(){
     });
   });
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  Object.keys(aiBreakdowns).forEach(date => {
+    enqueueOp({ id: genId(), type: "upsert_breakdown", payload: { date } });
+  });
 }
 
 async function syncOnSignIn(){
@@ -2548,7 +2574,8 @@ function generateCoachNotes(){
 // ---------- full AI breakdown (on-demand, cached, not re-generated automatically) ----------
 // Keyed by session date so each day's breakdown is generated once and then
 // stays put - reopening the app or re-rendering never re-fires the call.
-// Purely a local convenience cache, not training data, so it isn't synced.
+// Synced to the ai_breakdowns table when signed in, which is also where
+// outlive's strength-sync function reads them from.
 const AI_BREAKDOWN_KEY = "strength-tracker-ai-breakdowns";
 let aiBreakdowns = (function(){
   try{ return JSON.parse(window.localStorage.getItem(AI_BREAKDOWN_KEY)) || {}; }catch(e){ return {}; }
@@ -2605,8 +2632,9 @@ async function generateFullAiBreakdown(){
     });
     const body = await res.json().catch(() => null);
     if(!res.ok || !body || !body.breakdown) throw new Error((body && body.error) || `request failed (${res.status})`);
-    aiBreakdowns[lastDate] = body.breakdown;
+    aiBreakdowns[lastDate] = { ...body.breakdown, generatedAt: body.generatedAt || new Date().toISOString() };
     saveAiBreakdowns();
+    enqueueOp({ id: genId(), type: "upsert_breakdown", payload: { date: lastDate } });
     aiBreakdownExpanded[lastDate] = true;
   }catch(e){
     // A fresh deployment (anyone else pulling this repo and standing up
