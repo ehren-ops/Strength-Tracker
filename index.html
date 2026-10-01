@@ -454,15 +454,17 @@ async function runOp(op){
     return true;
   }
   if(op.type === "upsert_breakdown"){
-    const b = aiBreakdowns[op.payload.date];
+    const kind = op.payload.kind || "session";
+    const b = coachStore(kind)[op.payload.date];
     if(!b) return true;
     const { generatedAt, ...breakdown } = b;
     const { error } = await supabaseClient.from("ai_breakdowns").upsert({
       user_id: userId,
+      kind,
       session_date: op.payload.date,
       breakdown,
       generated_at: generatedAt || new Date().toISOString(),
-    }, { onConflict: "user_id,session_date" });
+    }, { onConflict: "user_id,kind,session_date" });
     if(error) throw error;
     return true;
   }
@@ -589,12 +591,14 @@ async function pullRemoteAndMerge(){
   const { data: breakdownRows, error: bdErr } = await supabaseClient.from("ai_breakdowns").select("*").eq("user_id", userId);
   if(bdErr) console.error(bdErr);
   (breakdownRows || []).forEach(r => {
-    const local = aiBreakdowns[r.session_date];
+    const store = coachStore(r.kind || "session");
+    const local = store[r.session_date];
     if(!local || (local.generatedAt || "") < r.generated_at){
-      aiBreakdowns[r.session_date] = { ...r.breakdown, generatedAt: r.generated_at };
+      store[r.session_date] = { ...r.breakdown, generatedAt: r.generated_at };
     }
   });
-  saveAiBreakdowns();
+  saveCoachStore("session");
+  saveCoachStore("weekly");
 
   persist();
   render();
@@ -610,8 +614,10 @@ function reconcileAllToQueue(){
     });
   });
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
-  Object.keys(aiBreakdowns).forEach(date => {
-    enqueueOp({ id: genId(), type: "upsert_breakdown", payload: { date } });
+  ["session", "weekly"].forEach(kind => {
+    Object.keys(coachStore(kind)).forEach(date => {
+      enqueueOp({ id: genId(), type: "upsert_breakdown", payload: { kind, date } });
+    });
   });
 }
 
@@ -2571,134 +2577,192 @@ function generateCoachNotes(){
   return sentences.join(" ");
 }
 
-// ---------- full AI breakdown (on-demand, cached, not re-generated automatically) ----------
-// Keyed by session date so each day's breakdown is generated once and then
-// stays put - reopening the app or re-rendering never re-fires the call.
-// Synced to the ai_breakdowns table when signed in, which is also where
-// outlive's strength-sync function reads them from.
+// ---------- coach analyses (on demand, cached, never re-generated automatically) ----------
+// Two kinds from the coach edge function: "session" is the post-workout note for the very next
+// session (keyed by session date); "weekly" is the deeper check-in (keyed by the week's last
+// day). Synced to the ai_breakdowns table when signed in, which is also where outlive's
+// strength-sync reads them from.
 const AI_BREAKDOWN_KEY = "strength-tracker-ai-breakdowns";
-let aiBreakdowns = (function(){
-  try{ return JSON.parse(window.localStorage.getItem(AI_BREAKDOWN_KEY)) || {}; }catch(e){ return {}; }
-})();
-function saveAiBreakdowns(){
-  try{ window.localStorage.setItem(AI_BREAKDOWN_KEY, JSON.stringify(aiBreakdowns)); }catch(e){}
+const AI_CHECKIN_KEY = "strength-tracker-ai-checkins";
+function loadCoachCache(key){
+  try{ return JSON.parse(window.localStorage.getItem(key)) || {}; }catch(e){ return {}; }
 }
-let aiBreakdownExpanded = {};
-let aiBreakdownLoading = false;
-let aiBreakdownError = null;
+let aiBreakdowns = loadCoachCache(AI_BREAKDOWN_KEY);
+let aiCheckins = loadCoachCache(AI_CHECKIN_KEY);
+function coachStore(kind){ return kind === "weekly" ? aiCheckins : aiBreakdowns; }
+function saveCoachStore(kind){
+  try{ window.localStorage.setItem(kind === "weekly" ? AI_CHECKIN_KEY : AI_BREAKDOWN_KEY, JSON.stringify(coachStore(kind))); }catch(e){}
+}
+let coachExpanded = {};
+let coachLoading = {};
+let coachError = {};
 
-// Builds the compact session summary sent to the workout-breakdown edge
-// function - only the one session's data plus a short recent-history trend
-// per exercise, not the full training history, to keep the request small
-// and keep the model from reasoning about anything not actually in view.
-function buildWorkoutBreakdownPayload(lastDate){
+function shiftISO(iso, days){
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+}
+function compactEntry(e, ex){
+  let s = `${e.date} ${formatEntryValue(e, ex)}`;
+  if(e.difficulty) s += ` @${e.difficulty}`;
+  if(e.note) s += ` "${String(e.note).slice(0, 100)}"`;
+  return s;
+}
+function describeSuggestion(ex, name){
+  const s = computeSuggestion(ex, name);
+  if(!s) return null;
+  if(ex.trackBy === "weight"){
+    const why = s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
+      : s.noteConcern ? "hold, note flagged" : s.difficultyNote === "hard" ? "hold, last RPE high" : "hold";
+    return `${s.weight} lb ${s.sets}x${s.reps} (${why})`;
+  }
+  if(ex.trackBy === "duration") return `${s.minutes} min`;
+  return `${s.sets}x${s.reps}`;
+}
+function coachTz(){
+  try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }catch(e){ return "UTC"; }
+}
+function activeModes(){ return Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])); }
+
+// One session plus the last 8 results per lift, so the note can see trends, not just today.
+function buildSessionCoachPayload(date){
   const exercises = [];
+  let prevDate = null;
   Object.entries(data).forEach(([name, ex]) => {
     if(ex.trackBy === "checklist") return;
-    const idx = ex.entries.findIndex(e => e.date === lastDate);
+    ex.entries.forEach(e => { if(e.date < date && (!prevDate || e.date > prevDate)) prevDate = e.date; });
+    let idx = -1;
+    ex.entries.forEach((e, i) => { if(e.date === date) idx = i; });
     if(idx === -1) return;
-    const entry = ex.entries[idx];
-    const recentHistory = ex.entries.slice(Math.max(0, idx - 4), idx).map(e => formatEntryValue(e, ex) + (e.difficulty ? ` @RPE ${e.difficulty}` : ""));
     exercises.push({
       name,
-      value: formatEntryValue(entry, ex),
-      targetHit: ex.trackBy === "weight" ? entry.reps >= (ex.targetReps || 8) : null,
-      difficulty: entry.difficulty ?? null,
-      note: entry.note || null,
-      recentHistory,
+      today: compactEntry(ex.entries[idx], ex),
+      targetReps: ex.trackBy === "weight" ? effectiveTargetReps(ex) : null,
+      history: ex.entries.slice(Math.max(0, idx - 8), idx).map(e => compactEntry(e, ex)),
+      appSuggestion: describeSuggestion(ex, name),
     });
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
-  return {
-    date: lastDate,
-    dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Last session",
-    modes: { ski: modes.ski, knee: modes.knee, back: modes.back, preseason: modes.preseason },
-    exercises,
-  };
+  const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
+  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), exercises };
 }
 
-async function generateFullAiBreakdown(){
-  const lastDate = getLastSessionDate();
-  if(!lastDate) return;
-  aiBreakdownLoading = true;
-  aiBreakdownError = null;
+// The past week plus 6 weeks of history per lift, enough to judge loading blocks and deloads.
+function buildWeeklyCoachPayload(){
+  const weekEnd = todayISO();
+  const since = shiftISO(weekEnd, -41);
+  const sessionDates = new Set();
+  const exercises = [];
+  Object.entries(data).forEach(([name, ex]) => {
+    if(ex.trackBy === "checklist") return;
+    const recent = ex.entries.filter(e => e.date >= since && e.date <= weekEnd);
+    if(!recent.length) return;
+    recent.forEach(e => sessionDates.add(e.date));
+    exercises.push({ name, entries: recent.map(e => compactEntry(e, ex)), appSuggestion: describeSuggestion(ex, name) });
+  });
+  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), sessionDates: [...sessionDates].sort(), exercises };
+}
+
+async function generateCoach(kind){
+  const payload = kind === "weekly" ? buildWeeklyCoachPayload() : buildSessionCoachPayload(getLastSessionDate());
+  const key = kind === "weekly" ? payload.weekEnd : payload.date;
+  if(!key) return;
+  coachLoading[kind] = true;
+  coachError[kind] = null;
   render();
   try{
-    const payload = buildWorkoutBreakdownPayload(lastDate);
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/workout-breakdown`, {
+    const headers = { "Content-Type": "application/json" };
+    // Signed in: lets the function match this account to Outlive for recovery and nutrition data.
+    if(currentSession && currentSession.access_token) headers.Authorization = "Bearer " + currentSession.access_token;
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/coach`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session: payload }),
+      headers,
+      body: JSON.stringify({ mode: kind, payload }),
     });
     const body = await res.json().catch(() => null);
     if(!res.ok || !body || !body.breakdown) throw new Error((body && body.error) || `request failed (${res.status})`);
-    aiBreakdowns[lastDate] = { ...body.breakdown, generatedAt: body.generatedAt || new Date().toISOString() };
-    saveAiBreakdowns();
-    enqueueOp({ id: genId(), type: "upsert_breakdown", payload: { date: lastDate } });
-    aiBreakdownExpanded[lastDate] = true;
+    coachStore(kind)[key] = { ...body.breakdown, generatedAt: body.generatedAt || new Date().toISOString() };
+    saveCoachStore(kind);
+    enqueueOp({ id: genId(), type: "upsert_breakdown", payload: { kind, date: key } });
+    coachExpanded[kind + key] = true;
   }catch(e){
-    // A fresh deployment (anyone else pulling this repo and standing up
-    // their own Supabase project) won't have ANTHROPIC_API_KEY set yet -
-    // the edge function reports that specific error rather than a generic
-    // failure, so surface setup instructions instead of "try again," which
-    // would just fail forever with no way for them to know why.
-    aiBreakdownError = e.message === "anthropic_key_not_configured"
-      ? "This needs an Anthropic API key configured on your Supabase project. Add ANTHROPIC_API_KEY under Project Settings → Edge Functions → Secrets - see supabase/functions/workout-breakdown/README.md for details."
-      : "Couldn't generate a breakdown right now - try again in a moment.";
+    // A fresh deployment (anyone else pulling this repo and standing up their own Supabase
+    // project) won't have ANTHROPIC_API_KEY set yet - show setup instructions instead of a
+    // "try again" that would fail forever.
+    coachError[kind] = e.message === "anthropic_key_not_configured"
+      ? "This needs an Anthropic API key configured on your Supabase project. Add ANTHROPIC_API_KEY under Project Settings → Edge Functions → Secrets - see supabase/functions/coach/README.md for details."
+      : "Couldn't generate this right now - try again in a moment.";
   }finally{
-    aiBreakdownLoading = false;
+    coachLoading[kind] = false;
     render();
   }
 }
 
-function toggleAiBreakdownExpanded(date){
-  aiBreakdownExpanded[date] = !aiBreakdownExpanded[date];
+function toggleCoachExpanded(id){
+  coachExpanded[id] = !coachExpanded[id];
   render();
+}
+
+// Breakdowns saved before the coach format had a headline plus four fixed lists.
+function normalizeCoach(b){
+  if(!b) return null;
+  if(Array.isArray(b.sections)) return b;
+  return {
+    verdict: b.headline || "",
+    sections: [["What went well", b.wentWell], ["What didn't go great", b.notGreat], ["How to improve", b.howToImprove], ["Be mindful of next time", b.mindfulNextTime]]
+      .filter(([, items]) => items && items.length)
+      .map(([title, items]) => ({ title, items })),
+  };
 }
 
 function renderAiBreakdownList(title, items){
   if(!items || !items.length) return "";
   return `<div style="margin-top:0.5rem;">
-    <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.04em;font-weight:700;color:var(--slate);margin-bottom:0.25rem;">${title}</div>
+    <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.04em;font-weight:700;color:var(--slate);margin-bottom:0.25rem;">${escapeHtml(String(title))}</div>
     <ul style="margin:0;padding-left:1.1rem;font-size:0.82rem;line-height:1.45;color:var(--ink);">
-      ${items.map(i => `<li>${escapeHtml(i)}</li>`).join("")}
+      ${items.map(i => `<li>${escapeHtml(String(i))}</li>`).join("")}
     </ul>
   </div>`;
 }
 
-function renderAiBreakdownSection(lastDate){
-  const cached = aiBreakdowns[lastDate];
+// The current week's check-in, if one was made in the last 7 days; otherwise the button shows.
+function currentCheckinKey(){
+  const latest = Object.keys(aiCheckins).sort().pop();
+  return latest && latest >= shiftISO(todayISO(), -6) ? latest : null;
+}
+
+function renderCoachBlock(kind, key){
+  const label = kind === "weekly" ? "📋 Weekly Check-in" : "🤖 Session Breakdown";
+  const loading = !!coachLoading[kind];
+  const err = coachError[kind] ? `<div style="font-size:0.74rem;color:var(--danger);margin-top:0.4rem;">${escapeHtml(coachError[kind])}</div>` : "";
+  const cached = key ? normalizeCoach(coachStore(kind)[key]) : null;
+  const wrap = inner => `<div style="margin-top:0.6rem;padding-top:0.5rem;border-top:1px dashed var(--line);">${inner}</div>`;
 
   if(!cached){
-    return `<div style="margin-top:0.6rem;padding-top:0.5rem;border-top:1px dashed var(--line);">
-      <button class="tool-btn" onclick="generateFullAiBreakdown()" ${aiBreakdownLoading ? "disabled" : ""}>
-        ${aiBreakdownLoading ? "🤖 Generating…" : "🤖 Full AI Breakdown"}
-      </button>
-      ${aiBreakdownError ? `<div style="font-size:0.74rem;color:var(--danger);margin-top:0.4rem;">${escapeHtml(aiBreakdownError)}</div>` : ""}
-    </div>`;
+    return wrap(`<button class="tool-btn" onclick="generateCoach('${kind}')" ${loading ? "disabled" : ""}>
+        ${loading ? "Generating…" : label}
+      </button>${err}`);
   }
 
-  const expanded = !!aiBreakdownExpanded[lastDate];
-  let html = `<div style="margin-top:0.6rem;padding-top:0.5rem;border-top:1px dashed var(--line);">
-    <div onclick="toggleAiBreakdownExpanded('${lastDate}')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:var(--slate);">
-      <span>🤖 Full AI Breakdown</span>
+  const id = kind + key;
+  const expanded = !!coachExpanded[id];
+  const [, m, d] = key.split("-");
+  const sub = (kind === "weekly" ? "week ending " : "") + `${Number(m)}/${Number(d)}`;
+  let inner = `<div onclick="toggleCoachExpanded('${id}')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:var(--slate);">
+      <span>${label} <span style="opacity:0.75;">· ${sub}</span></span>
       <span style="color:var(--amber);font-weight:600;">${expanded ? "Hide ▲" : "Show ▼"}</span>
     </div>`;
   if(expanded){
-    html += `<div style="margin-top:0.4rem;">
-      <p style="font-size:0.85rem;line-height:1.5;color:var(--ink);margin:0;">${escapeHtml(cached.headline || "")}</p>
-      ${renderAiBreakdownList("What went well", cached.wentWell)}
-      ${renderAiBreakdownList("What didn't go great", cached.notGreat)}
-      ${renderAiBreakdownList("How to improve", cached.howToImprove)}
-      ${renderAiBreakdownList("Be mindful of next time", cached.mindfulNextTime)}
-      <button class="tool-btn" style="margin-top:0.6rem;" onclick="generateFullAiBreakdown()" ${aiBreakdownLoading ? "disabled" : ""}>
-        ${aiBreakdownLoading ? "🤖 Regenerating…" : "↻ Regenerate"}
+    inner += `<div style="margin-top:0.4rem;">
+      <p style="font-size:0.85rem;line-height:1.5;color:var(--ink);margin:0;font-weight:600;">${escapeHtml(String(cached.verdict || ""))}</p>
+      ${cached.sections.map(s => renderAiBreakdownList(s.title, s.items)).join("")}
+      <button class="tool-btn" style="margin-top:0.6rem;" onclick="generateCoach('${kind}')" ${loading ? "disabled" : ""}>
+        ${loading ? "Regenerating…" : "↻ Regenerate"}
       </button>
-      ${aiBreakdownError ? `<div style="font-size:0.74rem;color:var(--danger);margin-top:0.4rem;">${escapeHtml(aiBreakdownError)}</div>` : ""}
+      ${err}
     </div>`;
   }
-  html += `</div>`;
-  return html;
+  return wrap(inner);
 }
 
 function renderLastSessionBreakdown(){
@@ -2765,7 +2829,8 @@ function renderOverview(){
       <h3 class="section" style="color:var(--amber);">🎯 Coach's Notes</h3>
       <p style="font-size:0.85rem;line-height:1.5;color:var(--ink);margin:0;">${coachNotes}</p>
       ${renderLastSessionBreakdown()}
-      ${renderAiBreakdownSection(getLastSessionDate())}
+      ${renderCoachBlock("session", getLastSessionDate())}
+      ${renderCoachBlock("weekly", currentCheckinKey())}
     </div>`;
   }
 

@@ -51,27 +51,31 @@ async function main(){
     route.fulfill({ path: path.join(__dirname, 'mock-supabase.js'), contentType: 'application/javascript' })
   );
   await context.route('https://fonts.googleapis.com/**', route => route.abort());
-  // The real workout-breakdown edge function costs real money and needs a
-  // live Anthropic key, neither of which belong in a test run - mocked here
-  // so scenario 59 can verify the button/cache/collapse behavior without
-  // ever making a real call. aiBreakdownCallCount lets that scenario assert
-  // it's called exactly once per explicit click, never automatically.
+  // The real coach edge function costs real money and needs a live
+  // Anthropic key, neither of which belong in a test run - mocked here so
+  // scenarios 59-63 can verify the button/cache/collapse behavior without
+  // ever making a real call. aiBreakdownCallCount lets them assert it's
+  // called exactly once per explicit click, never automatically.
   let aiBreakdownCallCount = 0;
-  await context.route('**/functions/v1/workout-breakdown', route => {
+  const coachRequests = [];
+  await context.route('**/functions/v1/coach', route => {
     aiBreakdownCallCount++;
+    const req = route.request().postDataJSON();
+    coachRequests.push(req);
+    const breakdown = req.mode === 'weekly'
+      ? { verdict: 'Mock weekly verdict.', sections: [
+          { title: 'Training', items: ['Mock weekly training item.'] },
+          { title: 'Next week', items: ['Mock next-week item.'] },
+        ] }
+      : { verdict: 'Mock breakdown headline for test verification.', sections: [
+          { title: 'Recovery context', items: ['Mock recovery item.'] },
+          { title: 'How to improve next session', items: ['Mock improve item.'] },
+          { title: 'Be mindful of', items: ['Mock mindful item.'] },
+        ] };
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        breakdown: {
-          headline: 'Mock breakdown headline for test verification.',
-          wentWell: ['Mock went-well item.'],
-          notGreat: ['Mock not-great item.'],
-          howToImprove: ['Mock improve item.'],
-          mindfulNextTime: ['Mock mindful item.'],
-        },
-        generatedAt: new Date().toISOString(),
-      }),
+      body: JSON.stringify({ breakdown, generatedAt: new Date().toISOString(), context: 'signed_out' }),
     });
   });
   const page = await context.newPage();
@@ -1419,29 +1423,33 @@ async function main(){
   if(!isGoneAfterFade) throw new Error('expected the overlay to be fully hidden once the fade-out transition completes');
   console.log('OK: overlay is hidden and cleaned up once the fade-out completes');
 
-  console.log('=== 59: Full AI Breakdown button generates once, then stays cached and collapsible ===');
+  console.log('=== 59: Session Breakdown button generates once, then stays cached and collapsible ===');
   await page.click('.tab:has-text("Overview")');
   await sleep(150);
-  if(await page.locator('button:has-text("Full AI Breakdown")').count() !== 1) throw new Error('expected a Full AI Breakdown button in Coach\'s Notes before any breakdown is generated');
-  await page.click('button:has-text("Full AI Breakdown")');
+  if(await page.locator('button:has-text("Session Breakdown")').count() !== 1) throw new Error('expected a Session Breakdown button in Coach\'s Notes before any breakdown is generated');
+  if(await page.locator('button:has-text("Weekly Check-in")').count() !== 1) throw new Error('expected a separate Weekly Check-in button in Coach\'s Notes');
+  await page.click('button:has-text("Session Breakdown")');
   await waitForText(page, '.card', t => t.includes('Mock breakdown headline'), 5000, 'AI breakdown generation');
-  if(await page.locator('text=Mock went-well item.').count() !== 1) throw new Error('expected the wentWell item to render');
-  if(await page.locator('text=Mock not-great item.').count() !== 1) throw new Error('expected the notGreat item to render');
-  if(await page.locator('text=Mock improve item.').count() !== 1) throw new Error('expected the howToImprove item to render');
-  if(await page.locator('text=Mock mindful item.').count() !== 1) throw new Error('expected the mindfulNextTime item to render');
+  if(await page.locator('text=Mock recovery item.').count() !== 1) throw new Error('expected the recovery item to render');
+  if(await page.locator('text=Mock improve item.').count() !== 1) throw new Error('expected the how-to-improve item to render');
+  if(await page.locator('text=Mock mindful item.').count() !== 1) throw new Error('expected the be-mindful item to render');
+  const sessionReq = coachRequests[coachRequests.length - 1];
+  if(sessionReq.mode !== 'session' || !sessionReq.payload.date || !sessionReq.payload.tz) throw new Error('expected a session-mode request with the session date and time zone, got: ' + JSON.stringify(sessionReq).slice(0, 300));
+  const squatPayload = sessionReq.payload.exercises.find(e => e.name === 'Squat');
+  if(!squatPayload || !Array.isArray(squatPayload.history) || squatPayload.history.length > 8 || !squatPayload.appSuggestion) throw new Error('expected each lift to carry up to 8 prior results and the app suggestion, got: ' + JSON.stringify(squatPayload));
   if(aiBreakdownCallCount !== 1) throw new Error('expected exactly one call to the breakdown function, got ' + aiBreakdownCallCount);
-  console.log('OK: clicking Full AI Breakdown calls the function once and renders all four sections plus a headline');
+  console.log('OK: clicking Session Breakdown calls the function once and renders the verdict and all three sections');
 
   await page.reload();
   await waitForText(page, '#sync-status', t => t.includes('Not signed in') || t.includes('Synced'), 10000, 'reload after generating AI breakdown');
   await page.click('.tab:has-text("Overview")');
   await sleep(150);
-  if(await page.locator('text=🤖 Full AI Breakdown').count() !== 1) throw new Error('expected the cached breakdown\'s collapsible header to persist across reload');
+  if(await page.locator('text=🤖 Session Breakdown').count() !== 1) throw new Error('expected the cached breakdown\'s collapsible header to persist across reload');
   if(await page.locator('text=Mock breakdown headline').count() !== 0) throw new Error('expected the cached breakdown to be collapsed by default, not auto-expanded, after reload');
   if(aiBreakdownCallCount !== 1) throw new Error('expected reload to reuse the cached breakdown, not call the function again, got ' + aiBreakdownCallCount + ' total calls');
   console.log('OK: cached breakdown persists across reload, collapsed by default, with no re-fetch');
 
-  await page.click('text=🤖 Full AI Breakdown');
+  await page.click('text=🤖 Session Breakdown');
   await sleep(150);
   if(await page.locator('text=Mock breakdown headline').count() !== 1) throw new Error('expected clicking the collapsed header to reveal the cached content');
   console.log('OK: clicking the collapsed header reveals the cached content without re-generating');
@@ -1450,7 +1458,7 @@ async function main(){
   // Overrides the context-level mock above just for this page - simulates
   // what anyone else pulling this repo and standing up their own Supabase
   // project sees before they've added the secret.
-  await page.route('**/functions/v1/workout-breakdown', route => {
+  await page.route('**/functions/v1/coach', route => {
     route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'anthropic_key_not_configured' }) });
   });
   await page.click('button:has-text("Regenerate")');
@@ -1525,7 +1533,7 @@ async function main(){
   if(!localBreakdownDates.length) throw new Error('expected a cached breakdown from scenario 59 to exist locally');
   const cloudBreakdowns = await page.evaluate(() => JSON.parse(sessionStorage.getItem('__mock_supabase_db__')).ai_breakdowns || []);
   const cloudRow = cloudBreakdowns.find(r => r.session_date === localBreakdownDates[0]);
-  if(!cloudRow || !cloudRow.breakdown.headline.startsWith('Mock breakdown headline')) throw new Error('expected the breakdown to be saved to the ai_breakdowns table, got: ' + JSON.stringify(cloudBreakdowns));
+  if(!cloudRow || cloudRow.kind !== 'session' || !cloudRow.breakdown.verdict.startsWith('Mock breakdown headline')) throw new Error('expected the breakdown to be saved to the ai_breakdowns table, got: ' + JSON.stringify(cloudBreakdowns));
   if('generatedAt' in cloudRow.breakdown || !cloudRow.generated_at) throw new Error('expected generatedAt stored in its own generated_at column, not inside the breakdown JSON');
   console.log('OK: breakdown saved to the cloud ai_breakdowns table');
 
@@ -1539,9 +1547,33 @@ async function main(){
   await page.click('button:has-text("Sign In")');
   await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'post-wipe breakdown restore');
   const restoredBreakdown = await page.evaluate((d) => aiBreakdowns[d], localBreakdownDates[0]);
-  if(!restoredBreakdown || !restoredBreakdown.headline.startsWith('Mock breakdown headline')) throw new Error('expected the breakdown to be restored from the cloud after a wipe, got: ' + JSON.stringify(restoredBreakdown));
+  if(!restoredBreakdown || !restoredBreakdown.verdict.startsWith('Mock breakdown headline')) throw new Error('expected the breakdown to be restored from the cloud after a wipe, got: ' + JSON.stringify(restoredBreakdown));
   if(aiBreakdownCallCount !== callsBeforeRestore) throw new Error('expected restore to come from the cloud, not a new AI call');
   console.log('OK: breakdown restored from the cloud onto a wiped phone with no new AI call');
+
+  console.log('=== 63: Weekly Check-in is a separate button with its own request, cache and cloud row ===');
+  await page.unroute('**/functions/v1/coach'); // drop scenario 60's missing-key override
+  await page.click('.tab:has-text("Overview")');
+  await sleep(150);
+  const callsBeforeWeekly = aiBreakdownCallCount;
+  await page.click('button:has-text("Weekly Check-in")');
+  await waitForText(page, 'body', t => t.includes('Mock weekly verdict.'), 5000, 'weekly check-in generation');
+  if(aiBreakdownCallCount !== callsBeforeWeekly + 1) throw new Error('expected exactly one coach call for the weekly check-in');
+  const weeklyReq = coachRequests[coachRequests.length - 1];
+  if(weeklyReq.mode !== 'weekly' || !weeklyReq.payload.weekEnd || !weeklyReq.payload.weekStart || !weeklyReq.payload.exercises.length) throw new Error('expected a weekly-mode request with the week window and lift history, got: ' + JSON.stringify(weeklyReq).slice(0, 300));
+  if(!weeklyReq.payload.exercises.every(e => Array.isArray(e.entries) && e.entries.every(x => x.slice(0, 10) >= weeklyReq.payload.weekEnd.slice(0, 4)))) throw new Error('expected compact dated entries per lift');
+  if(await page.locator('text=Mock weekly training item.').count() !== 1 || await page.locator('text=Mock next-week item.').count() !== 1) throw new Error('expected the weekly sections to render');
+  if(await page.locator('text=Mock breakdown headline').count() !== 0) throw new Error('expected the session breakdown to stay collapsed while the weekly check-in shows');
+  await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'weekly check-in sync');
+  const weeklyRow = await page.evaluate((d) => (JSON.parse(sessionStorage.getItem('__mock_supabase_db__')).ai_breakdowns || []).find(r => r.kind === 'weekly' && r.session_date === d), weeklyReq.payload.weekEnd);
+  if(!weeklyRow || weeklyRow.breakdown.verdict !== 'Mock weekly verdict.') throw new Error('expected the weekly check-in saved as its own ai_breakdowns row');
+  await page.reload();
+  await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'reload after weekly check-in');
+  await page.click('.tab:has-text("Overview")');
+  await sleep(150);
+  if(await page.locator('text=📋 Weekly Check-in').count() !== 1 || await page.locator('button:has-text("Weekly Check-in")').count() !== 0) throw new Error('expected this week\'s check-in to persist as a collapsed header, not a fresh button');
+  if(aiBreakdownCallCount !== callsBeforeWeekly + 1) throw new Error('expected reload to reuse the cached check-in, not call the function again');
+  console.log('OK: weekly check-in generates on its own button, syncs as kind "weekly", and stays cached for the week');
 
   console.log('\nALL SCENARIOS PASSED');
   await browser.close();
