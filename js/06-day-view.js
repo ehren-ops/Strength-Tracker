@@ -210,7 +210,40 @@ function planModifiers(name, ex){
   return on;
 }
 
-// One line of form, one line of swap, under the Next box.
+// The Next tile: always four rows at one fixed size on every lift, so the card never shifts.
+// 1: weight, sets x reps, rest. 2-3: the call and a short read of recent notes. 4: the load.
+function renderNextTile(headline, ex, guidance, load){
+  const rest = ex.trackBy !== "duration" ? ` · <span class="rec-rest">Rest ${restTimeFor(ex)}</span>` : "";
+  return `<div class="rec-box">
+    <div class="rec-headline">${headline}${rest}</div>
+    <div class="rec-desc">${guidance}</div>
+    <div class="rec-load${/ per side/.test(load) ? " plate-line" : ""}">${load}</div>
+  </div>`;
+}
+// When no note gives anything to act on, row 3 falls back to last session's numbers and RPE.
+function lastSessionLine(ex, last){
+  if(!last) return "";
+  const what = ex.trackBy === "weight" ? `${last.weight} lb, ${repLabel(last.sets, last.reps, ex.unit)}` : formatEntryValue(last, ex);
+  return `Last: ${what}${last.difficulty ? ` at RPE ${last.difficulty}` : ""}.`;
+}
+// Row 4: what to load. Plates for a barbell, per hand, the bell, bodyweight, or the cardio setting.
+function loadText(name, ex, sug){
+  if(ex.trackBy === "duration"){
+    const last = ex.entries[ex.entries.length - 1];
+    const parts = last ? [last.speed ? `${last.speed} mph` : "", last.incline ? `${last.incline}% incline` : ""].filter(Boolean) : [];
+    return parts.length ? `Last setting: ${parts.join(" · ")}` : "Conversational pace";
+  }
+  if(ex.trackBy === "reps") return sug && sug.powerHold ? "Bodyweight: go higher or farther, not more reps" : "Bodyweight";
+  if(!sug) return ex.equipment === "barbell" ? "Load: plates shown after your first log" : sidesOf(name).weight === "hand" ? "Load: weight in each hand" : "Load: total weight";
+  const w = sug.weight;
+  if(!(w > 0)) return "Bodyweight";
+  if(ex.equipment === "barbell") return `Load: ${platesLabel(w, ex.equipment)}`;
+  const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;
+  if(maxW) return `Load: one ${w} lb bell${w >= maxW ? " (heaviest available)" : ""}`;
+  return sidesOf(name).weight === "hand" ? `Load: ${w} lb in each hand` : `Load: ${w} lb total`;
+}
+
+// One line of form, one line of swap, under the chart.
 function renderTips(name){
   const t = EXERCISE_TIPS[name];
   if(!t) return "";
@@ -263,7 +296,12 @@ function renderExerciseCard(name, ex){
   }
 
   if(!hasEntries){
-    html += `<p style="color:var(--slate);font-size:0.8rem;margin:0.2rem 0;">No entries yet - log your first set below.</p>`;
+    // Same tile as every other lift, so the card never changes shape.
+    html += renderNextTile("Next: first session", ex,
+      ex.trackBy === "duration" ? "Start easy and steady; the app takes it from there."
+        : "Pick a load you can finish every set with 2 to 3 reps left; the app takes it from there.",
+      loadText(name, ex, null));
+    html += renderTips(name);
   } else {
     const delta = ex.entries.length > 1
       ? (ex.trackBy==="weight" ? last.weight-first.weight : ex.trackBy==="duration" ? last.minutes-first.minutes : last.reps-first.reps)
@@ -290,7 +328,7 @@ function renderExerciseCard(name, ex){
       let msg;
       let nextLabel;
       if(ex.trackBy === "weight"){
-        nextLabel = `${suggestion.weight} lbs${weightSuffix(name)} ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}${repsSuffix(name)}`;
+        nextLabel = `<b>${suggestion.weight} lbs${weightSuffix(name)}</b> · ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}${repsSuffix(name)}`;
         // When the prior session's actual reps beat the target, call that out by
         // name with the real number instead of flattening it to a plain "hit
         // target" - going over is a stronger, more specific signal than a bare hit.
@@ -309,22 +347,23 @@ function renderExerciseCard(name, ex){
         } else if(suggestion.atMaxWeight && suggestion.readyToProgress){
           msg = `Heaviest bell: add reps. Go single-arm at ${MAX_WEIGHT_REP_CAP}.`;
         } else if(suggestion.noteTarget != null && !(suggestion.careFlags && suggestion.careFlags.length)){
-          msg = `From your note: "${escapeHtml(suggestion.noteText)}"`;
+          msg = `Using the ${suggestion.noteTarget} lb you set last time.`;
         } else if(suggestion.deload){
           msg = `Missed target ${unitWord} ${suggestion.missStreak} sessions straight: drop ~15% and rebuild.`;
         } else if(suggestion.noteConcern){
+          const flagged = CONCERN_WORDS.find(w => suggestion.noteConcern.toLowerCase().includes(w)) || "a concern";
           msg = suggestion.hitTarget
-            ? `${hitLeadIn}, but your note said "${escapeHtml(suggestion.noteConcern)}": hold.`
-            : `Missed target ${unitWord}, note said "${escapeHtml(suggestion.noteConcern)}": hold.`;
+            ? `${hitLeadIn}, but your note flagged ${flagged}: hold.`
+            : `Missed target ${unitWord} and your note flagged ${flagged}: hold.`;
         } else if(suggestion.careFlags && suggestion.careFlags.length){
           const flagLabel = suggestion.careFlags.map(f => f === "knee" ? "Knee Care" : "Low Back Care").join(" + ");
           msg = suggestion.noteTarget != null
             ? `${flagLabel}: your note's lighter ${suggestion.noteTarget} lb.`
             : `${flagLabel}: ~10% lighter, holding.`;
         } else if(suggestion.noteCue === "hold"){
-          msg = `${hitLeadIn}, but your note said "${escapeHtml(suggestion.noteText)}": hold.`;
+          msg = `${hitLeadIn}; holding, as your note said.`;
         } else if(suggestion.noteCue === "up"){
-          msg = `${hitLeadIn} and your note said "${escapeHtml(suggestion.noteText)}": add weight.`;
+          msg = `${hitLeadIn}; adding weight, as your note said.`;
         } else if(suggestion.difficultyNote === "hard"){
           msg = `${hitLeadIn}, but rated 9-10: hold.`;
         } else if(suggestion.difficultyNote === "easy"){
@@ -355,28 +394,16 @@ function renderExerciseCard(name, ex){
           : suggestion.powerHold ? `Power: hold reps; go higher or farther only while every rep stays fast.`
           : `Add 2 reps.`;
       }
-      const restPart = ex.trackBy !== "duration" ? ` <span style="font-weight:400;">· Rest ${restTimeFor(ex)}</span>` : "";
-      const rpePart = last.difficulty ? ` <span class="rec-rpe">Last RPE ${last.difficulty}</span>` : "";
-      const loadLine = ex.equipment === "barbell" ? `<div class="plate-line">Load: ${platesLabel(suggestion.weight, ex.equipment)}</div>` : "";
-      // Your last two notes (from the last three sessions) for context, minus one already quoted above.
-      const recentNotes = ex.entries.slice(-3).reverse().filter(e => e.note && !msg.includes(escapeHtml(e.note))).slice(0, 2);
-      const notesLine = recentNotes.length
-        ? `<div class="rec-notes">${recentNotes.map(e => `${fmtDate(e.date)}: "${escapeHtml(e.note)}"`).join(" · ")}</div>` : "";
-      recHtml = `<div class="rec-box">
-        <div class="rec-headline">Next: ${nextLabel}${restPart}</div>
-        <div class="rec-desc">${msg}${rpePart}</div>
-        ${notesLine}
-        ${loadLine}
-      </div>`;
+      // Two lines hold about 100 characters on a phone; the note read gets what the call leaves.
+      recHtml = renderNextTile(`Next: ${nextLabel}`, ex, `${msg} ${noteInsight(ex.entries, 100 - msg.length) || lastSessionLine(ex, last)}`, loadText(name, ex, suggestion));
     }
 
     html += recHtml;
     html += renderChart(ex, suggestion, true, name);
+    html += renderTips(name);
   }
 
   html += renderForm(name, ex);
-  // Form and swap sit under the log button: there when wanted, out of the way of the Next call.
-  html += renderTips(name);
 
   if(!hasEntries){
     html += `<div style="margin-top:0.7rem;"><p style="color:var(--slate);font-size:0.8rem;font-style:italic;">Nothing logged yet.</p></div>`;

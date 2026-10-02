@@ -1890,8 +1890,8 @@ async function main(){
     };
     return { bss: read('Bulgarian Split Squat'), squat: read('Squat'), fly: read('Cable Chest Fly'), copen: read('Copenhagen Plank') };
   });
-  if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lbs\/hand 3x8\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
-  if(!sides.squat.labels.includes('Lb total') || !/lbs total 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
+  if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lbs\/hand · 3x8\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
+  if(!sides.squat.labels.includes('Lb total') || !/lbs total · 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
   if(!sides.fly.labels.includes('Lb / hand')) throw new Error('expected Cable Chest Fly labeled per hand (each stack), got: ' + JSON.stringify(sides.fly));
   if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
   console.log('OK: Bulgarian Split Squat reads lb/hand and reps/leg, Squat lb total, Cable Chest Fly lb/hand, Copenhagen Plank seconds/side');
@@ -1981,7 +1981,26 @@ async function main(){
   if(Math.max(...hs) - Math.min(...hs) > 1 || heights.noteLabel || heights.dateLabel) throw new Error('expected action buttons, inputs and Log to share one height with no Note/Date labels, got: ' + JSON.stringify(heights));
   console.log('OK: "move up"/"easy" add weight, "stay"/"fell apart" hold, "easy day" does neither; buttons, fields and Log share one height');
 
-  console.log('=== 74: the page, stylesheet and every script load with matching versions and no page errors ===');
+  console.log('=== 74: the Next tile is the same size on every exercise, with four rows ===');
+  const tiles = await page.evaluate(() => {
+    const out = {};
+    ['Squat', 'Bicep Curl', 'Incline Treadmill Walk', 'Lateral Raise Test'].forEach(n => {
+      const ex = data[n] || newExerciseShell(n);
+      const div = document.createElement('div');
+      div.style.width = '330px';
+      document.body.appendChild(div);
+      div.innerHTML = renderExerciseCard(n, ex);
+      const t = div.querySelector('.rec-box');
+      out[n] = t ? { h: Math.round(t.getBoundingClientRect().height), rows: t.children.length, load: !!t.querySelector('.rec-load').textContent.trim() } : null;
+      div.remove();
+    });
+    return out;
+  });
+  const tileHs = Object.values(tiles).map(t => t && t.h);
+  if(tileHs.some(h => !h) || new Set(tileHs).size !== 1 || Object.values(tiles).some(t => t.rows !== 3 || !t.load)) throw new Error('expected one fixed-size three-block (four-line) Next tile on every exercise, got: ' + JSON.stringify(tiles));
+  console.log('OK: Next tile is ' + tileHs[0] + 'px on a barbell lift, a dumbbell lift, cardio and a lift with no history');
+
+  console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
     srcs: [...document.querySelectorAll('script[src^="js/"], link[rel="stylesheet"][href^="styles"]')].map(e => e.getAttribute('src') || e.getAttribute('href')),

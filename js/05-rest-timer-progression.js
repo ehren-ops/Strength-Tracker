@@ -264,6 +264,37 @@ const NOTE_WEIGHT_PATTERNS = [
 const NOTE_UP_CUES = /\b(?:move|moving|go|going|bump)\s+(?:it\s+)?up\b|room for more|\btoo (?:easy|light)\b|\beasy\b(?!\s+day)|\bstarting light\b|\bfelt light\b/i;
 const NOTE_HOLD_CUES = /\b(?:stay|hold|stick)\b|fell apart|maxing out|\bmissed\b|\bfailed\b|\btired\b|poor balance|\bdeload\b/i;
 
+// Reads the last two notes as a coach would and returns one short line of guidance, in its own
+// words rather than quoting yours: what the notes say about pain, grip, balance, fatigue, how hard
+// it was, or setup. Notes with nothing to act on (a weight, "straight bar") give nothing.
+const NOTE_THEMES = [
+  { key: "pain", re: /\b(pain|pail|hurt|ache|aching|sore|tender|tweak)/i,
+    say: n => { const part = (n.match(/\b(knee|shoulder|back|elbow|wrist|hip|hamstring|ankle|neck)\b/i) || [])[1];
+      return part ? `Watch the ${part.toLowerCase()}; back off if it sharpens.` : "Something flared; back off if it sharpens."; } },
+  { key: "grip", re: /\bgrip\b/i,
+    say: n => /help|better|fixed|stagger|mixed|over\/under|strap|chalk/i.test(n) ? "The grip change is working; keep it." : "Grip gives out first; try straps or a staggered grip." },
+  { key: "balance", re: /balance|wobbl|stabil/i, say: () => "Balance limits it; slow the lowering and use the mirror." },
+  { key: "fatigue", re: /\btired|fatigue|end of|out of order|\bafter\b/i, say: () => "Fatigue showed late; rest a little longer before this one." },
+  { key: "grind", re: /heavy|grind|fell apart|maxing|hard to|tough|struggl|deload/i, say: () => "Last sets were a grind; own this load before adding." },
+  { key: "setup", re: /setup|set up|technique|\bform\b/i,
+    say: n => /good|solid|clean/i.test(n) ? "Technique is dialed; the load can follow." : "Setup was the sticking point; set up slower." },
+  { key: "strong", re: /\beasy\b(?!\s+day)|\blight\b|move up|moving up|felt good|strong|solid|room for more/i, say: () => "It moved well last time." },
+];
+// budget: characters left for it in the tile's two guidance lines after the call itself.
+function noteInsight(entries, budget = 60){
+  const notes = entries.slice(-3).reverse().map(e => e.note).filter(Boolean).slice(0, 2);
+  const out = [], seen = new Set();
+  notes.forEach(n => NOTE_THEMES.forEach(t => {
+    if(seen.has(t.key) || !t.re.test(n)) return;
+    seen.add(t.key);
+    // A strength read next to a warning is noise; keep the warning.
+    if(t.key === "strong" && out.length) return;
+    const line = t.say(n);
+    if(out.join(" ").length + line.length + 1 <= budget) out.push(line);
+  }));
+  return out.join(" ");
+}
+
 function noteTargetWeight(note, lastWeight){
   if(!note) return null;
   for(const re of NOTE_WEIGHT_PATTERNS){
