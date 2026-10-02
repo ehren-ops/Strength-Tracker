@@ -528,24 +528,28 @@ function renderForm(name, ex){
     html += `</div>`;
   }
   html += `<div class="form-row">`;
-  // With a modifier changing today's numbers, the form starts on the session's recommendation so
-  // logging it as prescribed takes one tap. Otherwise weight starts blank, as before.
+  // The form starts on this session's recommendation, so logging it as prescribed takes one tap:
+  // the modifier-adjusted plan when a modifier changes this lift's numbers, otherwise the next
+  // progression. Lifts set to carry their last reps (Back Extension) keep doing so unless a
+  // modifier sets the reps. A first-ever log has no recommendation and starts as before.
   const mods = planModifiers(name, ex);
-  const plan = mods.length && ex.entries.length ? computeSuggestion(ex, name) : null;
+  const plan = ex.entries.length ? computeSuggestion(ex, name) : null;
   let repsDefault = (ex.autoloadLastReps && ex.entries.length) ? ex.entries[ex.entries.length - 1].reps : effectiveTargetReps(ex);
   let setsDefault = 3;
   let weightDefault = "";
+  let minutesDefault = "";
   if(plan){
     if(plan.sets != null) setsDefault = plan.sets;
-    if(plan.reps != null) repsDefault = plan.reps;
+    if(plan.reps != null && (mods.length || !ex.autoloadLastReps)) repsDefault = plan.reps;
     if(ex.trackBy === "weight" && plan.weight != null) weightDefault = plan.weight;
+    if(ex.trackBy === "duration" && plan.minutes != null) minutesDefault = plan.minutes;
   }
   if(ex.trackBy === "weight"){
     html += `<div class="field"><label>Weight</label><input type="number" inputmode="decimal" id="f-weight" value="${weightDefault}"></div>`;
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   } else if(ex.trackBy === "duration"){
-    html += `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="f-minutes"></div>`;
+    html += `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="f-minutes" value="${minutesDefault}"></div>`;
     if(ex.trackDistance) html += `<div class="field"><label>Miles</label><input type="number" inputmode="decimal" step="0.1" id="f-distance"></div>`;
     if(ex.trackSpeed) html += `<div class="field"><label>MPH</label><input type="number" inputmode="decimal" step="0.1" id="f-speed"></div>`;
     if(ex.trackIncline) html += `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="f-incline"></div>`;
@@ -554,7 +558,7 @@ function renderForm(name, ex){
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   }
   html += `</div>`;
-  if(plan) html += `<p class="prefill-note">Pre-filled with today's plan (${mods.join(", ")}).</p>`;
+  if(plan) html += `<p class="prefill-note">${mods.length ? `Pre-filled with today's plan (${mods.join(", ")}).` : "Pre-filled with your next progression."}</p>`;
   html += `<div class="form-row">
     <div class="field" style="flex:0 0 68px;"><label>RPE / 10</label><input type="number" inputmode="numeric" id="f-difficulty" min="1" max="10" value="7"></div>
     <div class="field" style="flex:1 1 140px;"><label>Note</label><input type="text" id="f-note" placeholder="${ex.trackBy==='duration' ? 'e.g. easy spin' : 'e.g. felt heavy'}"></div>

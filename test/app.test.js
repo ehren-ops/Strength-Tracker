@@ -1393,6 +1393,7 @@ async function main(){
   await page.click('.tab:has-text("Extra")');
   await page.locator('.pill').filter({ hasText: /^Zone 2 Ride/ }).click();
   await sleep(150);
+  await page.fill('#f-minutes', ''); // pre-filled from the last ride when there is one
   await page.click('button.log:has-text("Log set")');
   await sleep(50);
   const minutesHasError = await page.evaluate(() => document.getElementById('f-minutes').classList.contains('field-error'));
@@ -1787,7 +1788,7 @@ async function main(){
   if(storage.after.includes("Couldn't save")) throw new Error('expected the warning to clear once a save succeeds, got: ' + storage.after);
   console.log('OK: a refused local save shows "Couldn\'t save on this phone" and clears on the next good save');
 
-  console.log('=== 69: with a modifier changing a lift\'s numbers, the log form starts on today\'s plan ===');
+  console.log('=== 69: the log form starts on the modifier plan when one applies, otherwise the next progression ===');
   await page.evaluate(() => { MODE_DEFS.forEach(m => { if(modes[m.key]) toggleMode(m.key); }); });
   await page.click('.tab:has-text("Full Body")');
   const readForm = () => page.evaluate(() => ({
@@ -1799,8 +1800,8 @@ async function main(){
   const planFor = name => page.evaluate(n => { const s = computeSuggestion(data[n], n); return { weight: String(s.weight), sets: String(s.sets), reps: String(s.reps) }; }, name);
   await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
   await sleep(100);
-  const plain = await readForm();
-  if(plain.weight !== '' || plain.note) throw new Error('expected no pre-fill with every modifier off, got: ' + JSON.stringify(plain));
+  const plain = await readForm(), plainPlan = await planFor('Squat');
+  if(plain.weight !== plainPlan.weight || plain.sets !== plainPlan.sets || plain.reps !== plainPlan.reps || plain.note !== 'Pre-filled with your next progression.') throw new Error('expected every modifier off to pre-fill the next progression ' + JSON.stringify(plainPlan) + ', got: ' + JSON.stringify(plain));
   await page.evaluate(() => toggleMode('knee'));
   await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
   await sleep(100);
@@ -1814,10 +1815,20 @@ async function main(){
   await page.evaluate(() => toggleMode('deload'));
   await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
   await sleep(100);
-  const bench = await readForm();
-  if(bench.weight !== '' || bench.note) throw new Error('expected Knee Care to leave Bench Press (not knee-flagged) un-filled, got: ' + JSON.stringify(bench));
+  const bench = await readForm(), benchPlan = await planFor('Bench Press');
+  if(bench.weight !== benchPlan.weight || bench.note !== 'Pre-filled with your next progression.') throw new Error('expected Bench Press (not knee-flagged) to pre-fill its plain progression under Knee Care, got: ' + JSON.stringify(bench));
   await page.evaluate(() => toggleMode('knee'));
-  console.log('OK: Knee Care and Deload pre-fill weight, sets and reps with the plan and say so; unaffected lifts and no-modifier days stay as before');
+  const backExt = await page.evaluate(() => {
+    const ex = data['Back Extension'] ||= newExerciseShell('Back Extension');
+    const saved = ex.entries;
+    ex.entries = [{ clientId: 'be1', date: '2026-09-20', weight: 25, sets: 3, reps: 12 }];
+    selected = 'Back Extension'; view = 'full'; render();
+    const out = { reps: document.getElementById('f-reps').value, weight: document.getElementById('f-weight').value };
+    ex.entries = saved; render();
+    return out;
+  });
+  if(backExt.reps !== '12' || !backExt.weight) throw new Error('expected Back Extension to keep carrying its last reps (12) with a pre-filled weight, got: ' + JSON.stringify(backExt));
+  console.log('OK: the form pre-fills the modifier plan when one applies, otherwise the next progression, and says which; Back Extension keeps its last reps');
 
   console.log('=== 70: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
