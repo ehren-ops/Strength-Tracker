@@ -1466,6 +1466,8 @@ async function main(){
   if(!squatPayload || !Array.isArray(squatPayload.history) || squatPayload.history.length > 8 || !squatPayload.appSuggestion) throw new Error('expected each lift to carry up to 8 prior results and the app suggestion, got: ' + JSON.stringify(squatPayload));
   if(!squatPayload.trend || squatPayload.trend.pattern !== 'squat' || typeof squatPayload.trend.sessionsAtCurrentLoad !== 'number') throw new Error('expected a pre-computed trend with the movement pattern per lift, got: ' + JSON.stringify(squatPayload.trend));
   if(!sessionReq.payload.patterns || typeof sessionReq.payload.patterns !== 'object') throw new Error('expected a movement-pattern summary in the session payload');
+  const lt = sessionReq.payload.logTimes;
+  if(!Array.isArray(lt) || !lt.length || !lt.every(l => l.name && !isNaN(Date.parse(l.at))) || lt.some((l, i) => i && l.at < lt[i-1].at)) throw new Error('expected the session payload to carry each lift\'s log time, oldest first, for the heart-rate split, got: ' + JSON.stringify(lt));
   const timedTrend = await page.evaluate(() => liftTrend("Farmer's Carry", { trackBy: 'weight', unit: 'sec', entries: [
     { date: '2026-09-15', weight: 60, sets: 3, reps: 8 }, { date: '2026-10-01', weight: 60, sets: 3, reps: 40 } ] }, '2026-10-01'));
   if(timedTrend.e1rmChange4WeeksPct !== null || timedTrend.secondsChange4Weeks !== 32) throw new Error('expected timed holds to report a seconds change, not a fake e1RM gain, got: ' + JSON.stringify(timedTrend));

@@ -24,6 +24,13 @@ table (`kind` = `session` or `weekly`) when signed in. Model: Claude Sonnet 5.5.
   and reads the goals row (`page_content`, page `coach`, key `goals`), 14 days of Whoop recovery,
   sleep and rides (used only to explain a specific lift result), and the bodyweight trend (weekly
   only). Recovery and nutrition analysis itself lives in Outlive.
+- **Per-lift heart rate, through Outlive:** the app sends each lift's log time. The function asks
+  Outlive's `strava-hr` function for the wearable's heart-rate stream (Whoop via Strava) over that
+  session and splits it at the log times, since each lift is logged right after its last set: one
+  window per lift, with its peak and average HR. Session mode also does this for the latest earlier
+  session of the same day type, for a like-for-like comparison; weekly mode does it for each
+  session that week. Right after a workout the wearable may not have uploaded yet, in which case
+  the analysis runs without heart rate.
 
 ## Setup after cloning this repo
 

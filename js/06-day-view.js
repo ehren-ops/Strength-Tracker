@@ -377,10 +377,9 @@ function renderExerciseCard(name, ex){
 
     html += `<div style="margin-top:0.9rem;">`;
     html += `<h3 class="section" style="margin-bottom:0.4rem;">Recent History</h3>`;
-    const histColLabel = ex.trackBy==="duration"
-      ? "Time" + (ex.trackDistance ? "/Dist" : "") + (ex.trackSpeed ? "/Spd" : "") + (ex.trackIncline ? "/Incl" : "")
-      : `${ex.trackBy==="weight"?"Weight/":""}${ex.unit==="sec"?"Sets/Sec":"Sets/Reps"}`;
-    html += `<div class="hist-row header"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;
+    const histColLabel = ex.trackBy==="duration" ? "Cardio" : ex.trackBy==="weight" ? "Load" : "Sets";
+    const cardioCls = ex.trackBy==="duration" ? " cardio" : "";
+    html += `<div class="hist-row header${cardioCls}"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;
     recent.forEach((r, idx) => { html += renderHistRow(r.e, r.i, idx === 0, ex, name); });
 
     if(older.length){
@@ -438,13 +437,15 @@ function renderHistRow(e, idx, isLatest, ex, name){
     </div>`;
   }
 
-  let html = `<div class="hist-row${isLatest?' latest':''}">`;
-  const todayTag = (isLatest && e.date === todayISO()) ? ' (TODAY)' : '';
-  html += `<span>${fmtDate(e.date)}${e.confirmed===false?'<span class="est">*</span>':''}${isLatest?` <span class="latest-tag">Latest${todayTag}</span>`:''}<br><span class="hist-session-label">${e.label}</span></span>`;
+  // Narrow date, numbers and RPE columns; the note takes the rest in the body font, which fits
+  // far more per line than the mono numbers.
+  let html = `<div class="hist-row${isLatest?' latest':''}${ex.trackBy==="duration"?' cardio':''}">`;
+  const tag = isLatest ? (e.date === todayISO() ? "Today" : "Latest") : "";
+  html += `<span>${fmtDate(e.date)}${e.confirmed===false?'<span class="est">*</span>':''}${tag ? `<br><span class="latest-tag">${tag}</span>` : ''}</span>`;
   html += `<span class="exact">${formatEntryValue(e, ex)}</span>`;
   html += `<span class="exact">${e.difficulty ?? "-"}</span>`;
-  html += `<span>`;
-  if(e.note) html += `<span class="note">${escapeHtml(e.note)}</span>`;
+  html += `<span class="hist-note-cell">`;
+  html += `<span class="note">${e.note ? escapeHtml(e.note) : ""}</span>`;
   html += `<span class="row-actions">
     <button class="icon-btn" onclick="startEdit('${name.replace(/'/g,"\\'")}', ${idx})" aria-label="Edit">✎</button>
     <button class="icon-btn" onclick="startDelete('${name.replace(/'/g,"\\'")}', ${idx})" aria-label="Delete">✕</button>

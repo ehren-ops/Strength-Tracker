@@ -164,6 +164,67 @@ async function outliveContext(email: string, mode: "session" | "weekly", end: st
   return { status: "outlive_ok", data };
 }
 
+// ---------- heart rate per lift ----------
+// The app logs each lift right after its last set, so the wearable's heart-rate stream (Whoop via
+// Strava, fetched by Outlive's strava-hr function) splits at those log times into one window per
+// lift: its sets plus the rests before them. Peak is the hardest set; average reflects density.
+type Log = { name: string; at: string };
+const FIRST_LIFT_LEAD_MIN = 20; // the first lift's window starts at most this long before its log
+
+function clock(ms: number, tz: string) {
+  try { return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(ms)); }
+  catch (_e) { return new Date(ms).toISOString().slice(11, 16); }
+}
+
+async function hrStream(start: number, end: number) {
+  const key = Deno.env.get("OUTLIVE_SUPABASE_SECRET_KEY")?.trim();
+  if (!key) return null;
+  const resp = await fetch(`${OUTLIVE_URL}/functions/v1/strava-hr`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, apikey: key, "Content-Type": "application/json" },
+    body: JSON.stringify({ start: new Date(start).toISOString(), end: new Date(end).toISOString() }),
+  });
+  if (!resp.ok) { console.error("strava-hr", resp.status, await resp.text()); return null; }
+  return await resp.json() as { activity: Row | null; samples: [number, number][] };
+}
+
+async function sessionHeartRate(logs: unknown, tz: string) {
+  if (!Array.isArray(logs) || logs.length < 2) return null;
+  const valid = (logs as Log[]).filter((l) => l && typeof l.name === "string" && Number.isFinite(Date.parse(l.at)))
+    .sort((x, y) => Date.parse(x.at) - Date.parse(y.at));
+  // Keep the main block of the session: a lift logged hours later (cardio entered the next
+  // morning, say) would stretch the window past anything the wearable recorded together.
+  const clusters: Log[][] = [];
+  for (const l of valid) {
+    const cur = clusters[clusters.length - 1];
+    if (cur && Date.parse(l.at) - Date.parse(cur[cur.length - 1].at) <= 90 * 60_000) cur.push(l);
+    else clusters.push([l]);
+  }
+  const ls = clusters.sort((x, y) => y.length - x.length)[0] ?? [];
+  const times = ls.map((l) => Date.parse(l.at));
+  if (ls.length < 2) return null;
+  // Sets imported in bulk share one timestamp: not a real timeline, so no per-lift split.
+  if (ls.length >= 3 && times[times.length - 1] - times[0] < 5 * 60_000) return { status: "no_log_timeline" };
+  const res = await hrStream(times[0] - 75 * 60_000, times[times.length - 1] + 2 * 60_000).catch((e) => { console.error("strava-hr", e); return null; });
+  if (!res) return { status: "hr_unavailable" };
+  if (!res.activity || !res.samples?.length) return { status: "not_uploaded_yet" };
+  const actStart = Date.parse(String(res.activity.startTime));
+  const lifts = ls.map((l, i) => {
+    const to = times[i];
+    const from = i ? times[i - 1] : Math.max(actStart, to - FIRST_LIFT_LEAD_MIN * 60_000);
+    const w = res.samples.filter(([t]) => t * 1000 > from && t * 1000 <= to).map(([, h]) => h);
+    if (w.length < 3) return `${l.name}: no heart rate in its window`;
+    const avgHr = Math.round(w.reduce((a, b) => a + b, 0) / w.length);
+    return `${l.name} ${clock(to, tz)} (${Math.round((to - from) / 60_000)} min): peak ${Math.max(...w)}, avg ${avgHr}`;
+  });
+  const a = res.activity;
+  return {
+    status: "ok",
+    session: `${round(num(a.elapsedSec) != null ? num(a.elapsedSec)! / 60 : null)} min, avg ${round(num(a.avgHr))}, max ${round(num(a.maxHr))}`,
+    lifts,
+  };
+}
+
 // ---------- prompts and output shapes ----------
 const PRINCIPLES = `Your value is synthesis the athlete cannot see on the log screen. They already see every weight, set, rep and RPE they logged, so never hand those back. Every bullet must be an insight: a pattern across sessions, a comparison between lifts or movement patterns, a likely cause, or a decision. Numbers appear only as brief evidence for the insight, never as the point.
 Bad: "Bench Press: 170 lb 3x8 at RPE 7."
@@ -175,6 +236,7 @@ Look for:
 - Exercise order: lifts are normally done in their numbered order (#1 first). A lift done out of its planned place usually means its equipment was busy, not a choice, so never criticize the swap itself. Do use it to explain a result: a lift done later than planned was done more fatigued, one done earlier, fresher. Recommend changing the program order only when a pattern across sessions shows the order is holding back a priority lift, and then say the numbered order should change.
 - Notes that cluster by body region or keep repeating across weeks.
 - Progressions that jumped too far, and lifts that matter most for the current training phase and goal.
+- Heart rate, when "heartRate" has status "ok": each lift's peak and average come from the wearable stream split at the app's log times, so the window holds that lift's sets plus the rests before them. Treat it as effort evidence and compare like for like: the same lift at a similar load against the comparison session (lower HR at the same or heavier load means better conditioning; higher means fatigue, heat or shorter rests). Accessories pushing HR as high as the main lifts suggest rests too short or circuit pacing. High RPE with modest HR points to a local muscular limit, not cardio. Cite HR only when it changes a conclusion. If heartRate is missing or its status is not "ok", ignore it and never mention heart rate.
 - Recovery data, when present, is only an explainer: use it only when it explains a specific lift result (for example a hard set the day after a long ride or a short night). Never summarize recovery, sleep or HRV trends on their own; another app covers that.
 
 Rules:
@@ -186,7 +248,7 @@ Rules:
 
 const SESSION_SYSTEM = `You are the athlete's strength coach writing a short note right after a lifting session. Think about how this session fits the last several weeks before writing.
 
-Input is JSON: each lift done today with today's result, its last 8 results (date, weight and sets x reps, RPE after @, note in quotes), the app's own next-session suggestion and a pre-computed "trend" (movement pattern, 4-week e1RM change, sessions at the current load, RPE at that load); a "patterns" summary across all lifts; active training modes; a "deload" status (whether a deload week is on, the last one, the next due date); "order" (the lifts in the order they were logged today, each with its planned number, plus any done out of order; null if unknown). Results tagged [deload] were intentionally light, never a regression. When available, an "outlive" block adds goals and training phases plus 14 days of recovery lines.
+Input is JSON: each lift done today with today's result, its last 8 results (date, weight and sets x reps, RPE after @, note in quotes), the app's own next-session suggestion and a pre-computed "trend" (movement pattern, 4-week e1RM change, sessions at the current load, RPE at that load); a "patterns" summary across all lifts; active training modes; a "deload" status (whether a deload week is on, the last one, the next due date); "order" (the lifts in the order they were logged today, each with its planned number, plus any done out of order; null if unknown); "heartRate" (today's session and, under "compare", the latest earlier session of the same day type: per-lift peak and average HR with each lift's log time and window length). Results tagged [deload] were intentionally light, never a regression. When available, an "outlive" block adds goals and training phases plus 14 days of recovery lines.
 
 ${PRINCIPLES}
 
@@ -197,7 +259,7 @@ Write:
 
 const WEEKLY_SYSTEM = `You are the athlete's strength coach writing the weekly check-in. It is the big-picture strength review: how the program is moving as a whole, where it is lopsided, and what to prioritize next week. Think it through across all lifts and weeks before writing.
 
-Input is JSON: the week (weekStart to weekEnd), session dates, up to 6 weeks of history per lift (date, weight and sets x reps, RPE after @, note in quotes), the app's next-session suggestion and a pre-computed "trend" per lift, a "patterns" summary, a "deload" status (on or off, the last deload, the next due date), and "sessionOrders" (for sessions in the last 14 days, the lifts in logged order with planned numbers and any done out of order). Results tagged [deload] were intentionally light, never a regression. When available, an "outlive" block adds goals and training phases, 14 days of recovery lines, and a bodyweight trend.
+Input is JSON: the week (weekStart to weekEnd), session dates, up to 6 weeks of history per lift (date, weight and sets x reps, RPE after @, note in quotes), the app's next-session suggestion and a pre-computed "trend" per lift, a "patterns" summary, a "deload" status (on or off, the last deload, the next due date), "sessionOrders" (for sessions in the last 14 days, the lifts in logged order with planned numbers and any done out of order), and "heartRate" (per-lift peak and average HR for this week's sessions, by date). Results tagged [deload] were intentionally light, never a regression. When available, an "outlive" block adds goals and training phases, 14 days of recovery lines, and a bodyweight trend.
 
 ${PRINCIPLES}
 
@@ -276,12 +338,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Per-lift heart rate, fetched in parallel. The raw log times stay out of the prompt.
+    const { logTimes, compareSession, weekLogTimes, ...forModel } = payload as Record<string, any>;
+    let heartRate: Row | null = null;
+    if (mode === "session") {
+      const [today, compare] = await Promise.all([
+        sessionHeartRate(logTimes, tz),
+        compareSession?.logs ? sessionHeartRate(compareSession.logs, tz) : Promise.resolve(null),
+      ]);
+      if (today) heartRate = { ...today, compare: compare && compareSession?.date ? { date: compareSession.date, ...compare } : null };
+    } else if (weekLogTimes && typeof weekLogTimes === "object") {
+      const dates = Object.keys(weekLogTimes).filter(isDate).sort().slice(-5);
+      const byDate = await Promise.all(dates.map((d) => sessionHeartRate(weekLogTimes[d], tz)));
+      heartRate = Object.fromEntries(dates.map((d, i) => [d, byDate[i]]).filter(([, h]) => h));
+    }
+
     const client = new Anthropic({ apiKey });
     const response = await client.beta.messages.parse({
       model: MODEL,
       max_tokens: 16000,
       system: mode === "weekly" ? WEEKLY_SYSTEM : SESSION_SYSTEM,
-      messages: [{ role: "user", content: "Data (JSON):\n" + JSON.stringify({ ...payload, outlive: context.data }) }],
+      messages: [{ role: "user", content: "Data (JSON):\n" + JSON.stringify({ ...forModel, heartRate, outlive: context.data }) }],
       output_config: {
         effort: mode === "weekly" ? "high" : "medium",
         format: betaZodOutputFormat(mode === "weekly" ? WeeklyOut : SessionOut),
@@ -300,7 +377,7 @@ Deno.serve(async (req) => {
       return json({ error: "could_not_parse_breakdown", stop_reason: response.stop_reason }, 502);
     }
 
-    console.log("coach", mode, context.status, "usage", JSON.stringify(response.usage));
+    console.log("coach", mode, context.status, "hr", JSON.stringify(heartRate && (heartRate.status ?? Object.keys(heartRate).length)), "usage", JSON.stringify(response.usage));
     return json({
       breakdown: toSections(mode, response.parsed_output as Record<string, unknown>),
       generatedAt: new Date().toISOString(),

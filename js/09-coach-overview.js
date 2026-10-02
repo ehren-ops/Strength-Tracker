@@ -124,6 +124,26 @@ function sessionOrder(date){
   };
 }
 
+// When each lift was logged on one date, oldest first. Lifts are logged right after their last set,
+// so the coach function splits the wearable's heart-rate stream at these times to estimate each
+// lift's peak and average HR. Empty when the day predates log times.
+function sessionLogTimes(date){
+  const logs = [];
+  Object.entries(data).forEach(([name, ex]) => {
+    if(ex.trackBy === "checklist") return;
+    ex.entries.forEach(e => { if(e.date === date && e.loggedAt) logs.push({ name, at: e.loggedAt }); });
+  });
+  return logs.sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
+}
+// The latest earlier session of the same day type, for a like-for-like heart-rate comparison.
+function previousComparableSession(date){
+  const day = guessDayForNames(sessionLogTimes(date).map(l => l.name));
+  const dates = new Set();
+  Object.values(data).forEach(ex => ex.entries.forEach(e => { if(e.date < date) dates.add(e.date); }));
+  const prev = [...dates].sort().reverse().find(d => guessDayForNames(sessionLogTimes(d).map(l => l.name)) === day && sessionLogTimes(d).length >= 2);
+  return prev ? { date: prev, logs: sessionLogTimes(prev) } : null;
+}
+
 function coachTz(){
   try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }catch(e){ return "UTC"; }
 }
@@ -150,7 +170,7 @@ function buildSessionCoachPayload(date){
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
   const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
-  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), exercises, patterns: patternSummary(date) };
+  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionLogTimes(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date) };
 }
 
 // The past week plus 6 weeks of history per lift, enough to judge loading blocks and deloads.
@@ -169,7 +189,9 @@ function buildWeeklyCoachPayload(){
   const orderSince = shiftISO(weekEnd, -13);
   const sessionOrders = Object.fromEntries([...sessionDates].filter(d => d >= orderSince).sort()
     .map(d => [d, sessionOrder(d)]).filter(([, o]) => o));
-  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, exercises, patterns: patternSummary(weekEnd) };
+  const weekLogTimes = Object.fromEntries([...sessionDates].filter(d => d >= shiftISO(weekEnd, -6)).sort()
+    .map(d => [d, sessionLogTimes(d)]).filter(([, l]) => l.length >= 2));
+  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd) };
 }
 
 async function generateCoach(kind){
