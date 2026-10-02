@@ -247,16 +247,51 @@ function capAtMaxWeight(sug, ex, name, last){
   return { ...sug, weight: maxW, reps, atMaxWeight: true, atRepCap: atRepCap && sug.readyToProgress };
 }
 
+// A weight written into last session's note for next time: "Dial to 50!", "Good to move up to
+// 180", "Good for 150 next", "Ok for 15 lbs", "next 155", "try 52.5". Only phrasings that point at
+// the next session count; a number tagged as seconds, minutes, reps, sets or percent never does,
+// and it has to be a plausible load for this lift (half to double the last weight, or up to 100 lb
+// on a lift last done at bodyweight), so "60 sec intervals" can't turn into 60 lb.
+const NOTE_NUM = String.raw`(\d+(?:\.\d+)?)\b(?!\s*(?:sec|s\b|seconds|min|mins|minutes|reps?|sets?|x\b|%))`;
+const NOTE_WEIGHT_PATTERNS = [
+  new RegExp(String.raw`\b(?:dial|drop|go|move|bump|jump|step|come|increase|decrease|reduce|cut|switch|try|use|start|stay|hold|stick|load)(?:\s+(?:it\s+)?(?:up|down|back))?\s+(?:to|at|with)\s+` + NOTE_NUM, "i"),
+  new RegExp(String.raw`\b(?:good|ok|okay|ready|fine)\s+(?:for|with|at)\s+` + NOTE_NUM, "i"),
+  new RegExp(String.raw`\b(\d+(?:\.\d+)?)\s*(?:lbs?|pounds)?\s+next\b`, "i"),
+  new RegExp(String.raw`\bnext\s+(?:time\s+|session\s+)?(?:at\s+|try\s+)?` + NOTE_NUM, "i"),
+  new RegExp(String.raw`\btry\s+` + NOTE_NUM, "i"),
+];
+function noteTargetWeight(note, lastWeight){
+  if(!note) return null;
+  for(const re of NOTE_WEIGHT_PATTERNS){
+    const m = String(note).match(re);
+    if(!m) continue;
+    const n = Number(m[1]);
+    const plausible = lastWeight > 0 ? (n >= lastWeight * 0.5 && n <= lastWeight * 2) : (n > 0 && n <= 100);
+    if(plausible) return n;
+  }
+  return null;
+}
+// The note's number replaces the automatic progression, including a miss-streak drop. With Knee
+// or Back Care trimming the lift, the note can only take it lower, never back up.
+function applyNoteTarget(core, ex, last){
+  if(!core || !last || ex.trackBy !== "weight") return core;
+  const w = noteTargetWeight(last.note, last.weight);
+  if(w == null) return core;
+  if(core.careFlags && core.careFlags.length) return w < core.weight ? { ...core, weight: w, noteTarget: w, noteText: last.note } : core;
+  return { ...core, weight: w, deload: false, readyToProgress: w > last.weight, noteTarget: w, noteText: last.note };
+}
+
 function computeSuggestion(ex, name){
   if(!ex.entries.length) return null;
   const baseline = ex.entries.filter(e => !e.deload);
   const baseEntries = baseline.length ? baseline : ex.entries;
-  const core = capAtMaxWeight(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, name, baseEntries[baseEntries.length - 1]);
+  const lastBaseEntry = baseEntries[baseEntries.length - 1];
+  const core = capAtMaxWeight(applyNoteTarget(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, lastBaseEntry), ex, name, lastBaseEntry);
   if(!modes.deload || !core || ex.trackBy === "duration") return core;
   const lastBase = (baseline.length ? baseline : ex.entries)[ (baseline.length ? baseline : ex.entries).length - 1 ];
   const sets = Math.max(2, Math.round((lastBase.sets || core.sets || 3) * 2 / 3));
   if(ex.trackBy !== "weight") return { ...core, sets, reps: lastBase.reps, deloadWeek: true };
-  const alreadyReduced = !!(core.careFlags && core.careFlags.length) || core.deload;
+  const alreadyReduced = !!(core.careFlags && core.careFlags.length) || core.deload || (core.noteTarget != null && core.noteTarget < lastBase.weight);
   const weight = alreadyReduced ? core.weight : Math.round((lastBase.weight * 0.9) / 2.5) * 2.5;
   return { ...core, weight, sets, reps: ex.targetReps || core.reps, readyToProgress: false, deloadWeek: true, deloadKeptReduction: alreadyReduced };
 }
@@ -377,6 +412,9 @@ function computeSuggestionCore(ex, name){
     return { minutes, difficultyNote: note };
   }
 
+  // Jumps and bounds train speed and landing quality: reps stay at the target and progress comes
+  // from a higher box or a longer bound, never from more reps.
+  if(ex.preseasonPower) return { reps: targetReps, sets: last.sets, hitTarget: true, powerHold: true };
   return { reps: last.reps + 2, sets: last.sets, hitTarget: true };
 }
 

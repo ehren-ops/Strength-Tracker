@@ -301,6 +301,8 @@ function renderExerciseCard(name, ex){
           msg = `${suggestion.weight} lb is the heaviest available and you're at ${MAX_WEIGHT_REP_CAP} reps. Next step up: single-arm swings at ${suggestion.weight} lb (roughly double the load per side), or a 1 second hold at the top with a harder hip snap.`;
         } else if(suggestion.atMaxWeight && suggestion.readyToProgress){
           msg = `${suggestion.weight} lb is the heaviest available, so progressing by reps instead: aim for ${suggestion.reps}. At ${MAX_WEIGHT_REP_CAP} reps, move to single-arm swings.`;
+        } else if(suggestion.noteTarget != null && !(suggestion.careFlags && suggestion.careFlags.length)){
+          msg = `Going with ${suggestion.noteTarget} lb from last session's note ("${escapeHtml(suggestion.noteText)}").`;
         } else if(suggestion.deload){
           msg = `Missed target ${unitWord} for ${suggestion.missStreak} sessions straight - that's a stall, not a bad day. Dropping ~15% to rebuild with clean reps.`;
         } else if(suggestion.noteConcern){
@@ -309,7 +311,9 @@ function renderExerciseCard(name, ex){
             : `Missed target ${unitWord}, and last session's note flagged "${escapeHtml(suggestion.noteConcern)}" - hold weight and keep an eye on that.`;
         } else if(suggestion.careFlags && suggestion.careFlags.length){
           const flagLabel = suggestion.careFlags.map(f => f === "knee" ? "Knee Care" : "Low Back Care").join(" + ");
-          msg = `${flagLabel} mode is on - cutting load ~10% and holding here while that settles down.`;
+          msg = suggestion.noteTarget != null
+            ? `${flagLabel} mode is on, and last session's note asked for ${suggestion.noteTarget} lb, which is lighter still - going with that.`
+            : `${flagLabel} mode is on - cutting load ~10% and holding here while that settles down.`;
         } else if(suggestion.difficultyNote === "hard"){
           msg = `${hitLeadIn}, but rated 9-10/10 - holding here until it feels more manageable.`;
         } else if(suggestion.difficultyNote === "easy"){
@@ -338,7 +342,9 @@ function renderExerciseCard(name, ex){
           : `Held steady - log an RPE next time for a sharper call.`;
       } else {
         nextLabel = repLabel(suggestion.sets,suggestion.reps,ex.unit);
-        msg = suggestion.deloadWeek ? `Deload week - same reps, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.` : `Bodyweight move, aiming for a couple more reps.`;
+        msg = suggestion.deloadWeek ? `Deload week - same reps, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`
+          : suggestion.powerHold ? `Power move: keep it at ${suggestion.reps} fast reps. Progress with a higher box or a longer bound, and only while every rep stays quick and every landing is quiet.`
+          : `Bodyweight move, aiming for a couple more reps.`;
       }
       const restPart = ex.trackBy !== "duration" ? ` <span style="font-weight:400;">· Rest ${restTimeFor(ex)}</span>` : "";
       const diffText = last.difficulty ? last.difficulty + "/10" : "not rated";

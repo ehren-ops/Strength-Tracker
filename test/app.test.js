@@ -1830,7 +1830,35 @@ async function main(){
   if(backExt.reps !== '12' || !backExt.weight) throw new Error('expected Back Extension to keep carrying its last reps (12) with a pre-filled weight, got: ' + JSON.stringify(backExt));
   console.log('OK: the form pre-fills the modifier plan when one applies, otherwise the next progression, and says which; Back Extension keeps its last reps');
 
-  console.log('=== 70: the page, stylesheet and every script load with matching versions and no page errors ===');
+  console.log('=== 70: a weight written in last session\'s note sets the next one; jumps and bounds hold their reps ===');
+  const noteCases = await page.evaluate(() => [
+    ['Dial to 50!', 60], ['60 sec intervals. Good to move up to 180', 175], ['Good for 150 next', 130], ['Ok for 15 lbs', 0],
+    ['next 155', 150], ['try 52.5', 50], ['drop back to 135', 155], ['Next time 47.5', 45],
+    ['60 sec intervals', 175], ['Felt heavy, stay', 150], ['Good to move up', 150], ['Stay one set', 150], ['Go to 10 reps', 40],
+    ['3x8 felt easy', 135], ['Maxing out, deload again next', 37.5], ['Pail in left front shoulder on curl', 30], ['move up to 500', 175], ['try 90 sec rest', 60],
+  ].map(([note, w]) => noteTargetWeight(note, w)));
+  const wantNotes = [50, 180, 150, 15, 155, 52.5, 135, 47.5, null, null, null, null, null, null, null, null, null, null];
+  if(JSON.stringify(noteCases) !== JSON.stringify(wantNotes)) throw new Error('note weight parsing mismatch: ' + JSON.stringify(noteCases));
+  const noteSug = await page.evaluate(() => {
+    const mk = (entries, extra) => Object.assign({ trackBy: 'weight', targetReps: 8, increment: 5, entries }, extra || {});
+    const saved = { ...modes };
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const bss = computeSuggestion(mk([{ date: '2026-09-23', weight: 45, sets: 3, reps: 8, difficulty: 7 }, { date: '2026-09-28', weight: 60, sets: 3, reps: 6, difficulty: 8, note: 'Dial to 50!' }]), 'Bulgarian Split Squat');
+    const squatUp = computeSuggestion(mk([{ date: '2026-10-02', weight: 175, sets: 3, reps: 8, difficulty: 7, note: '60 sec intervals. Good to move up to 180' }]), 'Squat');
+    modes.knee = true;
+    const kneeHigher = computeSuggestion(mk([{ date: '2026-10-02', weight: 175, sets: 3, reps: 8, note: 'move up to 180' }]), 'Squat');
+    const kneeLower = computeSuggestion(mk([{ date: '2026-10-02', weight: 175, sets: 3, reps: 8, note: 'drop to 135' }]), 'Squat');
+    modes.knee = false;
+    const box = computeSuggestion(Object.assign(newExerciseShell('Box Jumps'), { entries: [{ date: '2026-10-02', weight: 0, sets: 4, reps: 3, difficulty: 4 }] }), 'Box Jumps');
+    const skater = computeSuggestion(Object.assign(newExerciseShell('Skater Bound'), { entries: [{ date: '2026-10-02', weight: 0, sets: 3, reps: 6, difficulty: 6 }] }), 'Skater Bound');
+    Object.assign(modes, saved);
+    return { bss: [bss.weight, bss.noteTarget, bss.deload], squatUp: [squatUp.weight, squatUp.readyToProgress], kneeHigher: kneeHigher.weight, kneeLower: kneeLower.weight, box: [box.sets, box.reps, !!box.powerHold], skater: [skater.sets, skater.reps] };
+  });
+  const wantSug = { bss: [50, 50, false], squatUp: [180, true], kneeHigher: 157.5, kneeLower: 135, box: [4, 3, true], skater: [3, 4] };
+  if(JSON.stringify(noteSug) !== JSON.stringify(wantSug)) throw new Error('expected note targets and power holds ' + JSON.stringify(wantSug) + ', got: ' + JSON.stringify(noteSug));
+  console.log('OK: "Dial to 50!" sets 50, "move up to 180" sets 180, Knee Care lets a note lower but not raise the load, and jumps/bounds hold their target reps');
+
+  console.log('=== 71: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
     srcs: [...document.querySelectorAll('script[src^="js/"], link[rel="stylesheet"][href^="styles"]')].map(e => e.getAttribute('src') || e.getAttribute('href')),

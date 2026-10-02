@@ -37,12 +37,12 @@ function describeSuggestion(ex, name){
   const s = computeSuggestion(ex, name);
   if(!s) return null;
   if(ex.trackBy === "weight"){
-    const why = s.deloadWeek ? "deload week" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
+    const why = s.deloadWeek ? "deload week" : s.noteTarget != null ? "set by last note" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
       : s.noteConcern ? "hold, note flagged" : s.difficultyNote === "hard" ? "hold, last RPE high" : "hold";
     return `${s.weight} lb ${s.sets}x${s.reps} (${why})`;
   }
   if(ex.trackBy === "duration") return `${s.minutes} min`;
-  return `${s.sets}x${s.reps}`;
+  return `${s.sets}x${s.reps}${s.powerHold ? " (power: hold reps, progress height or distance)" : ""}`;
 }
 // Movement pattern per lift, so the coach can compare push vs pull, squat vs hinge, etc.
 const LIFT_PATTERNS = {
