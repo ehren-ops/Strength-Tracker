@@ -66,10 +66,14 @@
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--stone);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom);}
-  header{background:linear-gradient(180deg,var(--pine) 0%,var(--pine-2) 100%);color:var(--header-text);padding:calc(1.4rem + env(safe-area-inset-top)) 1.1rem 1.1rem;}
+  header{position:relative;background:linear-gradient(180deg,var(--pine) 0%,var(--pine-2) 100%);color:var(--header-text);padding:calc(1.4rem + env(safe-area-inset-top)) 1.1rem 1.1rem;}
   header h1{font-family:var(--font-display);font-weight:400;letter-spacing:0.03em;font-size:1.7rem;margin:0 0 0.2rem;text-transform:uppercase;}
   header p{margin:0;color:var(--header-muted);font-size:0.85rem;}
-  .sync-status{margin-top:0.4rem !important;font-size:0.68rem !important;color:var(--sync-muted) !important;font-family:var(--font-mono);}
+  /* Sync status sits in the header's empty top-right corner, out of the layout flow, so showing or
+     hiding it never moves the page. Hidden once synced; issues stay visible until they clear. */
+  header .sync-status{position:absolute;top:calc(env(safe-area-inset-top) + 0.45rem);right:1.1rem;max-width:calc(100% - 2.2rem);margin:0;font-size:0.68rem;line-height:1.2;color:var(--sync-muted);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;opacity:0;visibility:hidden;transition:opacity 0.4s ease,visibility 0s linear 0.4s;pointer-events:none;}
+  header .sync-status.show{opacity:1;visibility:visible;transition:opacity 0.25s ease;}
+  header .sync-status.warn{color:var(--amber-light);pointer-events:auto;cursor:pointer;}
   .app-modal{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);padding:1rem;}
   .app-modal[hidden]{display:none;}
   .app-modal-card{background:var(--card);color:var(--ink);border:1px solid var(--deload-border);border-radius:12px;padding:1rem;max-width:360px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.25);}
@@ -273,7 +277,7 @@
 <header>
   <h1 id="page-title">Full Body</h1>
   <p id="page-sub">Tap a day, log your sets, watch progress build.</p>
-  <p id="sync-status" class="sync-status">☁ Not signed in - logging locally</p>
+  <p id="sync-status" class="sync-status show" role="status" aria-live="polite" onclick="onSyncStatusTap()">☁ Not signed in - logging locally</p>
   <div class="tabs" id="tabs"></div>
 </header>
 <main id="app"></main>
@@ -332,20 +336,48 @@ function enqueueOp(op){
   flushQueue();
 }
 
+// Shown only when there's something to know: signed out, offline, syncing, or stuck. Reaching
+// "Synced" from any other state flashes it briefly, then it fades; steady-state synced stays hidden.
+const SYNC_FLASH_MS = 2500;
+let lastSyncState = null;
+let syncFlashTimer = null;
 function renderSyncStatus(){
   const el = document.getElementById("sync-status");
   if(!el) return;
+  let state;
   if(!currentSession){
+    state = "signed-out";
     el.textContent = "☁ Not signed in - logging locally";
   } else if(typeof navigator !== "undefined" && navigator.onLine === false){
+    state = "offline";
     el.textContent = pendingQueue.length ? `☁ Offline - ${pendingQueue.length} pending` : "☁ Offline";
   } else if(pendingQueue.length){
+    state = lastFlushHadFailures ? "failing" : "syncing";
     el.textContent = lastFlushHadFailures
-      ? `⚠ ${pendingQueue.length} pending - having trouble syncing, tap Sync now`
+      ? `⚠ ${pendingQueue.length} pending - having trouble syncing, tap to retry`
       : `☁ Syncing… ${pendingQueue.length} pending`;
   } else {
+    state = "synced";
     el.textContent = "☁ Synced";
   }
+  el.title = el.textContent;
+  el.classList.toggle("warn", state === "failing" || state === "offline");
+  if(state === "synced"){
+    if(lastSyncState !== null && lastSyncState !== "synced"){
+      el.classList.add("show");
+      clearTimeout(syncFlashTimer);
+      syncFlashTimer = setTimeout(() => el.classList.remove("show"), SYNC_FLASH_MS);
+    } else if(lastSyncState === null){
+      el.classList.remove("show");
+    }
+  } else {
+    clearTimeout(syncFlashTimer);
+    el.classList.add("show");
+  }
+  lastSyncState = state;
+}
+function onSyncStatusTap(){
+  if(lastSyncState === "failing" || lastSyncState === "offline") manualSync();
 }
 
 function exerciseToRow(ex){
@@ -950,7 +982,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v39";
+const APP_VERSION = "v40";
 const APP_UPDATED = "Oct 2, 2026";
 
 // ---------- state ----------

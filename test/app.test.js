@@ -1698,6 +1698,24 @@ async function main(){
   await page.evaluate(() => toggleMode('deload'));
   console.log('OK: deload messages carry the RPE 6 cap; a deload ends itself after a week and the popup can keep it on another week');
 
+  console.log('=== 66: sync status lives in the header corner, hidden when synced, shown for trouble, never shifts the page ===');
+  const syncShown = () => page.evaluate(() => getComputedStyle(document.getElementById('sync-status')).opacity === '1');
+  const tabsTop = () => page.evaluate(() => document.getElementById('tabs').getBoundingClientRect().top);
+  await waitForText(page, '#sync-status', t => t.includes('Synced'), 15000, 'synced before scenario 66');
+  await sleep(3200);
+  if(await syncShown()) throw new Error('expected the sync status to be hidden once steady-state synced');
+  const topSynced = await tabsTop();
+  await page.evaluate(() => { pendingQueue.push({ type: 'noop-test' }); lastFlushHadFailures = true; renderSyncStatus(); });
+  await sleep(400);
+  if(!(await syncShown())) throw new Error('expected the sync status to show while sync is having trouble');
+  if(await tabsTop() !== topSynced) throw new Error('expected showing the sync status not to move the page');
+  await page.evaluate(() => { pendingQueue.pop(); lastFlushHadFailures = false; renderSyncStatus(); });
+  await sleep(400);
+  if(!(await syncShown())) throw new Error('expected "Synced" to flash after recovering');
+  await sleep(3000);
+  if(await syncShown()) throw new Error('expected the "Synced" flash to fade after a couple of seconds');
+  console.log('OK: sync status hides when synced, shows for trouble, flashes "Synced" on recovery, and never moves the page');
+
   console.log('\nALL SCENARIOS PASSED');
   await browser.close();
 }
