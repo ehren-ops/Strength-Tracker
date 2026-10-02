@@ -260,6 +260,10 @@ const NOTE_WEIGHT_PATTERNS = [
   new RegExp(String.raw`\bnext\b\s*:?\s*(?:time\s+|session\s+)?(?:at\s+|try\s+)?` + NOTE_NUM, "i"),
   new RegExp(String.raw`\btry\s+` + NOTE_NUM, "i"),
 ];
+// Note cues for the next session. "easy day" is a recovery choice, not a sign the load is light.
+const NOTE_UP_CUES = /\b(?:move|moving|go|going|bump)\s+(?:it\s+)?up\b|room for more|\btoo (?:easy|light)\b|\beasy\b(?!\s+day)|\bstarting light\b|\bfelt light\b/i;
+const NOTE_HOLD_CUES = /\b(?:stay|hold|stick)\b|fell apart|maxing out|\bmissed\b|\bfailed\b|\btired\b|poor balance|\bdeload\b/i;
+
 function noteTargetWeight(note, lastWeight){
   if(!note) return null;
   for(const re of NOTE_WEIGHT_PATTERNS){
@@ -388,6 +392,18 @@ function computeSuggestionCore(ex, name){
     }
     if(noteConcern && readyToProgress) readyToProgress = false;
 
+    // Plain-language cues in the last note steer the call too: "stay", "hold", "fell apart",
+    // "tired" hold the weight; "move up", "easy", "starting light" add it once the target reps
+    // were hit and the RPE wasn't brutal. A concern word or an explicit weight in the note wins.
+    let noteCue = null;
+    if(last.note && !noteConcern){
+      if(NOTE_HOLD_CUES.test(last.note)){
+        if(readyToProgress){ readyToProgress = false; noteCue = "hold"; }
+      } else if(NOTE_UP_CUES.test(last.note) && hitTarget && !readyToProgress && difficultyNote !== "hard"){
+        readyToProgress = true; noteCue = "up";
+      }
+    }
+
     return {
       weight: readyToProgress ? last.weight + increment : last.weight,
       sets: last.sets,
@@ -398,6 +414,8 @@ function computeSuggestionCore(ex, name){
       requiredStreak,
       difficultyNote,
       noteConcern,
+      noteCue,
+      noteText: last.note || null,
       deload: false,
     };
   }

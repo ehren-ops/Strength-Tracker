@@ -1954,7 +1954,34 @@ async function main(){
   if(!crossTab) throw new Error('expected logging the last Upper Body lift from the Full Body tab to still complete Upper Body');
   console.log('OK: finishing a day from another tab (shared lift) still fires that day\'s popup');
 
-  console.log('=== 73: the page, stylesheet and every script load with matching versions and no page errors ===');
+  console.log('=== 73: plain-language note cues steer the next weight; the log rows share one height ===');
+  const cues = await page.evaluate(() => {
+    const saved = { ...modes };
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const one = (note, cons) => computeSuggestion({ trackBy: 'weight', targetReps: 8, increment: 5, conservative: cons, entries: [
+      { date: '2026-09-24', weight: 100, sets: 3, reps: 8, difficulty: 7, note } ] }, 'Bench Press');
+    const r = {
+      up: one('Good to move up', true), easy: one('Easy', true), easyDay: one('Took an easy day', true),
+      stay: one('Felt solid, stay', false), fellApart: one('Fell apart on last set', false), none: one('', false),
+    };
+    Object.assign(modes, saved);
+    return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, [v.weight, v.noteCue || null]]));
+  });
+  const wantCues = { up: [105, 'up'], easy: [105, 'up'], easyDay: [100, null], stay: [100, 'hold'], fellApart: [100, 'hold'], none: [105, null] };
+  if(JSON.stringify(cues) !== JSON.stringify(wantCues)) throw new Error('note cue mismatch, want ' + JSON.stringify(wantCues) + ' got ' + JSON.stringify(cues));
+  await page.click('.tab:has-text("Full Body")');
+  await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
+  await sleep(100);
+  const heights = await page.evaluate(() => {
+    const h = sel => Math.round(document.querySelector(sel).getBoundingClientRect().height);
+    return { btn: h('.action-row .tool-btn'), weight: h('#f-weight'), note: h('#f-note'), date: h('#f-date'), log: h('button.log'),
+      noteLabel: !!document.querySelector('.field-note label'), dateLabel: !!document.getElementById('f-date').closest('.field').querySelector('label') };
+  });
+  const hs = [heights.btn, heights.weight, heights.note, heights.date, heights.log];
+  if(Math.max(...hs) - Math.min(...hs) > 1 || heights.noteLabel || heights.dateLabel) throw new Error('expected action buttons, inputs and Log to share one height with no Note/Date labels, got: ' + JSON.stringify(heights));
+  console.log('OK: "move up"/"easy" add weight, "stay"/"fell apart" hold, "easy day" does neither; buttons, fields and Log share one height');
+
+  console.log('=== 74: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
     srcs: [...document.querySelectorAll('script[src^="js/"], link[rel="stylesheet"][href^="styles"]')].map(e => e.getAttribute('src') || e.getAttribute('href')),

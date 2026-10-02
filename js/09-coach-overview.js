@@ -37,8 +37,8 @@ function describeSuggestion(ex, name){
   const s = computeSuggestion(ex, name);
   if(!s) return null;
   if(ex.trackBy === "weight"){
-    const why = s.deloadWeek ? "deload week" : s.noteTarget != null ? "set by last note" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
-      : s.noteConcern ? "hold, note flagged" : s.difficultyNote === "hard" ? "hold, last RPE high" : "hold";
+    const why = s.deloadWeek ? "deload week" : s.noteTarget != null ? "set by last note" : s.noteCue === "up" ? "add weight, note said so" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
+      : s.noteConcern ? "hold, note flagged" : s.noteCue === "hold" ? "hold, note said so" : s.difficultyNote === "hard" ? "hold, last RPE high" : "hold";
     return `${s.weight} lb ${s.sets}x${s.reps} (${why})`;
   }
   if(ex.trackBy === "duration") return `${s.minutes} min`;

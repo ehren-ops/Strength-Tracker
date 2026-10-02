@@ -264,7 +264,6 @@ function renderExerciseCard(name, ex){
 
   if(!hasEntries){
     html += `<p style="color:var(--slate);font-size:0.8rem;margin:0.2rem 0;">No entries yet - log your first set below.</p>`;
-    html += renderTips(name);
   } else {
     const delta = ex.entries.length > 1
       ? (ex.trackBy==="weight" ? last.weight-first.weight : ex.trackBy==="duration" ? last.minutes-first.minutes : last.reps-first.reps)
@@ -322,6 +321,10 @@ function renderExerciseCard(name, ex){
           msg = suggestion.noteTarget != null
             ? `${flagLabel}: your note's lighter ${suggestion.noteTarget} lb.`
             : `${flagLabel}: ~10% lighter, holding.`;
+        } else if(suggestion.noteCue === "hold"){
+          msg = `${hitLeadIn}, but your note said "${escapeHtml(suggestion.noteText)}": hold.`;
+        } else if(suggestion.noteCue === "up"){
+          msg = `${hitLeadIn} and your note said "${escapeHtml(suggestion.noteText)}": add weight.`;
         } else if(suggestion.difficultyNote === "hard"){
           msg = `${hitLeadIn}, but rated 9-10: hold.`;
         } else if(suggestion.difficultyNote === "easy"){
@@ -355,19 +358,25 @@ function renderExerciseCard(name, ex){
       const restPart = ex.trackBy !== "duration" ? ` <span style="font-weight:400;">· Rest ${restTimeFor(ex)}</span>` : "";
       const rpePart = last.difficulty ? ` <span class="rec-rpe">Last RPE ${last.difficulty}</span>` : "";
       const loadLine = ex.equipment === "barbell" ? `<div class="plate-line">Load: ${platesLabel(suggestion.weight, ex.equipment)}</div>` : "";
+      // Your last two notes (from the last three sessions) for context, minus one already quoted above.
+      const recentNotes = ex.entries.slice(-3).reverse().filter(e => e.note && !msg.includes(escapeHtml(e.note))).slice(0, 2);
+      const notesLine = recentNotes.length
+        ? `<div class="rec-notes">${recentNotes.map(e => `${fmtDate(e.date)}: "${escapeHtml(e.note)}"`).join(" · ")}</div>` : "";
       recHtml = `<div class="rec-box">
         <div class="rec-headline">Next: ${nextLabel}${restPart}</div>
         <div class="rec-desc">${msg}${rpePart}</div>
+        ${notesLine}
         ${loadLine}
       </div>`;
     }
 
     html += recHtml;
-    html += renderTips(name);
     html += renderChart(ex, suggestion, true, name);
   }
 
   html += renderForm(name, ex);
+  // Form and swap sit under the log button: there when wanted, out of the way of the Next call.
+  html += renderTips(name);
 
   if(!hasEntries){
     html += `<div style="margin-top:0.7rem;"><p style="color:var(--slate);font-size:0.8rem;font-style:italic;">Nothing logged yet.</p></div>`;
@@ -576,10 +585,10 @@ function renderForm(name, ex){
   html += `</div>`;
   if(plan) html += `<p class="prefill-note">${mods.length ? `Pre-filled: ${mods.join(", ")} plan` : "Pre-filled: next progression"}</p>`;
   html += `<div class="form-row">
-    ${ex.trackBy === "duration" ? rpeField : ""}<div class="field field-note"><label>Note</label><input type="text" id="f-note" placeholder="${ex.trackBy==='duration' ? 'e.g. easy spin' : 'e.g. felt heavy, or next: 185'}"></div>
+    ${ex.trackBy === "duration" ? rpeField : ""}<div class="field field-note"><input type="text" id="f-note" aria-label="Note" placeholder="${ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
   </div>`;
   html += `<div class="date-log-row">
-    <div class="field"><label>Date</label><input type="date" id="f-date" value="${todayISO()}"></div>
+    <div class="field"><input type="date" id="f-date" aria-label="Date" value="${todayISO()}"></div>
     <button class="log" onclick="logEntry()">Log set</button>
   </div>`;
   return html;

@@ -119,7 +119,11 @@
   .rec-rpe{color:var(--slate);white-space:nowrap;}
   .rec-rpe::before{content:"· ";}
   .rec-box .plate-line{margin-top:0.1rem;font-size:0.68rem;}
-  .ex-tips{font-size:0.7rem;line-height:1.3;color:var(--slate);margin:0.3rem 0.1rem 0;}
+  .ex-tips{font-size:0.7rem;line-height:1.3;color:var(--slate);margin:0.5rem 0.1rem 0;}
+  .rec-notes{font-size:0.68rem;line-height:1.3;color:var(--slate);margin-top:0.1rem;font-style:italic;}
+  /* One height for the action buttons, every log field and the Log button, so the rows line up. */
+  .card{--input-h:2.3rem;}
+  .field input, .field input[type="date"]{height:var(--input-h) !important;line-height:normal;}
   .ex-tips b{color:var(--ink);font-weight:600;margin-right:0.2rem;}
   .care-disclaimer{font-size:0.62rem;color:var(--slate);margin:0 0 0.4rem;font-style:italic;}
   .rec-desc b{font-family:var(--font-mono);}
@@ -128,7 +132,7 @@
   .rest-action-btn{background:var(--surface);border:1.5px solid var(--amber);color:var(--amber);font-size:0.72rem;font-weight:600;padding:0.4rem 0.5rem;border-radius:7px;cursor:pointer;}
   .rest-action-btn:active{background:var(--amber);color:#fff;}
   .action-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.4rem;align-items:stretch;margin-top:0.5rem;}
-  .action-row .tool-btn, .action-row .progression-btn, .action-row .rest-action-btn{padding:0.28rem 0.3rem;font-size:0.7rem;white-space:nowrap;}
+  .action-row .tool-btn, .action-row .progression-btn, .action-row .rest-action-btn{height:var(--input-h);padding:0 0.3rem;font-size:0.74rem;white-space:nowrap;}
   .action-row .tool-btn, .action-row .progression-btn, .action-row .rest-action-btn, .action-row .action-btn-spacer{width:100%;margin:0;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;}
   .action-btn-spacer{background:none;border:1.5px solid transparent;color:transparent;font-size:0.72rem;font-weight:600;padding:0.4rem 0.5rem;border-radius:7px;visibility:hidden;pointer-events:none;}
   svg.chart{width:100%;height:150px;display:block;margin-top:0.6rem;}
@@ -139,7 +143,7 @@
   .field.field-note{flex:1 1 120px;min-width:0;}
   .field{flex:1 1 60px;}
   .field label{display:block;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);margin-bottom:0.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .field input{width:100%;height:2.1rem;padding:0.32rem 0.45rem;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--ink);}
+  .field input{width:100%;height:var(--input-h);padding:0.32rem 0.45rem;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--ink);}
   .field input:focus{outline:2px solid var(--amber-light);border-color:var(--amber);}
   .field input.field-error{border-color:var(--danger);animation:field-error-flash 0.3s ease 2;}
   @keyframes field-error-flash{0%,100%{box-shadow:0 0 0 0 transparent;}50%{box-shadow:0 0 0 3px var(--danger);}}
@@ -147,7 +151,7 @@
   button.log.log-confirmed{background:var(--emerald);}
   .date-log-row{margin-top:0.4rem;display:flex;gap:0.4rem;align-items:flex-end;}
   .date-log-row .field{flex:1 1 140px;min-width:0;}
-  .date-log-row button.log{flex:1 1 auto;width:auto;min-width:0;margin-top:0;height:2.1rem;padding:0 0.5rem;}
+  .date-log-row button.log{flex:1 1 auto;width:auto;min-width:0;margin-top:0;height:var(--input-h);padding:0 0.5rem;}
   input[type="date"]{display:block !important;width:100% !important;max-width:100% !important;min-width:0 !important;box-sizing:border-box !important;-webkit-appearance:none !important;appearance:none !important;}
   :root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.85);}
   input, select, textarea{font-size:16px !important;}
