@@ -54,6 +54,20 @@ function spawnConfetti(container, count){
 // needs no library. Held fully visible for 3s, then fades out over 0.6s to
 // match the CSS transition, and the DOM is cleared after so old confetti
 // can't linger under the next celebration.
+// Held long enough to actually see between sets; a tap anywhere closes it early.
+const CELEBRATION_HOLD_MS = 7000;
+function dismissCelebration(){
+  const el = document.getElementById("celebration-banner");
+  if(!el || el.hidden) return;
+  clearTimeout(window.__celebrationTimer);
+  clearTimeout(window.__celebrationFadeTimer);
+  el.classList.add("fade-out");
+  window.__celebrationFadeTimer = setTimeout(() => {
+    el.hidden = true;
+    el.innerHTML = "";
+    el.classList.remove("fade-out");
+  }, 650);
+}
 function showCelebration(msg){
   const el = document.getElementById("celebration-banner");
   if(!el) return;
@@ -65,16 +79,14 @@ function showCelebration(msg){
   messageEl.className = "celebration-message";
   messageEl.textContent = msg;
   el.appendChild(messageEl);
+  const hintEl = document.createElement("div");
+  hintEl.className = "celebration-hint";
+  hintEl.textContent = "Tap to close";
+  el.appendChild(hintEl);
   spawnConfetti(el, 60);
+  el.onclick = dismissCelebration;
   el.hidden = false;
-  window.__celebrationTimer = setTimeout(() => {
-    el.classList.add("fade-out");
-    window.__celebrationFadeTimer = setTimeout(() => {
-      el.hidden = true;
-      el.innerHTML = "";
-      el.classList.remove("fade-out");
-    }, 650);
-  }, 3000);
+  window.__celebrationTimer = setTimeout(dismissCelebration, CELEBRATION_HOLD_MS);
 }
 
 // Only the numbered, built-in exercises for full/upper/lower count as "core" -

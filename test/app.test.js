@@ -1407,7 +1407,7 @@ async function main(){
   if(!minutesHasError) throw new Error('expected the Minutes field to flash red when left empty on a duration-tracked exercise');
   console.log('OK: duration-tracked exercises flash their Minutes field the same way');
 
-  console.log('=== 58: workout-complete celebration is a full-screen confetti takeover that auto-fades ===');
+  console.log('=== 58: workout-complete celebration is a full-screen confetti takeover that holds ~7 sec, fades, and closes on tap ===');
   // Every Full Body exercise is already logged today from scenario 26,
   // except Cable Chest Fly - scenario 52 overwrote its entries with
   // historical (non-today) dates to test the progression-lock fix. Log it
@@ -1435,15 +1435,24 @@ async function main(){
   if(overlayBox.confetti < 20) throw new Error('expected a substantial number of confetti pieces, got: ' + overlayBox.confetti);
   console.log('OK: celebration overlay covers the full screen with confetti pieces');
 
-  await sleep(3050);
+  await sleep(3500);
+  const stillUp = await page.evaluate(() => { const el = document.getElementById('celebration-banner'); return !el.hidden && !el.classList.contains('fade-out'); });
+  if(!stillUp) throw new Error('expected the overlay to still be fully up at 3.5 seconds (held 7 seconds now)');
+  await sleep(3600);
   const isFadingOut = await page.evaluate(() => document.getElementById('celebration-banner').classList.contains('fade-out'));
-  if(!isFadingOut) throw new Error('expected the overlay to start fading out around the 3 second mark');
-  console.log('OK: overlay begins fading out after being held fully visible for ~3 seconds');
+  if(!isFadingOut) throw new Error('expected the overlay to start fading out around the 7 second mark');
+  console.log('OK: overlay holds fully visible for ~7 seconds, then fades');
 
   await sleep(700);
   const isGoneAfterFade = await page.evaluate(() => document.getElementById('celebration-banner').hidden);
   if(!isGoneAfterFade) throw new Error('expected the overlay to be fully hidden once the fade-out transition completes');
   console.log('OK: overlay is hidden and cleaned up once the fade-out completes');
+  await page.evaluate(() => showCelebration('test'));
+  await sleep(200);
+  await page.click('#celebration-banner');
+  await sleep(750);
+  if(!(await page.evaluate(() => document.getElementById('celebration-banner').hidden))) throw new Error('expected a tap to close the celebration early');
+  console.log('OK: tapping the celebration closes it early');
 
   console.log('=== 59: Session Breakdown button generates once, then stays cached and collapsible ===');
   await page.click('.tab:has-text("Overview")');
