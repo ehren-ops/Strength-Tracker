@@ -1444,12 +1444,12 @@ async function main(){
   await waitForText(page, '#sync-status', t => t.includes('Not signed in') || t.includes('Synced'), 10000, 'reload after generating AI breakdown');
   await page.click('.tab:has-text("Overview")');
   await sleep(150);
-  if(await page.locator('text=🤖 Session Breakdown').count() !== 1) throw new Error('expected the cached breakdown\'s collapsible header to persist across reload');
+  if(await page.locator('.ai-panel-head:has-text("Session Breakdown")').count() !== 1) throw new Error('expected the cached breakdown\'s collapsible header to persist across reload');
   if(await page.locator('text=Mock breakdown headline').count() !== 0) throw new Error('expected the cached breakdown to be collapsed by default, not auto-expanded, after reload');
   if(aiBreakdownCallCount !== 1) throw new Error('expected reload to reuse the cached breakdown, not call the function again, got ' + aiBreakdownCallCount + ' total calls');
   console.log('OK: cached breakdown persists across reload, collapsed by default, with no re-fetch');
 
-  await page.click('text=🤖 Session Breakdown');
+  await page.click('.ai-panel-head:has-text("Session Breakdown")');
   await sleep(150);
   if(await page.locator('text=Mock breakdown headline').count() !== 1) throw new Error('expected clicking the collapsed header to reveal the cached content');
   console.log('OK: clicking the collapsed header reveals the cached content without re-generating');
@@ -1571,7 +1571,18 @@ async function main(){
   await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'reload after weekly check-in');
   await page.click('.tab:has-text("Overview")');
   await sleep(150);
-  if(await page.locator('text=📋 Weekly Check-in').count() !== 1 || await page.locator('button:has-text("Weekly Check-in")').count() !== 0) throw new Error('expected this week\'s check-in to persist as a collapsed header, not a fresh button');
+  if(await page.locator('.ai-panel-head:has-text("Weekly Check-in")').count() !== 1) throw new Error('expected this week\'s check-in to persist as a collapsed panel below the notes');
+  const headRow = await page.evaluate(() => {
+    const row = document.querySelector('.coach-head');
+    return row ? [...row.children].map(c => c.textContent.replace(/\s+/g, ' ').trim()) : [];
+  });
+  if(headRow.length !== 3 || !/Coach's Notes/i.test(headRow[0]) || !/AI.*Session Breakdown/.test(headRow[1]) || !/AI.*Weekly Check-in/.test(headRow[2])) throw new Error('expected Coach\'s Notes and both AI buttons in one header row, got: ' + JSON.stringify(headRow));
+  await page.click('.ai-btn:has-text("Weekly Check-in")');
+  await sleep(150);
+  if(await page.locator('text=Mock weekly verdict.').count() !== 1) throw new Error('expected tapping the Weekly Check-in button to open the cached panel');
+  await page.click('.ai-btn:has-text("Weekly Check-in")');
+  await sleep(150);
+  if(await page.locator('text=Mock weekly verdict.').count() !== 0) throw new Error('expected tapping the button again to collapse the panel');
   if(aiBreakdownCallCount !== callsBeforeWeekly + 1) throw new Error('expected reload to reuse the cached check-in, not call the function again');
   console.log('OK: weekly check-in generates on its own button, syncs as kind "weekly", and stays cached for the week');
 
