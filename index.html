@@ -70,6 +70,9 @@
   header h1{font-family:var(--font-display);font-weight:400;letter-spacing:0.03em;font-size:1.7rem;margin:0 0 0.2rem;text-transform:uppercase;}
   header p{margin:0;color:var(--header-muted);font-size:0.85rem;}
   .sync-status{margin-top:0.4rem !important;font-size:0.68rem !important;color:var(--sync-muted) !important;font-family:var(--font-mono);}
+  .app-modal{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);padding:1rem;}
+  .app-modal[hidden]{display:none;}
+  .app-modal-card{background:var(--card);color:var(--ink);border:1px solid var(--deload-border);border-radius:12px;padding:1rem;max-width:360px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.25);}
   .celebration-banner{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:var(--emerald);color:var(--chart-white);text-align:center;padding:2rem;overflow:hidden;opacity:1;transition:opacity 0.6s ease;}
   .celebration-banner[hidden]{display:none;}
   .celebration-banner.fade-out{opacity:0;}
@@ -257,6 +260,7 @@
 </head>
 <body>
 <div id="celebration-banner" class="celebration-banner" hidden></div>
+<div id="deload-modal" class="app-modal" hidden></div>
 <div id="rest-timer-badge" class="rest-timer-badge" hidden onclick="handleRestTimerBadgeTap()"></div>
 <header>
   <h1 id="page-title">Full Body</h1>
@@ -467,6 +471,7 @@ async function runOp(op){
       ...Object.fromEntries(MODE_DEFS.map(m => [m.column, modes[m.key]])),
       deload_started_on: deloadDates.startedOn || null,
       deload_ended_on: deloadDates.endedOn || null,
+      deload_planned_end_on: deloadDates.plannedEndOn || null,
     }, { onConflict: "user_id" });
     if(error) throw error;
     return true;
@@ -606,7 +611,7 @@ async function pullRemoteAndMerge(){
     }
   });
   if(settingsRow && !deloadDates.startedOn && settingsRow.deload_started_on){
-    deloadDates = { startedOn: settingsRow.deload_started_on, endedOn: settingsRow.deload_ended_on || null };
+    deloadDates = { startedOn: settingsRow.deload_started_on, endedOn: settingsRow.deload_ended_on || null, plannedEndOn: settingsRow.deload_planned_end_on || null };
     saveDeloadDates();
   }
 
@@ -624,6 +629,7 @@ async function pullRemoteAndMerge(){
 
   persist();
   render();
+  checkDeloadAutoEnd();
 }
 
 function reconcileAllToQueue(){
@@ -715,15 +721,17 @@ const SEED = {
 // checkCoreWorkoutComplete), so being on two lists made it silently
 // required on Upper Body while reading, visually, like an Extra accessory.
 // Dropped from Upper Body for that reason; it still lives on Extra.
+// Kettlebell Swings started on Lower Body (Sep 1) and is back there as the
+// second hinge next to RDL, on Lower only for the same one-list reason.
 // The preseason-only additions below (PRESEASON_ONLY) are hidden from the
 // pill rows, numbering and completion banner whenever Preseason Prep is off
 // - see activeDayOrder. Squat, Kettlebell Swings, Standing Calf Raise and
 // Farmer's Carry predate preseason and only carry preseason notes, so they
 // always show.
 const DAY_ORDER = {
-  full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Kettlebell Swings","Seated Calf Raise"],
+  full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Seated Calf Raise"],
   upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
-  lower: ["Squat","RDL","Bulgarian Split Squat","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat"],
+  lower: ["Squat","RDL","Bulgarian Split Squat","Kettlebell Swings","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat"],
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
   // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
@@ -807,7 +815,7 @@ const EXERCISE_DEFAULTS = {
   "Barbell Row": { equipment: "barbell" },
   "Back Extension": { trackBy: "weight", autoloadLastReps: true },
   "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb - keep building load here." },
-  "Kettlebell Swings": { preseason: true, preseasonPower: true, preseasonNote: "Power work - do this first, before the rest of today's lifts. 4x10, 35 lb building to 53 lb." },
+  "Kettlebell Swings": { maxWeight: 35, preseason: true, preseasonPower: true, preseasonNote: "Power work - do this first, before the rest of today's lifts. 4x10 at 35 lb, the heaviest bell available; progress with reps, then single-arm swings." },
   "Standing Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15, load as needed (dumbbells 45-95 lb, barbell 115-225 lb)." },
   "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down - do not jump down. Stop the set if speed drops. If you need it gentler, swap in a slow 3 sec step-down off the box instead." },
   "Med Ball Slam": { trackBy: "weight", targetReps: 6, preseason: true, preseasonPower: true, preseasonNote: "3x6, 10-15 lb. Stop the set if speed drops." },
@@ -1002,6 +1010,7 @@ function toggleDarkMode(){
 // suggestions can skip the lighter deload sessions once it's over.
 const DELOAD_DATES_KEY = "strength-tracker-deload-dates";
 const DELOAD_EVERY_DAYS = 35; // a lighter week after roughly every 5 weeks of steady loading
+const DELOAD_LENGTH_DAYS = 7;  // switches itself off after a week unless you choose to keep it on
 let deloadDates = (function(){
   try{ return JSON.parse(window.localStorage.getItem(DELOAD_DATES_KEY)) || {}; }catch(e){ return {}; }
 })();
@@ -1014,7 +1023,7 @@ function toggleMode(key){
   modes[key] = !modes[key];
   try{ window.localStorage.setItem(def.storageKey, modes[key] ? "1" : "0"); }catch(e){}
   if(key === "deload"){
-    if(modes.deload) deloadDates = { startedOn: todayISO(), endedOn: null };
+    if(modes.deload) deloadDates = { startedOn: todayISO(), endedOn: null, plannedEndOn: shiftISO(todayISO(), DELOAD_LENGTH_DAYS) };
     else if(deloadDates.startedOn) deloadDates.endedOn = todayISO();
     saveDeloadDates();
   }
@@ -1364,7 +1373,7 @@ function checkRestTimerCompletion(){
   renderRestTimerBadge();
 }
 document.addEventListener("visibilitychange", () => {
-  if(document.visibilityState === "visible") checkRestTimerCompletion();
+  if(document.visibilityState === "visible"){ checkRestTimerCompletion(); checkDeloadAutoEnd(); }
 });
 
 // In-app only: a buzz where the browser supports it (Android; iOS Safari has no Vibration
@@ -1520,10 +1529,24 @@ function computeRecoveryReadiness(){
 // instead of being cut again, and only lose sets. Sets logged during a deload
 // are tagged (entry.deload) and skipped when computing suggestions, so
 // progression resumes from the pre-deload working weights.
+// Heaviest load the gym has for a lift (EXERCISE_DEFAULTS maxWeight). Once a
+// progression would pass it, progress by reps up to MAX_WEIGHT_REP_CAP, then
+// point at a harder variation instead of a heavier weight.
+const MAX_WEIGHT_REP_CAP = 20;
+function capAtMaxWeight(sug, ex, name, last){
+  const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;
+  if(!sug || ex.trackBy !== "weight" || !maxW || !last || sug.weight == null) return sug;
+  if(sug.weight <= maxW && !(sug.readyToProgress && last.weight >= maxW)) return sug;
+  const atRepCap = (last.reps || 0) >= MAX_WEIGHT_REP_CAP;
+  const reps = sug.readyToProgress && !atRepCap ? Math.min((last.reps || 0) + 2, MAX_WEIGHT_REP_CAP) : (last.reps || sug.reps);
+  return { ...sug, weight: maxW, reps, atMaxWeight: true, atRepCap: atRepCap && sug.readyToProgress };
+}
+
 function computeSuggestion(ex, name){
   if(!ex.entries.length) return null;
   const baseline = ex.entries.filter(e => !e.deload);
-  const core = computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name);
+  const baseEntries = baseline.length ? baseline : ex.entries;
+  const core = capAtMaxWeight(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, name, baseEntries[baseEntries.length - 1]);
   if(!modes.deload || !core || ex.trackBy === "duration") return core;
   const lastBase = (baseline.length ? baseline : ex.entries)[ (baseline.length ? baseline : ex.entries).length - 1 ];
   const sets = Math.max(2, Math.round((lastBase.sets || core.sets || 3) * 2 / 3));
@@ -1934,8 +1957,12 @@ function renderExerciseCard(name, ex){
           : `Hit target ${unitWord}`;
         if(suggestion.deloadWeek){
           msg = suggestion.deloadKeptReduction
-            ? `Deload week - this lift is already reduced, so keeping that weight and just cutting sets.`
-            : `Deload week - about 10% lighter and a third fewer sets. Progression picks back up from your pre-deload weight once you turn it off.`;
+            ? `Deload week - this lift is already reduced, so keeping that weight and just cutting sets. Stop around RPE 6, 3 to 4 reps short of failure.`
+            : `Deload week - about 10% lighter and a third fewer sets. Stop around RPE 6, 3 to 4 reps short of failure. Progression picks back up from your pre-deload weight once you turn it off.`;
+        } else if(suggestion.atRepCap){
+          msg = `${suggestion.weight} lb is the heaviest available and you're at ${MAX_WEIGHT_REP_CAP} reps. Next step up: single-arm swings at ${suggestion.weight} lb (roughly double the load per side), or a 1 second hold at the top with a harder hip snap.`;
+        } else if(suggestion.atMaxWeight && suggestion.readyToProgress){
+          msg = `${suggestion.weight} lb is the heaviest available, so progressing by reps instead: aim for ${suggestion.reps}. At ${MAX_WEIGHT_REP_CAP} reps, move to single-arm swings.`;
         } else if(suggestion.deload){
           msg = `Missed target ${unitWord} for ${suggestion.missStreak} sessions straight - that's a stall, not a bad day. Dropping ~15% to rebuild with clean reps.`;
         } else if(suggestion.noteConcern){
@@ -1973,7 +2000,7 @@ function renderExerciseCard(name, ex){
           : `Held steady - log an RPE next time for a sharper call.`;
       } else {
         nextLabel = repLabel(suggestion.sets,suggestion.reps,ex.unit);
-        msg = suggestion.deloadWeek ? `Deload week - same reps, fewer sets.` : `Bodyweight move, aiming for a couple more reps.`;
+        msg = suggestion.deloadWeek ? `Deload week - same reps, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.` : `Bodyweight move, aiming for a couple more reps.`;
       }
       const restPart = ex.trackBy !== "duration" ? ` <span style="font-weight:400;">· Rest ${restTimeFor(ex)}</span>` : "";
       const diffText = last.difficulty ? last.difficulty + "/10" : "not rated";
@@ -2937,12 +2964,46 @@ function fmtShortDate(iso){
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+// A deload is planned as one week: on day 7 it switches itself off and a popup
+// offers to keep it on for another week instead.
+function checkDeloadAutoEnd(){
+  if(!modes.deload || !deloadDates.plannedEndOn || todayISO() < deloadDates.plannedEndOn) return;
+  toggleMode("deload");
+  showDeloadEndedModal();
+}
+function showDeloadEndedModal(){
+  const el = document.getElementById("deload-modal");
+  if(!el) return;
+  el.innerHTML = `<div class="app-modal-card">
+    <h3 class="section" style="color:var(--deload-text);">🔋 Deload week complete</h3>
+    <p style="font-size:0.85rem;line-height:1.5;margin:0 0 0.8rem;">A week is up, so Deload Week is now off and suggestions pick back up from your pre-deload weights.</p>
+    <div style="display:flex;gap:0.5rem;justify-content:flex-end;flex-wrap:wrap;">
+      <button class="tool-btn" onclick="keepDeloadOn()">Keep it on another week</button>
+      <button class="tool-btn" style="background:var(--deload);color:var(--deload-on-text);border-color:var(--deload);" onclick="closeDeloadModal()">Sounds good</button>
+    </div>
+  </div>`;
+  el.hidden = false;
+}
+function closeDeloadModal(){
+  const el = document.getElementById("deload-modal");
+  if(el) el.hidden = true;
+}
+function keepDeloadOn(){
+  const startedOn = deloadDates.startedOn;
+  toggleMode("deload");
+  deloadDates = { startedOn: startedOn || todayISO(), endedOn: null, plannedEndOn: shiftISO(todayISO(), DELOAD_LENGTH_DAYS) };
+  saveDeloadDates();
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  closeDeloadModal();
+  render();
+}
+
 function renderDeloadModifier(){
   const st = deloadStatus();
   let last, next;
   if(st.on){
     const days = daysBetween(st.startedOn, todayISO()) + 1;
-    last = `On since ${fmtShortDate(st.startedOn)} (day ${days}). A deload usually runs about a week.`;
+    last = `On since ${fmtShortDate(st.startedOn)} (day ${days}).${deloadDates.plannedEndOn ? ` Switches off on ${fmtShortDate(deloadDates.plannedEndOn)} unless you keep it on.` : ""}`;
     next = `Next one: about 5 weeks after you switch this off.`;
   } else {
     last = st.startedOn ? `Last deload: ${fmtShortDate(st.startedOn)} to ${fmtShortDate(st.endedOn || st.startedOn)}.` : `No deload logged yet.`;
@@ -2953,7 +3014,7 @@ function renderDeloadModifier(){
   }
   return `<div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.4rem;">
-        🔋 A planned lighter week to let joints and tendons catch up and avoid injury: about 10% less weight and a third fewer sets on every lift. Overrides Ski and Preseason targets. Lifts already cut for Knee or Back Care keep that weight and just lose sets. When you switch it off, suggestions pick back up from your pre-deload weights.
+        🔋 A planned lighter week to let joints and tendons catch up and avoid injury: about 10% less weight and a third fewer sets on every lift. Overrides Ski and Preseason targets. Lifts already cut for Knee or Back Care keep that weight and just lose sets. It switches itself off after a week unless you choose to keep it on, and suggestions pick back up from your pre-deload weights.
       </p>
       <div class="deload-line" id="deload-status">${last}<br>${next}</div>
       <button class="tool-btn" onclick="toggleMode('deload')" style="background:${modes.deload ? 'var(--deload)' : ''};color:${modes.deload ? 'var(--deload-on-text)' : ''};border-color:${modes.deload ? 'var(--deload)' : ''};">
@@ -3283,6 +3344,7 @@ function logEntry(){
 }
 
 render();
+checkDeloadAutoEnd();
 </script>
 </body>
 </html>

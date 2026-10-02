@@ -376,8 +376,9 @@ async function main(){
   if(await page.locator('.back-badge').count() !== 0) throw new Error('did not expect a back badge on Bench Press');
   await page.locator('.pill').filter({ hasText: new RegExp('^' + '1\. Squat' + '\\s*.?$') }).click();
   if(await page.locator('.knee-badge').count() !== 1 || await page.locator('.back-badge').count() !== 1) throw new Error('expected Squat to show BOTH knee and back badges simultaneously');
-  // Kettlebell Swings lives only on Full Body (the hinge day) - it's not duplicated onto Lower Body.
-  await page.locator('.pill').filter({ hasText: new RegExp('^' + '10\. Kettlebell Swings' + '\\s*.?$') }).click();
+  // Kettlebell Swings lives only on Lower Body, the second hinge after RDL.
+  await page.click('.tab:has-text("Lower Body")');
+  await page.locator('.pill').filter({ hasText: new RegExp('^' + '4\. Kettlebell Swings' + '\\s*.?$') }).click();
   if(await page.locator('.back-badge').count() !== 1) throw new Error('expected a back badge on Kettlebell Swings');
   console.log('OK: back badge appears only on RDL/Barbell Row/Kettlebell Swings, and Squat shows both badges at once');
 
@@ -918,20 +919,20 @@ async function main(){
   console.log('OK: Preseason Prep toggle exists, flips independently of Ski Season, and syncs to the cloud');
 
   console.log('=== 41: Preseason Prep badges/notes appear on flagged exercises and shift Squat\'s tempo target ===');
-  await page.click('.tab:has-text("Full Body")');
-  // Kettlebell Swings lives only on Full Body (the hinge day) and is a
-  // power exercise, so with Preseason Prep on it's bumped to the front of
-  // the pill row (see getDisplayOrder) and numbered 1.
+  await page.click('.tab:has-text("Lower Body")');
+  // Kettlebell Swings lives only on Lower Body and is a power exercise, so
+  // with Preseason Prep on it's bumped to the front of the pill row (see
+  // getDisplayOrder) and numbered 1.
   await page.locator('.pill').filter({ hasText: /^1\.\s*Kettlebell Swings/ }).click();
   if(await page.locator('.preseason-badge').count() !== 1) throw new Error('expected a Preseason badge on Kettlebell Swings with the toggle on');
   const kbNote = await page.locator('.preseason-line').textContent();
   if(!kbNote.includes('do this first')) throw new Error('expected the "do this first" power note on Kettlebell Swings, got: ' + kbNote);
   console.log('OK: Kettlebell Swings shows the Preseason badge and "do this first" note, bumped to the front of the pill row');
 
-  // Squat isn't a power exercise, so on Full Body it sits after Kettlebell
-  // Swings (the only power exercise left on this day since the Box Jumps/
-  // Skater Bound/Spanish Squat regrouping), landing at position 2.
-  await page.locator('.pill').filter({ hasText: /^2\.\s*Squat/ }).click();
+  // Full Body has no power exercises since Kettlebell Swings moved back to
+  // Lower Body, so Squat stays first there.
+  await page.click('.tab:has-text("Full Body")');
+  await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
   if(await page.locator('.preseason-badge').count() !== 1) throw new Error('expected a Preseason badge on Squat');
   const squatTempoLine = await page.locator('.preseason-line').first().textContent();
   if(!squatTempoLine.includes('4 sec lowering') || !squatTempoLine.includes('5')) throw new Error('unexpected preseason tempo line on Squat: ' + squatTempoLine);
@@ -944,8 +945,8 @@ async function main(){
   // Day mapping: Lower Body = squat day (Box Jumps/Lateral Lunge/Trap Bar
   // Jump/Skater Bound/Spanish Squat - all quad-dominant/squat-pattern work
   // now lives here, not spread across days), Upper Body = upper day (Med
-  // Ball Slam), Full Body = hinge day (Kettlebell Swings, the one exercise
-  // that actually mirrors RDL's hip-hinge pattern, plus Seated Calf Raise).
+  // Ball Slam), Full Body = hinge day (Seated Calf Raise; Kettlebell Swings
+  // moved back to Lower Body next to RDL).
   // Copenhagen Plank (hip adductor, no upper-body connection) moved to
   // Extra instead of Upper Body.
   await page.click('.tab:has-text("Overview")');
@@ -976,17 +977,17 @@ async function main(){
   // getDisplayOrder only affects the pill row's rendering order - selected/
   // DAY_ORDER/completion-banner logic all still read the static array, so
   // this only checks the visible pill text order, not any of that other state.
-  // Kettlebell Swings lives only on Full Body now, so Lower Body's power
-  // exercises are Box Jumps, Trap Bar Jump, and (since the regrouping)
-  // Skater Bound - Spanish Squat is an isometric hold, not power-flagged.
+  // Lower Body's power exercises are Kettlebell Swings, Box Jumps, Trap Bar
+  // Jump and Skater Bound (Spanish Squat is an isometric hold, not
+  // power-flagged), in their DAY_ORDER order, then the rest.
   await page.click('.tab:has-text("Lower Body")');
   const lowerPillOrder = await page.locator('.pill-row .pill').allTextContents();
   const lowerNonAddPills = lowerPillOrder.filter(t => t.trim() !== '+');
-  if(!/^1\.\s*Box Jumps/.test(lowerNonAddPills[0])) throw new Error('expected Box Jumps first in the Lower Body pill row, got: ' + lowerNonAddPills[0]);
-  if(!/^2\.\s*Trap Bar Jump/.test(lowerNonAddPills[1])) throw new Error('expected Trap Bar Jump second in the Lower Body pill row, got: ' + lowerNonAddPills[1]);
-  if(!/^3\.\s*Skater Bound/.test(lowerNonAddPills[2])) throw new Error('expected Skater Bound third in the Lower Body pill row (moved from Full Body), got: ' + lowerNonAddPills[2]);
-  if(!/^4\.\s*Squat/.test(lowerNonAddPills[3])) throw new Error('expected Squat to follow the power exercises in the Lower Body pill row, got: ' + lowerNonAddPills[3]);
-  console.log('OK: power exercises (Box Jumps, Trap Bar Jump, Skater Bound) are bumped ahead of the rest of the Lower Body pill row');
+  const expectedLowerStart = ['Kettlebell Swings', 'Box Jumps', 'Trap Bar Jump', 'Skater Bound', 'Squat'];
+  expectedLowerStart.forEach((name, i) => {
+    if(!new RegExp('^' + (i + 1) + '\\.\\s*' + name).test(lowerNonAddPills[i])) throw new Error('expected ' + name + ' at position ' + (i + 1) + ' in the Lower Body pill row, got: ' + lowerNonAddPills[i]);
+  });
+  console.log('OK: power exercises (Kettlebell Swings, Box Jumps, Trap Bar Jump, Skater Bound) are bumped ahead of the rest of the Lower Body pill row');
 
   console.log('=== 43: week-3 exercises are noted, not auto-hidden, and stack correctly with Knee Care badges ===');
   // Knee Care mode has been ON since an earlier scenario in this suite and
@@ -1222,20 +1223,20 @@ async function main(){
   await page.click('button:has-text("Preseason Prep: OFF")'); // scenario 44 left this off
   await sleep(150);
   await page.click('.tab:has-text("Full Body")');
-  const kbPillClass = await page.locator('.pill').filter({ hasText: /Kettlebell Swings/ }).getAttribute('class');
-  if(!kbPillClass.includes('preseason-pill')) throw new Error('expected a preseason-flagged pill (Kettlebell Swings) to carry the preseason-pill class, got: ' + kbPillClass);
+  const kbPillClass = await page.locator('.pill').filter({ hasText: /Seated Calf Raise/ }).getAttribute('class');
+  if(!kbPillClass.includes('preseason-pill')) throw new Error('expected a preseason-flagged pill (Seated Calf Raise) to carry the preseason-pill class, got: ' + kbPillClass);
   const benchPillClass = await page.locator('.pill').filter({ hasText: /Bench Press/ }).getAttribute('class');
   if(benchPillClass.includes('preseason-pill')) throw new Error('did not expect a non-preseason pill (Bench Press) to carry the preseason-pill class, got: ' + benchPillClass);
   console.log('OK: preseason-flagged pills carry a distinct class, non-flagged pills do not');
 
-  await page.locator('.pill').filter({ hasText: /Kettlebell Swings/ }).click();
-  const kbActivePillClass = await page.locator('.pill').filter({ hasText: /Kettlebell Swings/ }).getAttribute('class');
+  await page.locator('.pill').filter({ hasText: /Seated Calf Raise/ }).click();
+  const kbActivePillClass = await page.locator('.pill').filter({ hasText: /Seated Calf Raise/ }).getAttribute('class');
   if(!kbActivePillClass.includes('preseason-pill') || !kbActivePillClass.includes('active')) throw new Error('expected the selected preseason pill to carry both preseason-pill and active, got: ' + kbActivePillClass);
-  const kbBg = await page.locator('.pill').filter({ hasText: /Kettlebell Swings/ }).evaluate(el => getComputedStyle(el).backgroundColor);
+  const kbBg = await page.locator('.pill').filter({ hasText: /Seated Calf Raise/ }).evaluate(el => getComputedStyle(el).backgroundColor);
   // Bench Press (not preseason-flagged) for the "normal active" comparison - Squat
   // is also preseason-flagged (its tempo/reps shift too), so it wouldn't isolate this.
-  await page.locator('.pill').filter({ hasText: /^3\.\s*Bench Press/ }).click();
-  const nonPreseasonActiveBg = await page.locator('.pill').filter({ hasText: /^3\.\s*Bench Press/ }).evaluate(el => getComputedStyle(el).backgroundColor);
+  await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
+  const nonPreseasonActiveBg = await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).evaluate(el => getComputedStyle(el).backgroundColor);
   if(kbBg === nonPreseasonActiveBg) throw new Error('expected the active preseason pill\'s background to differ from the normal amber active-pill background, both read: ' + kbBg);
   console.log('OK: an active preseason pill renders a different (darker purple) background than a normal active pill:', kbBg, 'vs', nonPreseasonActiveBg);
 
@@ -1243,7 +1244,10 @@ async function main(){
   await page.click('button:has-text("Preseason Prep: ON")');
   await sleep(150);
   await page.click('.tab:has-text("Full Body")');
-  const kbPillClassAfterOff = await page.locator('.pill').filter({ hasText: /Kettlebell Swings/ }).getAttribute('class');
+  // Squat always shows and carries preseason notes, so it's the one to check;
+  // Seated Calf Raise is preseason-only and is hidden entirely once it's off.
+  if(await page.locator('.pill').filter({ hasText: /Seated Calf Raise/ }).count() !== 0) throw new Error('expected preseason-only Seated Calf Raise to hide once Preseason Prep is off');
+  const kbPillClassAfterOff = await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).getAttribute('class');
   if(kbPillClassAfterOff.includes('preseason-pill')) throw new Error('expected the preseason-pill class to disappear once Preseason Prep is turned off, got: ' + kbPillClassAfterOff);
   console.log('OK: pills lose the preseason coloring once Preseason Prep is turned back off');
 
@@ -1662,6 +1666,37 @@ async function main(){
   const settingsRow = await page.evaluate(() => (JSON.parse(sessionStorage.getItem('__mock_supabase_db__')).user_settings || [])[0]);
   if(!settingsRow || !settingsRow.deload_started_on || !settingsRow.deload_ended_on || settingsRow.deload_mode !== false) throw new Error('expected deload dates synced to user_settings, got: ' + JSON.stringify(settingsRow));
   console.log('OK: Deload Week is first, cuts load and sets, respects care-mode cuts, skips deload sessions afterward, and syncs its dates');
+
+  console.log('=== 65: Kettlebell Swings cap at 35 lb, deload messages carry the RPE 6 cap, and a deload ends itself after a week ===');
+  const kbSug = await page.evaluate(() => {
+    const saved = { knee: modes.knee, back: modes.back, deload: modes.deload };
+    modes.knee = false; modes.back = false; modes.deload = false;
+    const mk = reps => ({ trackBy: 'weight', targetReps: 12, entries: [
+      { date: '2026-09-20', weight: 35, sets: 3, reps, difficulty: 6 }, { date: '2026-09-28', weight: 35, sets: 3, reps, difficulty: 6 } ] });
+    const out = { mid: computeSuggestion(mk(12), 'Kettlebell Swings'), cap: computeSuggestion(mk(20), 'Kettlebell Swings') };
+    Object.assign(modes, saved);
+    return out;
+  });
+  if(kbSug.mid.weight !== 35 || kbSug.mid.reps !== 14 || !kbSug.mid.atMaxWeight) throw new Error('expected swings to stay at 35 lb and progress by reps, got: ' + JSON.stringify(kbSug.mid));
+  if(kbSug.cap.weight !== 35 || !kbSug.cap.atRepCap) throw new Error('expected swings at 20 reps to point at a harder variation, got: ' + JSON.stringify(kbSug.cap));
+  console.log('OK: Kettlebell Swings never suggest more than 35 lb, progress by reps, then point to single-arm swings');
+
+  if(!(await page.evaluate(() => modes.deload))) await page.evaluate(() => toggleMode('deload'));
+  await page.click('.tab:has-text("Full Body")');
+  await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
+  await sleep(100);
+  const deloadMsg = await page.locator('.rec-box').first().textContent();
+  if(!/RPE 6, 3 to 4 reps short of failure/.test(deloadMsg)) throw new Error('expected the deload message to carry the RPE 6 effort cap, got: ' + deloadMsg);
+  await page.evaluate(() => { deloadDates.plannedEndOn = shiftISO(todayISO(), -1); saveDeloadDates(); checkDeloadAutoEnd(); });
+  await sleep(150);
+  const autoEnded = await page.evaluate(() => ({ on: modes.deload, modal: !document.getElementById('deload-modal').hidden }));
+  if(autoEnded.on || !autoEnded.modal) throw new Error('expected the deload to switch itself off after a week and show the popup, got: ' + JSON.stringify(autoEnded));
+  await page.click('#deload-modal button:has-text("Keep it on another week")');
+  await sleep(150);
+  const kept = await page.evaluate(() => ({ on: modes.deload, planned: deloadDates.plannedEndOn, expected: shiftISO(todayISO(), 7), modal: !document.getElementById('deload-modal').hidden }));
+  if(!kept.on || kept.planned !== kept.expected || kept.modal) throw new Error('expected "keep it on" to restore the deload for another week, got: ' + JSON.stringify(kept));
+  await page.evaluate(() => toggleMode('deload'));
+  console.log('OK: deload messages carry the RPE 6 cap; a deload ends itself after a week and the popup can keep it on another week');
 
   console.log('\nALL SCENARIOS PASSED');
   await browser.close();
