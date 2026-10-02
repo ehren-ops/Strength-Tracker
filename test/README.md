@@ -1,6 +1,6 @@
 # Regression tests
 
-A single Playwright script that drives `index.html` in a real (headless)
+A single Playwright script that drives the app (`index.html` plus `styles.css` and `js/`) in a real (headless)
 browser and checks the app's actual behavior end to end - offline-first
 sync, the rest timer, progression suggestions, the celebration overlay,
 and so on. There's no framework or test runner: `app.test.js` is a plain

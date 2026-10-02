@@ -83,7 +83,13 @@ async function main(){
     });
   });
   const page = await context.newPage();
-  page.on('pageerror', err => console.log('[pageerror]', err.message));
+  // Any uncaught page error fails the run at the end. The app is split across ordered classic
+  // scripts, so a load-order mistake (a file calling a function from a later file at load) shows
+  // up here first.
+  const pageErrors = [];
+  page.on('pageerror', err => { pageErrors.push(err.message); console.log('[pageerror]', err.message); });
+  const failedLoads = [];
+  page.on('response', r => { if(r.url().startsWith(URL) && r.status() >= 400) failedLoads.push(r.status() + ' ' + r.url()); });
 
   console.log('=== 1: fresh load, no sign-in yet ===');
   await page.goto(URL);
@@ -1765,6 +1771,35 @@ async function main(){
   if(!order.payload || order.payload.logged !== order.order.logged) throw new Error('expected the session coach payload to carry the order');
   if(order.unknown !== null) throw new Error('expected no order when an entry that day predates order tracking');
   console.log('OK: sets carry loggedAt, the coach sees Squat #1, RDL #2, Hip Thrust #4, Bulgarian Split Squat #3 and which two were swapped');
+
+  console.log('=== 68: a local save the phone refuses (storage full) shows in the sync status until saves work again ===');
+  const storage = await page.evaluate(() => {
+    const real = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(){ throw new DOMException('full', 'QuotaExceededError'); };
+    const ok = persist();
+    const shown = { ok, text: document.getElementById('sync-status').textContent, warn: document.getElementById('sync-status').classList.contains('warn') };
+    Storage.prototype.setItem = real;
+    persist();
+    shown.after = document.getElementById('sync-status').textContent;
+    return shown;
+  });
+  if(storage.ok !== false || !storage.text.includes("Couldn't save on this phone") || !storage.warn) throw new Error('expected a refused save to show a warning in the sync status, got: ' + JSON.stringify(storage));
+  if(storage.after.includes("Couldn't save")) throw new Error('expected the warning to clear once a save succeeds, got: ' + storage.after);
+  console.log('OK: a refused local save shows "Couldn\'t save on this phone" and clears on the next good save');
+
+  console.log('=== 69: the page, stylesheet and every script load with matching versions and no page errors ===');
+  const assets = await page.evaluate(() => ({
+    version: APP_VERSION,
+    srcs: [...document.querySelectorAll('script[src^="js/"], link[rel="stylesheet"][href^="styles"]')].map(e => e.getAttribute('src') || e.getAttribute('href')),
+    styled: getComputedStyle(document.querySelector('header')).position,
+  }));
+  const want = assets.version.replace(/^v/, '');
+  const stale = assets.srcs.filter(u => !u.endsWith('?v=' + want));
+  if(assets.srcs.length < 12 || stale.length) throw new Error('expected styles.css and every js/ file tagged ?v=' + want + ' (APP_VERSION), mismatched: ' + JSON.stringify(stale));
+  if(assets.styled !== 'relative') throw new Error('expected styles.css to apply, header position is ' + assets.styled);
+  if(failedLoads.length) throw new Error('expected every app file to load, failed: ' + failedLoads.join(', '));
+  if(pageErrors.length) throw new Error('expected no uncaught page errors, got: ' + pageErrors.join(' | '));
+  console.log('OK: ' + assets.srcs.length + ' files tagged ?v=' + want + ', all loaded, no page errors');
 
   console.log('\nALL SCENARIOS PASSED');
   await browser.close();

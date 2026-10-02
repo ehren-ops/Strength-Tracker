@@ -49,3 +49,19 @@ It started as a simple lift log, but it's grown into a real coaching and data sy
 1. Open the app link in Safari and tap **Share → Add to Home Screen**.
 2. Go to the **Overview** tab and create an account under **Backup & Restore** to turn on cloud sync (optional, logging works without it).
 3. Confirm your email, sign in, and start logging. Everything from here syncs automatically.
+
+## Code layout
+
+No build step. GitHub Pages serves the repo as-is.
+
+- `index.html`: markup only. Loads `styles.css` and the scripts in `js/`.
+- `styles.css`: theme tokens (light, then dark) and components.
+- `js/01-sync.js` to `js/11-init.js`: ordered classic scripts sharing one global scope. Each file
+  opens with a line saying what it holds. A file can only call functions from later files
+  inside handlers, never at load. Event wiring and the first render live in `js/11-init.js`.
+- `supabase/`: the `coach` edge function and database migrations.
+- `test/`: the Playwright regression suite (`cd test && npm test`).
+
+**Releasing:** bump `APP_VERSION` in `js/02-program.js` and the `?v=` on every file in
+`index.html` to the same number. Pages caches files for 10 minutes, and the shared version keeps a
+phone from mixing new and old scripts. The test suite fails if they don't match.

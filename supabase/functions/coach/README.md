@@ -17,7 +17,7 @@ table (`kind` = `session` or `weekly`) when signed in. Model: Claude Sonnet 5.5.
 ## What it reads
 
 - **Always:** the training summary the app sends (`buildSessionCoachPayload` /
-  `buildWeeklyCoachPayload` in `index.html`): recent results per lift with RPE and notes, plus the
+  `buildWeeklyCoachPayload` in `js/09-coach-overview.js`): recent results per lift with RPE and notes, plus the
   app's own next-session suggestion.
 - **Optionally, from an Outlive project:** when the caller is signed in and
   `OUTLIVE_SUPABASE_SECRET_KEY` is set, the function finds the Outlive account with the same email
@@ -31,7 +31,7 @@ table (`kind` = `session` or `weekly`) when signed in. Model: Claude Sonnet 5.5.
    modest monthly spend cap there.
 2. In your Supabase project: **Edge Functions → Secrets** → add `ANTHROPIC_API_KEY`.
 3. Deploy: `supabase functions deploy coach --no-verify-jwt`.
-4. If you're not using project `eixbpujqsectkstkqllz`, point `SUPABASE_URL` in `index.html` at your
+4. If you're not using project `eixbpujqsectkstkqllz`, point `SUPABASE_URL` in `js/01-sync.js` at your
    own project.
 5. Optional Outlive link: add `OUTLIVE_SUPABASE_SECRET_KEY` (a secret API key from the Outlive
    project) and, if needed, `OUTLIVE_SUPABASE_URL`.

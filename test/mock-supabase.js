@@ -26,7 +26,6 @@
     // Real sessions always carry an access_token (the coach function needs it).
     function sessionFor(user){ return user ? { access_token: 'mock-token-' + user.id, user: { id: user.id, email: user.email } } : null; }
 
-    setTimeout(() => { notify('INITIAL_SESSION', sessionFor(loadSessionUser())); }, 0);
 
     class Builder {
       constructor(table){ this.table = table; this.filters = []; this.op = null; this._single = false; this._maybeSingle = false; }
@@ -63,7 +62,13 @@
 
     return {
       auth: {
-        onAuthStateChange(cb){ listeners.push(cb); return { data: { subscription: { unsubscribe(){} } } }; },
+        // Like supabase-js v2: every new subscriber gets INITIAL_SESSION on its own, shortly after
+        // subscribing, so a listener registered late still learns the current session.
+        onAuthStateChange(cb){
+          listeners.push(cb);
+          setTimeout(() => cb('INITIAL_SESSION', sessionFor(loadSessionUser())), 0);
+          return { data: { subscription: { unsubscribe(){} } } };
+        },
         async signUp({ email, password }){
           const db = loadDb();
           if(db.users[email]) return { data: { session: null }, error: { message: 'User already registered' } };
