@@ -281,7 +281,7 @@ const NOTE_THEMES = [
   { key: "strong", re: /\beasy\b(?!\s+day)|\blight\b|move up|moving up|felt good|strong|solid|room for more/i, say: () => "It moved well last time." },
 ];
 // budget: characters left for it in the tile's two guidance lines after the call itself.
-function noteInsight(entries, budget = 60){
+function noteInsights(entries){
   const notes = entries.slice(-3).reverse().map(e => e.note).filter(Boolean).slice(0, 2);
   const out = [], seen = new Set();
   notes.forEach(n => NOTE_THEMES.forEach(t => {
@@ -289,10 +289,9 @@ function noteInsight(entries, budget = 60){
     seen.add(t.key);
     // A strength read next to a warning is noise; keep the warning.
     if(t.key === "strong" && out.length) return;
-    const line = t.say(n);
-    if(out.join(" ").length + line.length + 1 <= budget) out.push(line);
+    out.push(t.say(n));
   }));
-  return out.join(" ");
+  return out;
 }
 
 function noteTargetWeight(note, lastWeight){

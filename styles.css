@@ -277,3 +277,5 @@
   :root[data-theme="dark"] .pill.cat-cardio.active,
   :root[data-theme="dark"] .pill.cat-core.active,
   :root[data-theme="dark"] .pill.cat-stretch.active{color:#050308;}
+/* Unclamped while fitGuidance() measures how many sentences fill two lines. */
+.rec-desc.fitting{display:block;max-height:none;-webkit-line-clamp:unset;overflow:visible;}

@@ -1981,7 +1981,7 @@ async function main(){
   if(Math.max(...hs) - Math.min(...hs) > 1 || heights.noteLabel || heights.dateLabel) throw new Error('expected action buttons, inputs and Log to share one height with no Note/Date labels, got: ' + JSON.stringify(heights));
   console.log('OK: "move up"/"easy" add weight, "stay"/"fell apart" hold, "easy day" does neither; buttons, fields and Log share one height');
 
-  console.log('=== 74: the Next tile is the same size on every exercise, with four rows ===');
+  console.log('=== 74: the Next tile is the same size on every exercise, with four rows and two full lines of guidance ===');
   const tiles = await page.evaluate(() => {
     const out = {};
     ['Squat', 'Bicep Curl', 'Incline Treadmill Walk', 'Lateral Raise Test'].forEach(n => {
@@ -1999,6 +1999,33 @@ async function main(){
   const tileHs = Object.values(tiles).map(t => t && t.h);
   if(tileHs.some(h => !h) || new Set(tileHs).size !== 1 || Object.values(tiles).some(t => t.rows !== 3 || !t.load)) throw new Error('expected one fixed-size three-block (four-line) Next tile on every exercise, got: ' + JSON.stringify(tiles));
   console.log('OK: Next tile is ' + tileHs[0] + 'px on a barbell lift, a dumbbell lift, cardio and a lift with no history');
+
+  // The guidance always fills both lines with whole sentences, narrow phone or wide: Cable Chest Fly
+  // with a short call and clean history used to stop at one line.
+  const guide = await page.evaluate(() => {
+    const fly = data['Cable Chest Fly'] || newExerciseShell('Cable Chest Fly');
+    const saved = fly.entries;
+    fly.entries = [{date: shiftISO(todayISO(), -7), weight: 60, sets: 3, reps: 12, difficulty: 7}, {date: shiftISO(todayISO(), -3), weight: 60, sets: 3, reps: 12, difficulty: 7}];
+    data['Cable Chest Fly'] = fly;
+    const out = [];
+    [300, 400].forEach(w => ['Cable Chest Fly', 'Squat', 'Incline Treadmill Walk', 'Dead Hang'].forEach(n => {
+      const div = document.createElement('div');
+      div.style.width = w + 'px';
+      document.body.appendChild(div);
+      div.innerHTML = renderExerciseCard(n, data[n] || newExerciseShell(n));
+      fitGuidance();
+      const d = div.querySelector('.rec-desc');
+      d.classList.add('fitting');
+      out.push({ w, n, lines: Math.round(d.scrollHeight / parseFloat(getComputedStyle(d).lineHeight)), text: d.textContent.trim() });
+      d.classList.remove('fitting');
+      div.remove();
+    }));
+    fly.entries = saved;
+    return out;
+  });
+  const short = guide.filter(g => g.lines !== 2 || !/\.$/.test(g.text));
+  if(short.length) throw new Error('expected two full lines of whole-sentence guidance on every tile, got: ' + JSON.stringify(short));
+  console.log('OK: guidance fills exactly two lines at 300px and 400px, e.g. "' + guide[0].text + '"');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

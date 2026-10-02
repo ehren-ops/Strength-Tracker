@@ -17,5 +17,8 @@ document.addEventListener("visibilitychange", () => {
   if(document.visibilityState === "visible"){ checkRestTimerCompletion(); checkDeloadAutoEnd(); }
 });
 
+// The Next tile's guidance lines depend on the font; refit once the web font is in.
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitGuidance);
+
 render();
 checkDeloadAutoEnd();

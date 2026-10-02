@@ -4,6 +4,7 @@
 // ---------- rendering ----------
 let lastRenderedView = null;
 function render(){
+  guidancePools = [];
   const oldPillScroll = document.getElementById("pill-scroll");
   const sameView = lastRenderedView === view;
   const savedPillScrollLeft = (sameView && oldPillScroll) ? oldPillScroll.scrollLeft : null;
@@ -15,6 +16,7 @@ function render(){
     if(newPillScroll) newPillScroll.scrollLeft = savedPillScrollLeft;
   }
   lastRenderedView = view;
+  fitGuidance();
 }
 
 function renderTabs(){
@@ -220,35 +222,117 @@ function renderNextTile(headline, ex, guidance, load){
     <div class="rec-load${/ per side/.test(load) ? " plate-line" : ""}">${load}</div>
   </div>`;
 }
-// Rows 2-3: the call first, then whatever else the history says, most useful first, while whole
-// sentences still fit in two lines (about 105 characters on a narrow phone), so nothing is cut
-// mid-sentence and the second line carries something: a read of recent notes, last session, the trend.
-function composeGuidance(msg, name, ex, last){
-  const FIT = 105;
+// Rows 2-3: the call first, then whole sentences from a pool, most useful first. The pool rides on
+// the element and fitGuidance() keeps every sentence that still fits, so both lines are always full
+// on any phone width and nothing is cut mid-sentence. The 105-character first pass is what a narrow
+// phone fits; it only shows if the fit pass can't run.
+let guidancePools = [];
+function guidanceHtml(msg, pool){
+  const id = guidancePools.push([msg, ...pool.filter(Boolean)]) - 1;
   const parts = [msg];
-  const add = t => { if(t && parts.join(" ").length + t.length + 1 <= FIT) parts.push(t); };
-  add(noteInsight(ex.entries, FIT - msg.length - 1));
-  add(lastSessionLine(ex, last));
-  add(trendLine(name, ex));
-  return parts.join(" ");
+  pool.forEach(t => { if(t && parts.join(" ").length + t.length + 1 <= 105) parts.push(t); });
+  return `<span data-gpool="${id}">${escapeHtml(parts.join(" "))}</span>`;
 }
-// How the lift has moved: e1RM over four weeks, sessions at this weight, or sessions this month.
+function composeGuidance(msg, name, ex, last){
+  return guidanceHtml(msg, [
+    ...noteInsights(ex.entries), lastSessionLine(ex, last), ...trendLine(name, ex),
+    bestLine(ex, last), progressionRule(name, ex), effortLine(ex), daysSinceLine(last), LOG_TIMING_TIP, NOTE_TIP,
+  ]);
+}
+function firstSessionGuidance(name, ex){
+  const start = ex.trackBy === "duration" ? "Start easy and steady"
+    : ex.unit === "sec" ? "Pick a hold you can finish every set with a little left"
+    : ex.trackBy === "reps" ? "Pick reps you can finish every set with 2 to 3 left"
+    : "Pick a load you can finish every set with 2 to 3 reps left";
+  return guidanceHtml(`${start}; the app takes it from there.`,
+    [progressionRule(name, ex), effortLine(ex), LOG_TIMING_TIP, NOTE_TIP]);
+}
+// Greedy fill: add each sentence in order, drop any that would push past two lines. A tile that
+// changes width later (rotation, a scrollbar, the web font arriving) is refit by the observer.
+const guidanceObserver = typeof ResizeObserver === "function"
+  ? new ResizeObserver(list => list.forEach(r => { if(r.target.clientWidth !== r.target._fitW) fitOne(r.target); }))
+  : null;
+function fitGuidance(){
+  document.querySelectorAll(".rec-desc").forEach(box => {
+    fitOne(box);
+    if(guidanceObserver) guidanceObserver.observe(box);
+  });
+}
+function fitOne(box){
+  const span = box.querySelector("[data-gpool]");
+  const pool = span && guidancePools[+span.dataset.gpool];
+  if(!pool || !box.clientWidth) return;
+  box._fitW = box.clientWidth;
+  box.classList.add("fitting");
+  const lh = parseFloat(getComputedStyle(box).lineHeight) || 16;
+  const kept = [pool[0]];
+  for(const t of pool.slice(1)){
+    span.textContent = [...kept, t].join(" ");
+    if(box.scrollHeight <= lh * 2 + 2) kept.push(t);
+  }
+  span.textContent = kept.join(" ");
+  box.classList.remove("fitting");
+}
+const LOG_TIMING_TIP = "Log right after the last set for heart rate timing.";
+const NOTE_TIP = "Note anything off; it steers the next session.";
+// The best session on record, when it isn't the last one.
+function bestLine(ex, last){
+  const es = ex.entries;
+  if(es.length < 2 || !last) return "";
+  if(ex.trackBy === "duration"){
+    const best = es.reduce((a, e) => (e.minutes || 0) > (a.minutes || 0) ? e : a, es[0]);
+    return best !== last && best.minutes ? `Longest: ${best.minutes} min on ${fmtShortDate(best.date)}.` : "";
+  }
+  const loaded = ex.trackBy === "weight" && last.weight > 0;
+  const score = e => loaded ? (e.weight > 0 ? e.weight * (1 + (e.reps || 0) / 30) : 0) : (e.reps || 0) * (e.sets || 1);
+  const best = es.reduce((a, e) => score(e) > score(a) ? e : a, es[0]);
+  if(best === last || score(best) <= score(last)) return "";
+  const what = ex.trackBy === "weight" && best.weight > 0 ? `${best.weight} lb, ${repLabel(best.sets, best.reps, ex.unit)}` : repLabel(best.sets, best.reps, ex.unit);
+  return `Best: ${what} on ${fmtShortDate(best.date)}.`;
+}
+// How this lift moves up, in one line.
+function progressionRule(name, ex){
+  const target = effectiveTargetReps(ex);
+  if(ex.trackBy === "duration") return "Add time first; push the pace only once it feels easy.";
+  if(ex.trackBy === "reps"){
+    if(ex.preseasonPower) return "End a set the moment a rep slows; speed is the point.";
+    return ex.unit === "sec" ? `Build every hold to ${target} sec, then make it harder.` : `Build every set to ${target} reps, then make it harder.`;
+  }
+  if(ex.preseasonPower) return "Light and fast; add weight only while every rep stays explosive.";
+  const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;
+  if(maxW) return `At ${maxW} lb, progress with reps, then single-arm.`;
+  const inc = ex.increment || 5;
+  return ex.unit === "sec" ? `Add ${inc} lb once every hold reaches ${target} sec.` : `Add ${inc} lb once every set reaches ${target} reps.`;
+}
+function effortLine(ex){
+  if(ex.trackBy === "duration") return "Keep it conversational: RPE 6 to 7.";
+  if(ex.preseasonPower) return "Rest fully; every rep should be crisp.";
+  return ex.unit === "sec" ? "Aim for RPE 7 to 8: end each hold with a little left." : "Aim for RPE 7 to 8: two or three reps left.";
+}
+function daysSinceLine(last){
+  if(!last) return "";
+  const days = Math.round((Date.parse(todayISO()) - Date.parse(last.date)) / 86400000);
+  return days > 1 ? `Last done ${days} days ago.` : "";
+}
+// How the lift has moved, as short separate sentences so they pack into a line's leftover room:
+// e1RM over four weeks, sessions at this weight, or sessions this month.
 function trendLine(name, ex){
   const t = typeof liftTrend === "function" ? liftTrend(name, ex, todayISO()) : null;
   const bits = [];
   if(t && t.e1rmChange4WeeksPct != null && t.e1rmChange4WeeksPct !== 0) bits.push(`Est. 1RM ${t.e1rmChange4WeeksPct > 0 ? "up" : "down"} ${Math.round(Math.abs(t.e1rmChange4WeeksPct))}% in 4 weeks`);
-  if(t && t.sessionsAtCurrentLoad > 1) bits.push(`${t.sessionsAtCurrentLoad} sessions at this weight`);
+  if(t && t.sessionsAtCurrentLoad > 1 && ex.entries[ex.entries.length - 1].weight > 0) bits.push(`${t.sessionsAtCurrentLoad} sessions at this weight`);
   if(!bits.length){
     const since = shiftISO(todayISO(), -28);
     const n = ex.entries.filter(e => e.date >= since).length;
     if(n) bits.push(`${n} session${n > 1 ? "s" : ""} in the last 4 weeks`);
   }
-  return bits.length ? bits.join(", ") + "." : "";
+  return bits.map(b => b + ".");
 }
 // Last session's numbers and RPE, the fallback detail when notes give nothing to act on.
 function lastSessionLine(ex, last){
   if(!last) return "";
-  const what = ex.trackBy === "weight" ? `${last.weight} lb, ${repLabel(last.sets, last.reps, ex.unit)}` : formatEntryValue(last, ex);
+  const what = ex.trackBy !== "weight" ? formatEntryValue(last, ex)
+    : `${last.weight > 0 ? `${last.weight} lb` : "bodyweight"}, ${repLabel(last.sets, last.reps, ex.unit)}`;
   return `Last: ${what}${last.difficulty ? ` at RPE ${last.difficulty}` : ""}.`;
 }
 // Row 4: what to load. Plates for a barbell, per hand, the bell, bodyweight, or the cardio setting.
@@ -322,10 +406,7 @@ function renderExerciseCard(name, ex){
 
   if(!hasEntries){
     // Same tile as every other lift, so the card never changes shape.
-    html += renderNextTile("Next: first session", ex,
-      ex.trackBy === "duration" ? "Start easy and steady; the app takes it from there."
-        : "Pick a load you can finish every set with 2 to 3 reps left; the app takes it from there.",
-      loadText(name, ex, null));
+    html += renderNextTile("Next: first session", ex, firstSessionGuidance(name, ex), loadText(name, ex, null));
     html += renderTips(name);
   } else {
     const delta = ex.entries.length > 1
