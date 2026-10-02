@@ -23,7 +23,8 @@
       }catch(e){}
     }
     function notify(event, session){ listeners.forEach(cb => cb(event, session)); }
-    function sessionFor(user){ return user ? { user: { id: user.id, email: user.email } } : null; }
+    // Real sessions always carry an access_token (the coach function needs it).
+    function sessionFor(user){ return user ? { access_token: 'mock-token-' + user.id, user: { id: user.id, email: user.email } } : null; }
 
     setTimeout(() => { notify('INITIAL_SESSION', sessionFor(loadSessionUser())); }, 0);
 

@@ -59,6 +59,10 @@ async function main(){
   let aiBreakdownCallCount = 0;
   const coachRequests = [];
   await context.route('**/functions/v1/coach', route => {
+    // Mirrors the real function: no signed-in session, no call.
+    if(!/^Bearer \S+/.test(route.request().headers()['authorization'] || '')){
+      return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'not_signed_in' }) });
+    }
     aiBreakdownCallCount++;
     const req = route.request().postDataJSON();
     coachRequests.push(req);
@@ -376,11 +380,15 @@ async function main(){
   if(await page.locator('.back-badge').count() !== 0) throw new Error('did not expect a back badge on Bench Press');
   await page.locator('.pill').filter({ hasText: new RegExp('^' + '1\. Squat' + '\\s*.?$') }).click();
   if(await page.locator('.knee-badge').count() !== 1 || await page.locator('.back-badge').count() !== 1) throw new Error('expected Squat to show BOTH knee and back badges simultaneously');
-  // Kettlebell Swings lives only on Lower Body, the second hinge after RDL.
+  // Lower Body: Hip Thrust follows Bulgarian Split Squat, then Kettlebell Swings.
   await page.click('.tab:has-text("Lower Body")');
-  await page.locator('.pill').filter({ hasText: new RegExp('^' + '4\. Kettlebell Swings' + '\\s*.?$') }).click();
+  await page.locator('.pill').filter({ hasText: new RegExp('^' + '4\. Hip Thrust' + '\\s*.?$') }).click();
+  if(await page.locator('.back-badge').count() !== 1) throw new Error('expected a back badge on Hip Thrust');
+  const htTip = await page.locator('.back-care-line').textContent();
+  if(!/glute bridge/i.test(htTip)) throw new Error('expected Back Care to swap Hip Thrust to a glute bridge, got: ' + htTip);
+  await page.locator('.pill').filter({ hasText: new RegExp('^' + '5\. Kettlebell Swings' + '\\s*.?$') }).click();
   if(await page.locator('.back-badge').count() !== 1) throw new Error('expected a back badge on Kettlebell Swings');
-  console.log('OK: back badge appears only on RDL/Barbell Row/Kettlebell Swings, and Squat shows both badges at once');
+  console.log('OK: back badge appears only on RDL/Barbell Row/Hip Thrust/Kettlebell Swings, Hip Thrust swaps to a glute bridge, and Squat shows both badges at once');
 
   console.log('=== 18: Knee Care mode cuts load ~10% and holds, instead of progressing, with the tip surfaced ===');
   await page.click('.tab:has-text("Full Body")');
@@ -1428,6 +1436,18 @@ async function main(){
   await sleep(150);
   if(await page.locator('.coach-head .ai-btn:has-text("Session")').count() !== 1) throw new Error('expected a Session Breakdown button in Coach\'s Notes before any breakdown is generated');
   if(await page.locator('.coach-head .ai-btn:has-text("Weekly")').count() !== 1) throw new Error('expected a separate Weekly Check-in button in Coach\'s Notes');
+  // The coach function only serves signed-in accounts, so signed out the button explains that
+  // instead of calling it.
+  if(!(await page.textContent('#sync-status')).includes('Synced')){
+    await page.click('.coach-head .ai-btn:has-text("Session")');
+    await waitForText(page, '.card', t => t.includes('Sign in to use AI coaching'), 5000, 'signed-out coach message');
+    if(aiBreakdownCallCount !== 0) throw new Error('expected no call to the coach function while signed out, got ' + aiBreakdownCallCount);
+    console.log('OK: signed out, the AI buttons ask you to sign in and never call the function');
+    await page.fill('#auth-email', EMAIL);
+    await page.fill('#auth-password', PASSWORD);
+    await page.click('button:has-text("Sign In")');
+    await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'sign in before AI breakdown');
+  }
   await page.click('.coach-head .ai-btn:has-text("Session")');
   await waitForText(page, '.card', t => t.includes('Mock breakdown headline'), 5000, 'AI breakdown generation');
   if(await page.locator('text=Mock recovery item.').count() !== 1) throw new Error('expected the recovery item to render');
@@ -1715,6 +1735,36 @@ async function main(){
   await sleep(3000);
   if(await syncShown()) throw new Error('expected the "Synced" flash to fade after a couple of seconds');
   console.log('OK: sync status hides when synced, shows for trouble, flashes "Synced" on recovery, and never moves the page');
+
+  console.log('=== 67: each logged set records when it was logged; the coach gets the actual exercise order vs the plan ===');
+  await page.click('.tab:has-text("Lower Body")');
+  await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
+  await page.fill('#f-weight', '135');
+  await page.click('button.log');
+  await sleep(150);
+  const logged = await page.evaluate(() => {
+    const e = data['Squat'].entries[data['Squat'].entries.length - 1];
+    return { at: e.loggedAt, row: entryToRow(e, 'x', 'y').logged_at };
+  });
+  if(!logged.at || Math.abs(Date.now() - Date.parse(logged.at)) > 60000 || logged.row !== logged.at) throw new Error('expected a fresh loggedAt that syncs as logged_at, got: ' + JSON.stringify(logged));
+  const legacyRow = await page.evaluate(() => 'logged_at' in JSON.parse(JSON.stringify(entryToRow({ clientId: 'old', date: '2026-01-01' }, 'x', 'y'))));
+  if(legacyRow) throw new Error('expected entries without loggedAt to leave logged_at out of the upsert, so an edit never wipes the server backfill');
+  const order = await page.evaluate(() => {
+    const saved = JSON.stringify(data);
+    const d = '2026-03-03';
+    const add = (name, t) => { (data[name] ||= newExerciseShell(name)).entries.push({ clientId: 'ord-' + name, date: d, weight: 100, sets: 3, reps: 8, loggedAt: '2026-03-03T17:' + t + ':00.000Z' }); };
+    add('Squat', '00'); add('RDL', '10'); add('Hip Thrust', '20'); add('Bulgarian Split Squat', '30'); add('Walking Lunge', '40');
+    const out = { order: sessionOrder(d), payload: buildSessionCoachPayload(d).order };
+    data['RDL'].entries.find(e => e.date === d).loggedAt = undefined;
+    out.unknown = sessionOrder(d);
+    data = JSON.parse(saved);
+    return out;
+  });
+  if(!order.order || !order.order.logged.startsWith('Squat (#1), RDL (#2), Hip Thrust (#4), Bulgarian Split Squat (#3)')) throw new Error('expected the logged order with planned numbers, got: ' + JSON.stringify(order.order));
+  if(JSON.stringify(order.order.outOfOrder) !== JSON.stringify(['Hip Thrust', 'Bulgarian Split Squat'])) throw new Error('expected Hip Thrust and Bulgarian Split Squat flagged as swapped, got: ' + JSON.stringify(order.order.outOfOrder));
+  if(!order.payload || order.payload.logged !== order.order.logged) throw new Error('expected the session coach payload to carry the order');
+  if(order.unknown !== null) throw new Error('expected no order when an entry that day predates order tracking');
+  console.log('OK: sets carry loggedAt, the coach sees Squat #1, RDL #2, Hip Thrust #4, Bulgarian Split Squat #3 and which two were swapped');
 
   console.log('\nALL SCENARIOS PASSED');
   await browser.close();

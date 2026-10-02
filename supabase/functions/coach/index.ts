@@ -12,8 +12,10 @@
 // itself owns recovery and nutrition analysis. Without the link it still runs on training data
 // alone; `context` in the response says which.
 //
-// Unauthenticated on purpose (verify_jwt: false): the app works with no account at all. The abuse
-// guard is a spend cap on the Anthropic key. Requires ANTHROPIC_API_KEY.
+// Signed-in callers only. verify_jwt stays false so CORS preflights pass, and the function checks
+// the caller's Supabase session itself: no session, no Anthropic call. Each account is also capped
+// at DAILY_CALL_CAP calls per UTC day (coach_bump in the database), so an account made through the
+// open sign-up form can't run up the Anthropic bill. Requires ANTHROPIC_API_KEY.
 
 import Anthropic from "npm:@anthropic-ai/sdk@0.129.0";
 import { betaZodOutputFormat } from "npm:@anthropic-ai/sdk@0.129.0/helpers/beta/zod";
@@ -23,6 +25,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 const MODEL = "claude-sonnet-5-5";
 const OUTLIVE_URL = Deno.env.get("OUTLIVE_SUPABASE_URL") ?? "https://szsgxlbvleviuzobhuty.supabase.co";
 const MAX_PAYLOAD_CHARS = 80_000;
+const DAILY_CALL_CAP = 20;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -48,12 +51,16 @@ const avg = (xs: (number | null)[]) => {
 };
 
 // ---------- who is calling ----------
-async function callerEmail(req: Request): Promise<string | null> {
+function serviceClient() {
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+}
+
+async function caller(req: Request): Promise<{ id: string; email: string | null } | null> {
   const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!jwt) return null;
-  const st = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-  const { data } = await st.auth.getUser(jwt);
-  return data?.user?.email?.toLowerCase() ?? null;
+  const { data } = await serviceClient().auth.getUser(jwt);
+  const u = data?.user;
+  return u ? { id: u.id, email: u.email?.toLowerCase() ?? null } : null;
 }
 
 // ---------- Outlive context ----------
@@ -158,6 +165,7 @@ Good: "Pressing is outrunning pulling: bench is up about 17% in 4 weeks while ro
 Look for:
 - Divergence between movement patterns (push vs pull, squat vs hinge, upper vs lower, compounds vs accessories). Use the "patterns" summary and each lift's "trend".
 - Stalled vs unpushed: several sessions at one load with RPE 7 or below is unpushed, not stalled. Rising RPE at the same load is real fatigue. Falling e1RM while related lifts climb points to a shared limiter (grip, a joint, fatigue from earlier exercises).
+- Exercise order: lifts are normally done in their numbered order (#1 first). A lift done out of its planned place usually means its equipment was busy, not a choice, so never criticize the swap itself. Do use it to explain a result: a lift done later than planned was done more fatigued, one done earlier, fresher. Recommend changing the program order only when a pattern across sessions shows the order is holding back a priority lift, and then say the numbered order should change.
 - Notes that cluster by body region or keep repeating across weeks.
 - Progressions that jumped too far, and lifts that matter most for the current training phase and goal.
 - Recovery data, when present, is only an explainer: use it only when it explains a specific lift result (for example a hard set the day after a long ride or a short night). Never summarize recovery, sleep or HRV trends on their own; another app covers that.
@@ -171,7 +179,7 @@ Rules:
 
 const SESSION_SYSTEM = `You are the athlete's strength coach writing a short note right after a lifting session. Think about how this session fits the last several weeks before writing.
 
-Input is JSON: each lift done today with today's result, its last 8 results (date, weight and sets x reps, RPE after @, note in quotes), the app's own next-session suggestion and a pre-computed "trend" (movement pattern, 4-week e1RM change, sessions at the current load, RPE at that load); a "patterns" summary across all lifts; active training modes; a "deload" status (whether a deload week is on, the last one, the next due date). Results tagged [deload] were intentionally light, never a regression. When available, an "outlive" block adds goals and training phases plus 14 days of recovery lines.
+Input is JSON: each lift done today with today's result, its last 8 results (date, weight and sets x reps, RPE after @, note in quotes), the app's own next-session suggestion and a pre-computed "trend" (movement pattern, 4-week e1RM change, sessions at the current load, RPE at that load); a "patterns" summary across all lifts; active training modes; a "deload" status (whether a deload week is on, the last one, the next due date); "order" (the lifts in the order they were logged today, each with its planned number, plus any done out of order; null if unknown). Results tagged [deload] were intentionally light, never a regression. When available, an "outlive" block adds goals and training phases plus 14 days of recovery lines.
 
 ${PRINCIPLES}
 
@@ -182,7 +190,7 @@ Write:
 
 const WEEKLY_SYSTEM = `You are the athlete's strength coach writing the weekly check-in. It is the big-picture strength review: how the program is moving as a whole, where it is lopsided, and what to prioritize next week. Think it through across all lifts and weeks before writing.
 
-Input is JSON: the week (weekStart to weekEnd), session dates, up to 6 weeks of history per lift (date, weight and sets x reps, RPE after @, note in quotes), the app's next-session suggestion and a pre-computed "trend" per lift, a "patterns" summary, and a "deload" status (on or off, the last deload, the next due date). Results tagged [deload] were intentionally light, never a regression. When available, an "outlive" block adds goals and training phases, 14 days of recovery lines, and a bodyweight trend.
+Input is JSON: the week (weekStart to weekEnd), session dates, up to 6 weeks of history per lift (date, weight and sets x reps, RPE after @, note in quotes), the app's next-session suggestion and a pre-computed "trend" per lift, a "patterns" summary, a "deload" status (on or off, the last deload, the next due date), and "sessionOrders" (for sessions in the last 14 days, the lifts in logged order with planned numbers and any done out of order). Results tagged [deload] were intentionally light, never a regression. When available, an "outlive" block adds goals and training phases, 14 days of recovery lines, and a bodyweight trend.
 
 ${PRINCIPLES}
 
@@ -240,13 +248,21 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) return json({ error: "anthropic_key_not_configured" }, 500);
 
+    const who = await caller(req).catch(() => null);
+    if (!who) return json({ error: "not_signed_in" }, 401);
+    const { data: calls, error: capErr } = await serviceClient().rpc("coach_bump", { p_user: who.id });
+    if (capErr) {
+      console.error("coach_bump failed:", capErr.message);
+      return json({ error: "usage_check_failed" }, 503);
+    }
+    if (Number(calls) > DAILY_CALL_CAP) return json({ error: "daily_limit_reached", cap: DAILY_CALL_CAP }, 429);
+
     const end = isDate(payload.weekEnd) ? payload.weekEnd : isDate(payload.date) ? payload.date : new Date().toISOString().slice(0, 10);
     const tz = typeof payload.tz === "string" ? payload.tz : "UTC";
 
-    let context: { status: string; data: Row | null } = { status: "signed_out", data: null };
-    const email = await callerEmail(req).catch(() => null);
-    if (email) {
-      context = await outliveContext(email, mode, end, tz).catch((e) => {
+    let context: { status: string; data: Row | null } = { status: "no_email", data: null };
+    if (who.email) {
+      context = await outliveContext(who.email, mode, end, tz).catch((e) => {
         console.error("outlive context failed:", e);
         return { status: "outlive_error", data: null };
       });

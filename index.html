@@ -431,6 +431,9 @@ function entryToRow(entry, exerciseId, userId){
     note: entry.note || "",
     completed_indices: entry.completedIndices ?? null,
     deload: !!entry.deload,
+    // undefined (dropped from the request) rather than null for entries logged before this
+    // existed, so an edit never wipes the time the server backfilled.
+    logged_at: entry.loggedAt || undefined,
   };
 }
 function rowToEntry(row){
@@ -449,6 +452,7 @@ function rowToEntry(row){
     note: row.note || "",
     completedIndices: row.completed_indices || undefined,
     deload: row.deload || undefined,
+    loggedAt: row.logged_at || undefined,
   };
 }
 
@@ -638,6 +642,9 @@ async function pullRemoteAndMerge(){
     } else {
       const existingIds = new Set(data[row.name].entries.map(e => e.clientId).filter(Boolean));
       remoteEntries.forEach(e => { if(!existingIds.has(e.clientId)) data[row.name].entries.push(e); });
+      // Entries logged before order tracking pick up the server's backfilled log time.
+      const remoteAt = new Map(remoteEntries.map(e => [e.clientId, e.loggedAt]));
+      data[row.name].entries.forEach(e => { if(!e.loggedAt && remoteAt.get(e.clientId)) e.loggedAt = remoteAt.get(e.clientId); });
       data[row.name].entries.sort((a,b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       data[row.name].entries.forEach((e,i) => { e.label = "S" + (i+1); });
     }
@@ -771,7 +778,7 @@ const SEED = {
 const DAY_ORDER = {
   full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Seated Calf Raise"],
   upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
-  lower: ["Squat","RDL","Bulgarian Split Squat","Kettlebell Swings","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat"],
+  lower: ["Squat","RDL","Bulgarian Split Squat","Hip Thrust","Kettlebell Swings","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat"],
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
   // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
@@ -804,7 +811,7 @@ const EXTRA_CATEGORY = {
 // to live on the exercise object or round-trip through Supabase like the
 // ski-season fields do.
 const KNEE_SENSITIVE_EXERCISES = new Set(["Squat", "Bulgarian Split Squat", "Walking Lunge", "Box Jumps", "Skater Bound"]);
-const LOW_BACK_SENSITIVE_EXERCISES = new Set(["Squat", "RDL", "Barbell Row", "Kettlebell Swings"]);
+const LOW_BACK_SENSITIVE_EXERCISES = new Set(["Squat", "RDL", "Barbell Row", "Kettlebell Swings", "Hip Thrust"]);
 const KNEE_CARE_TIP = {
   "Squat": "Consider a shallower squat depth or a box squat to reduce knee flexion range.",
   "Bulgarian Split Squat": "Consider less rear-foot elevation or a shorter range to ease knee flexion.",
@@ -817,6 +824,12 @@ const LOW_BACK_CARE_TIP = {
   "RDL": "Consider a shorter range (mid-shin instead of full stretch) to ease lower back load.",
   "Barbell Row": "Consider a chest-supported row variation to reduce lower back loading.",
   "Kettlebell Swings": "Consider a lighter bell or a hip thrust substitute to ease lower back load.",
+  "Hip Thrust": "Swap to a floor glute bridge: same glute work with less back arch. Ribs down, stop at hips level, no overextension.",
+};
+
+// Standing setup cue shown on the exercise card, whatever modifiers are on.
+const EXERCISE_CUES = {
+  "Hip Thrust": "Upper back on a bench, 1 sec squeeze at the top. Bench taken? Do a floor glute bridge with the same bar and log it here.",
 };
 
 // Every value ex.trackBy can ever hold. This list MUST stay in sync by hand
@@ -852,6 +865,7 @@ const EXERCISE_DEFAULTS = {
   "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec controlled descent each step" },
   "Bench Press": { equipment: "barbell" },
   "RDL": { equipment: "barbell" },
+  "Hip Thrust": { equipment: "barbell", targetReps: 10 },
   "Barbell Row": { equipment: "barbell" },
   "Back Extension": { trackBy: "weight", autoloadLastReps: true },
   "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb - keep building load here." },
@@ -982,7 +996,7 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v40";
+const APP_VERSION = "v41";
 const APP_UPDATED = "Oct 2, 2026";
 
 // ---------- state ----------
@@ -1940,6 +1954,9 @@ function renderExerciseCard(name, ex){
   } else {
     html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}${preseasonActive ? '<span class="preseason-badge">🏔️ Preseason</span>' : ''}${deloadActive ? '<span class="deload-badge">🔋 Deload</span>' : ''}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>`;
   }
+  if(EXERCISE_CUES[name]){
+    html += `<p style="font-size:0.74rem;color:var(--slate);margin:0 0 0.6rem;">${EXERCISE_CUES[name]}</p>`;
+  }
   if(kneeActive && KNEE_CARE_TIP[name]){
     html += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
   }
@@ -2734,7 +2751,7 @@ function describeSuggestion(ex, name){
 const LIFT_PATTERNS = {
   "Bench Press": "push", "Incline DB Press": "push", "Cable Chest Fly": "push", "Tricep Pushdown": "push", "Lateral Raise": "push",
   "Barbell Row": "pull", "Cable Lat Pulldown": "pull", "Face Pulls": "pull", "Bicep Curl": "pull", "Dead Hang": "pull",
-  "RDL": "hinge", "Back Extension": "hinge", "Kettlebell Swings": "hinge",
+  "RDL": "hinge", "Hip Thrust": "hinge", "Back Extension": "hinge", "Kettlebell Swings": "hinge",
   "Squat": "squat", "Spanish Squat": "squat",
   "Bulgarian Split Squat": "single-leg", "Walking Lunge": "single-leg", "Lateral Lunge": "single-leg",
   "Box Jumps": "power", "Trap Bar Jump": "power", "Skater Bound": "power", "Med Ball Slam": "power",
@@ -2786,6 +2803,30 @@ function patternSummary(asOf){
   }));
 }
 
+// The order lifts were actually done in on one date, each with its planned number from the day's
+// list (the pill numbering). Lifts usually go in planned order; a lift out of place usually means
+// its equipment was busy. Null when any entry that day predates order tracking.
+function sessionOrder(date){
+  const done = [];
+  Object.entries(data).forEach(([name, ex]) => {
+    if(ex.trackBy === "checklist") return;
+    ex.entries.forEach(e => { if(e.date === date) done.push({ name, at: e.loggedAt }); });
+  });
+  if(!done.length || done.some(d => !d.at)) return null;
+  done.sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
+  const seen = new Set();
+  const lifts = done.filter(d => !seen.has(d.name) && seen.add(d.name)).map(d => d.name);
+  const day = guessDayForNames(lifts);
+  const planned = day && day !== "extra" ? getDisplayOrder(day) : [];
+  const num = n => planned.indexOf(n) + 1;
+  const numbered = lifts.filter(n => num(n) > 0);
+  const outOfOrder = numbered.filter((n, i) => numbered.slice(i + 1).some(m => num(m) < num(n)) || numbered.slice(0, i).some(m => num(m) > num(n)));
+  return {
+    logged: lifts.map(n => num(n) ? `${n} (#${num(n)})` : `${n} (extra)`).join(", "),
+    outOfOrder,
+  };
+}
+
 function coachTz(){
   try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }catch(e){ return "UTC"; }
 }
@@ -2812,7 +2853,7 @@ function buildSessionCoachPayload(date){
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
   const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
-  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), exercises, patterns: patternSummary(date) };
+  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), exercises, patterns: patternSummary(date) };
 }
 
 // The past week plus 6 weeks of history per lift, enough to judge loading blocks and deloads.
@@ -2828,20 +2869,28 @@ function buildWeeklyCoachPayload(){
     recent.forEach(e => sessionDates.add(e.date));
     exercises.push({ name, entries: recent.map(e => compactEntry(e, ex)), appSuggestion: describeSuggestion(ex, name), trend: liftTrend(name, ex, weekEnd) });
   });
-  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), exercises, patterns: patternSummary(weekEnd) };
+  const orderSince = shiftISO(weekEnd, -13);
+  const sessionOrders = Object.fromEntries([...sessionDates].filter(d => d >= orderSince).sort()
+    .map(d => [d, sessionOrder(d)]).filter(([, o]) => o));
+  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, exercises, patterns: patternSummary(weekEnd) };
 }
 
 async function generateCoach(kind){
   const payload = kind === "weekly" ? buildWeeklyCoachPayload() : buildSessionCoachPayload(getLastSessionDate());
   const key = kind === "weekly" ? payload.weekEnd : payload.date;
   if(!key) return;
+  // The coach function only runs for signed-in accounts, so the Anthropic key can't be spent anonymously.
+  if(!currentSession || !currentSession.access_token){
+    coachError[kind] = "Sign in to use AI coaching (Backup & Restore, bottom of Overview).";
+    render();
+    return;
+  }
   coachLoading[kind] = true;
   coachError[kind] = null;
   render();
   try{
-    const headers = { "Content-Type": "application/json" };
-    // Signed in: lets the function match this account to Outlive for recovery and nutrition data.
-    if(currentSession && currentSession.access_token) headers.Authorization = "Bearer " + currentSession.access_token;
+    // The session also lets the function match this account to Outlive for recovery data.
+    const headers = { "Content-Type": "application/json", Authorization: "Bearer " + currentSession.access_token };
     const res = await fetch(`${SUPABASE_URL}/functions/v1/coach`, {
       method: "POST",
       headers,
@@ -2859,6 +2908,10 @@ async function generateCoach(kind){
     // "try again" that would fail forever.
     coachError[kind] = e.message === "anthropic_key_not_configured"
       ? "This needs an Anthropic API key configured on your Supabase project. Add ANTHROPIC_API_KEY under Project Settings → Edge Functions → Secrets - see supabase/functions/coach/README.md for details."
+      : e.message === "not_signed_in"
+      ? "Your sign-in expired. Sign in again under Backup & Restore at the bottom of Overview, then retry."
+      : e.message === "daily_limit_reached"
+      ? "Daily AI limit reached (20 a day). It resets at midnight UTC."
       : "Couldn't generate this right now - try again in a moment.";
   }finally{
     coachLoading[kind] = false;
@@ -3199,7 +3252,7 @@ function renderOverview(){
     ${renderModifierRow("ski", "🎿", "Ski Season", "Squat, Bulgarian Split Squat and Walking Lunge shift to lower reps with a slower lowering phase. Roughly Nov to March.")}
     ${renderModifierRow("preseason", "🏔️", "Preseason Prep", "Adds power, lateral, lowering-phase and calf work to your lift days for the 7 to 10 week ramp into ski season. Power work goes first; stop a set when speed drops.")}
     ${renderModifierRow("knee", "🦵", "Knee Care", "Squat, Bulgarian Split Squat and Walking Lunge hold and drop about 10% while your knee settles. Everything else trains as normal.")}
-    ${renderModifierRow("back", "🩺", "Low Back Care", "Squat, RDL, Barbell Row and Kettlebell Swings hold and drop about 10% while your lower back settles. Everything else trains as normal.")}
+    ${renderModifierRow("back", "🩺", "Low Back Care", "Squat, RDL, Barbell Row, Kettlebell Swings and Hip Thrust (swap to a glute bridge) hold and drop about 10% while your lower back settles. Everything else trains as normal.")}
   </div>`;
 
   html += renderBackupSyncCard();
@@ -3346,6 +3399,8 @@ function logEntry(){
     };
   }
   if(modes.deload && ex.trackBy !== "duration") entry.deload = true;
+  // When it was logged, so a session's actual exercise order can be compared with the planned one.
+  entry.loggedAt = new Date().toISOString();
   ex.entries.push(entry);
   persist();
   enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: selected, clientId: entry.clientId } });
