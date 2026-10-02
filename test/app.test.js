@@ -1896,7 +1896,32 @@ async function main(){
   if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
   console.log('OK: Bulgarian Split Squat reads lb/hand and reps/leg, Squat lb total, Cable Chest Fly lb/hand, Copenhagen Plank seconds/side');
 
-  console.log('=== 72: the page, stylesheet and every script load with matching versions and no page errors ===');
+  console.log('=== 72: preseason extras never block the workout-complete popup, Preseason Prep on or off ===');
+  const gate = await page.evaluate(() => {
+    const saved = JSON.stringify(data), savedCeleb = JSON.stringify(celebratedToday), savedPre = modes.preseason;
+    const t = todayISO();
+    const run = preseasonOn => {
+      if(modes.preseason !== preseasonOn) toggleMode('preseason');
+      data = JSON.parse(saved);
+      Object.keys(data).forEach(n => { data[n].entries = data[n].entries.filter(e => e.date !== t); });
+      DAY_ORDER.lower.filter(n => !PRESEASON_ONLY.has(n)).forEach(n => {
+        (data[n] ||= newExerciseShell(n)).entries.push({ clientId: 'gate-' + n, date: t, weight: 50, sets: 3, reps: 8 });
+      });
+      celebratedToday = {};
+      checkCoreWorkoutComplete('lower');
+      dismissCelebration();
+      return celebratedToday.lower === t;
+    };
+    const out = { on: run(true), off: run(false) };
+    data = JSON.parse(saved); celebratedToday = JSON.parse(savedCeleb);
+    if(modes.preseason !== savedPre) toggleMode('preseason');
+    render();
+    return out;
+  });
+  if(!gate.on || !gate.off) throw new Error('expected logging only the main Lower Body lifts to complete the day with Preseason Prep on and off, got: ' + JSON.stringify(gate));
+  console.log('OK: main lifts alone complete Lower Body; jumps, bounds and other preseason extras are optional');
+
+  console.log('=== 73: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
     srcs: [...document.querySelectorAll('script[src^="js/"], link[rel="stylesheet"][href^="styles"]')].map(e => e.getAttribute('src') || e.getAttribute('href')),
