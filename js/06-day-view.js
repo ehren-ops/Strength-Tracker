@@ -302,7 +302,7 @@ function progressionRule(name, ex){
   const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;
   if(maxW) return `At ${maxW} lb, progress with reps, then single-arm.`;
   const inc = ex.increment || 5;
-  return ex.unit === "sec" ? `Add ${inc} lb once every hold reaches ${target} sec.` : `Add ${inc} lb once every set reaches ${target} reps.`;
+  return ex.unit === "sec" ? `Add ${inc} lb once every hold reaches ${target} sec.` : `Add ${inc} lb once every set reaches ${target} ${repsWord(name)}.`;
 }
 function effortLine(ex){
   if(ex.trackBy === "duration") return "Keep it conversational: RPE 6 to 7.";
@@ -415,7 +415,7 @@ function renderExerciseCard(name, ex){
     const deltaColor = delta>0 ? "color:var(--emerald)" : delta<0 ? "color:var(--amber)" : "color:var(--slate)";
     const sideTag = s => s ? `<span class="side-tag">${s}</span>` : "";
     const bigVal = ex.trackBy==="weight" ? last.weight+" lbs" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
-      : ex.trackBy==="duration" ? last.minutes+" min" : last.reps+" reps" + sideTag(repsSuffix(name));
+      : ex.trackBy==="duration" ? last.minutes+" min" : last.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
 
     html += `<div class="weight-row">
       <div class="weight-main">

@@ -130,7 +130,7 @@ const EXERCISE_TIPS = {
 const EXERCISE_SIDES = {
   "Incline DB Press": { weight: "hand" },
   "Bulgarian Split Squat": { weight: "hand", reps: "leg" },
-  "Walking Lunge": { weight: "hand", reps: "leg" },
+  "Walking Lunge": { weight: "hand", reps: "steps" },  // reps are total steps, both legs together
   "Lateral Lunge": { reps: "side" },
   "Farmer's Carry": { weight: "hand" },
   "Bicep Curl": { weight: "hand" },
@@ -304,6 +304,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v58";
+const APP_VERSION = "v59";
 const APP_UPDATED = "Oct 2, 2026";
 

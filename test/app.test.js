@@ -1877,7 +1877,7 @@ async function main(){
   if(JSON.stringify(noteSug) !== JSON.stringify(wantSug)) throw new Error('expected note targets and power holds ' + JSON.stringify(wantSug) + ', got: ' + JSON.stringify(noteSug));
   console.log('OK: "Dial to 50!" sets 50, "move up to 180" sets 180, Knee Care lets a note lower but not raise the load, and jumps/bounds hold their target reps');
 
-  console.log('=== 71: every exercise says whether its weight and reps are per hand, per side, per leg or total ===');
+  console.log('=== 71: every exercise says whether its weight and reps are per hand, per side, per leg, total steps or total ===');
   const sides = await page.evaluate(() => {
     const read = name => {
       const ex = data[name] || (data[name] = newExerciseShell(name));
@@ -1888,13 +1888,16 @@ async function main(){
       ex.entries = saved;
       return { labels: [...div.querySelectorAll('.form-row .field label')].map(l => l.textContent), next: div.querySelector('.rec-headline').textContent };
     };
-    return { bss: read('Bulgarian Split Squat'), squat: read('Squat'), fly: read('Cable Chest Fly'), copen: read('Copenhagen Plank') };
+    return { bss: read('Bulgarian Split Squat'), squat: read('Squat'), fly: read('Cable Chest Fly'), copen: read('Copenhagen Plank'),
+      walk: read('Walking Lunge'), lateral: read('Lateral Lunge'), walkUnits: sidesText('Walking Lunge') };
   });
   if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lbs\/hand · 3x8\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
   if(!sides.squat.labels.includes('Lb total') || !/lbs total · 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
   if(!sides.fly.labels.includes('Lb / hand')) throw new Error('expected Cable Chest Fly labeled per hand (each stack), got: ' + JSON.stringify(sides.fly));
   if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
-  console.log('OK: Bulgarian Split Squat reads lb/hand and reps/leg, Squat lb total, Cable Chest Fly lb/hand, Copenhagen Plank seconds/side');
+  if(!sides.walk.labels.includes('Lb / hand') || !sides.walk.labels.includes('Steps total') || !/lbs\/hand · 3x8 steps/.test(sides.walk.next) || !/total steps/.test(sides.walkUnits)) throw new Error('expected Walking Lunge per hand with total steps, got: ' + JSON.stringify([sides.walk, sides.walkUnits]));
+  if(!sides.lateral.labels.includes('Reps / side') || !/3x8\/side/.test(sides.lateral.next)) throw new Error('expected Lateral Lunge reps per side, got: ' + JSON.stringify(sides.lateral));
+  console.log('OK: Bulgarian Split Squat reads lb/hand and reps/leg, Squat lb total, Cable Chest Fly lb/hand, Copenhagen Plank seconds/side, Walking Lunge total steps, Lateral Lunge reps/side');
 
   console.log('=== 72: preseason extras never block the workout-complete popup on any day, and shared lifts complete a day from any tab ===');
   const gate = await page.evaluate(() => {

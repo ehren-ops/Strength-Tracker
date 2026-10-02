@@ -141,11 +141,15 @@ function sidesOf(name){
   return { weight: s.weight || "total", reps: s.reps || "total" };
 }
 function weightSuffix(name){ const w = sidesOf(name).weight; return w === "total" ? " total" : "/" + w; }
-function repsSuffix(name){ const r = sidesOf(name).reps; return r === "total" ? "" : "/" + r; }
+function repsSuffix(name){ const r = sidesOf(name).reps; return r === "total" ? "" : r === "steps" ? " steps" : "/" + r; }
 function weightFieldLabel(name){ const w = sidesOf(name).weight; return w === "total" ? "Lb total" : "Lb / " + w; }
-function repsFieldLabel(name, unit){ const r = sidesOf(name).reps; const base = unit === "sec" ? "Seconds" : "Reps"; return r === "total" ? base : `${base} / ${r}`; }
+function repsFieldLabel(name, unit){
+  const r = sidesOf(name).reps; const base = unit === "sec" ? "Seconds" : "Reps";
+  return r === "total" ? base : r === "steps" ? "Steps total" : `${base} / ${r}`;
+}
+function repsWord(name){ return sidesOf(name).reps === "steps" ? "steps" : "reps"; }
 function sidesText(name){
-  const s = sidesOf(name), words = { hand: "each hand", side: "each side", leg: "each leg", total: "total" };
+  const s = sidesOf(name), words = { hand: "each hand", side: "each side", leg: "each leg", steps: "total steps, both legs counted", total: "total" };
   return `weight ${words[s.weight]}, reps ${words[s.reps]}`;
 }
 
