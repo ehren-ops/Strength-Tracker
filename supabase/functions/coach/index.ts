@@ -171,7 +171,7 @@ Rules:
 
 const SESSION_SYSTEM = `You are the athlete's strength coach writing a short note right after a lifting session. Think about how this session fits the last several weeks before writing.
 
-Input is JSON: each lift done today with today's result, its last 8 results (date, weight and sets x reps, RPE after @, note in quotes), the app's own next-session suggestion and a pre-computed "trend" (movement pattern, 4-week e1RM change, sessions at the current load, RPE at that load); a "patterns" summary across all lifts; active training modes. When available, an "outlive" block adds goals and training phases plus 14 days of recovery lines.
+Input is JSON: each lift done today with today's result, its last 8 results (date, weight and sets x reps, RPE after @, note in quotes), the app's own next-session suggestion and a pre-computed "trend" (movement pattern, 4-week e1RM change, sessions at the current load, RPE at that load); a "patterns" summary across all lifts; active training modes; a "deload" status (whether a deload week is on, the last one, the next due date). Results tagged [deload] were intentionally light, never a regression. When available, an "outlive" block adds goals and training phases plus 14 days of recovery lines.
 
 ${PRINCIPLES}
 
@@ -182,7 +182,7 @@ Write:
 
 const WEEKLY_SYSTEM = `You are the athlete's strength coach writing the weekly check-in. It is the big-picture strength review: how the program is moving as a whole, where it is lopsided, and what to prioritize next week. Think it through across all lifts and weeks before writing.
 
-Input is JSON: the week (weekStart to weekEnd), session dates, up to 6 weeks of history per lift (date, weight and sets x reps, RPE after @, note in quotes), the app's next-session suggestion and a pre-computed "trend" per lift, and a "patterns" summary. When available, an "outlive" block adds goals and training phases, 14 days of recovery lines, and a bodyweight trend.
+Input is JSON: the week (weekStart to weekEnd), session dates, up to 6 weeks of history per lift (date, weight and sets x reps, RPE after @, note in quotes), the app's next-session suggestion and a pre-computed "trend" per lift, a "patterns" summary, and a "deload" status (on or off, the last deload, the next due date). Results tagged [deload] were intentionally light, never a regression. When available, an "outlive" block adds goals and training phases, 14 days of recovery lines, and a bodyweight trend.
 
 ${PRINCIPLES}
 
@@ -191,7 +191,7 @@ Write:
 - moving: 1 to 3 bullets on what is progressing well and why it is working.
 - lagging: 1 to 3 bullets on what is stalled, regressing or unpushed, and the likely reason.
 - risks: 1 to 3 bullets on imbalances, recurring pain or limiters (grip, a joint, exercise order) that could stall progress.
-- block: 1 to 2 bullets on the training block: weeks of steady loading since the last lighter week, whether a deload is due and why, and what should shift for the coming phase.
+- block: 1 to 2 bullets on the training block: weeks of steady loading since the last deload (use the deload status), whether a deload is due and why, and what should shift for the coming phase. If a deload week is on, say what to watch for coming out of it.
 - nextWeek: 3 to 4 bullets of priorities for next week, written as focus points, not a full workout list.
 - bodyweight: one short sentence only if bodyweight changes the strength picture (for example strength rising while weight drops means relative strength is up). Otherwise an empty string.`;
 

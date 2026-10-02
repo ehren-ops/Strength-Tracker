@@ -35,6 +35,7 @@
     --cat-core:#1B8A7A; --cat-core-bg:#E3F5F2; --cat-core-border:#B8E3DC; --cat-core-text:#0F5C51;
     --cat-stretch:#6B8E4E; --cat-stretch-bg:#EEF3E6; --cat-stretch-border:#CFE0BB; --cat-stretch-text:#4A6134;
     --ai-bg:#E6EEE3; --ai-border:#B9CCB4; --ai-text:#1F3A2A; --ai-accent:#0F6B4A;
+    --deload:#3D6B7D; --deload-on-text:#FFFFFF; --deload-bg:#E6EFF2; --deload-border:#B7CDD5; --deload-text:#24495A;
     --font-display:'Fjalla One',sans-serif; --font-body:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
   }
   :root[data-theme="dark"]{
@@ -49,6 +50,7 @@
     --sync-muted:#6a5d94; --danger:#ff2054;
     --rec-bg:rgba(185,103,255,0.10); --rec-text:#d8cff2; --rec-headline:#fee440;
     --ai-bg:rgba(0,240,255,0.07); --ai-border:rgba(0,240,255,0.32); --ai-text:#bff9ff; --ai-accent:#00f0ff;
+    --deload:#fee440; --deload-on-text:#050308; --deload-bg:rgba(254,228,64,0.10); --deload-border:#fee440; --deload-text:#fff3a6;
     --panel-soft:#150c26; --panel-soft-active:#1c1430; --hairline:#241a3a; --track-bg:#1c1430;
     --chart-grid:#241a3a; --chart-axis:#6a5d94; --chart-line:#00f0ff; --chart-label-halo:#0e0a1a;
     --chart-white:#050308; --chart-under:#b967ff; --chart-missed:#ff2d95; --chart-extra:#fee440;
@@ -225,11 +227,13 @@
   .card.preseason-mode{border-color:var(--preseason);box-shadow:0 0 0 1px rgba(106,63,160,0.18);}
   /* Shared shape for all four mode badges - only the background differs
      per mode, so each class below is just a one-line color override. */
-  .ski-badge, .knee-badge, .back-badge, .preseason-badge{display:inline-block;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
+  .ski-badge, .knee-badge, .back-badge, .preseason-badge, .deload-badge{display:inline-block;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
   .ski-badge{background:var(--ski);}
   .knee-badge{background:var(--knee);}
   .back-badge{background:var(--back);}
   .preseason-badge{background:var(--preseason);}
+  .deload-badge{background:var(--deload);color:var(--deload-on-text);}
+  .deload-line{font-size:0.76rem;color:var(--deload-text);background:var(--deload-bg);border:1px solid var(--deload-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
   .ski-tempo-line{font-size:0.76rem;color:var(--ski-text);background:var(--ski-bg);border:1px solid var(--ski-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
   .preseason-line{font-size:0.76rem;color:var(--preseason-text);background:var(--preseason-bg);border:1px solid var(--preseason-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
   .preseason-line + .preseason-line{margin-top:-0.35rem;}
@@ -382,6 +386,7 @@ function entryToRow(entry, exerciseId, userId){
     difficulty: entry.difficulty ?? null,
     note: entry.note || "",
     completed_indices: entry.completedIndices ?? null,
+    deload: !!entry.deload,
   };
 }
 function rowToEntry(row){
@@ -399,6 +404,7 @@ function rowToEntry(row){
     difficulty: row.difficulty,
     note: row.note || "",
     completedIndices: row.completed_indices || undefined,
+    deload: row.deload || undefined,
   };
 }
 
@@ -459,6 +465,8 @@ async function runOp(op){
     const { error } = await supabaseClient.from("user_settings").upsert({
       user_id: userId,
       ...Object.fromEntries(MODE_DEFS.map(m => [m.column, modes[m.key]])),
+      deload_started_on: deloadDates.startedOn || null,
+      deload_ended_on: deloadDates.endedOn || null,
     }, { onConflict: "user_id" });
     if(error) throw error;
     return true;
@@ -597,6 +605,10 @@ async function pullRemoteAndMerge(){
       try{ window.localStorage.setItem(m.storageKey, modes[m.key] ? "1" : "0"); }catch(e){}
     }
   });
+  if(settingsRow && !deloadDates.startedOn && settingsRow.deload_started_on){
+    deloadDates = { startedOn: settingsRow.deload_started_on, endedOn: settingsRow.deload_ended_on || null };
+    saveDeloadDates();
+  }
 
   const { data: breakdownRows, error: bdErr } = await supabaseClient.from("ai_breakdowns").select("*").eq("user_id", userId);
   if(bdErr) console.error(bdErr);
@@ -703,6 +715,11 @@ const SEED = {
 // checkCoreWorkoutComplete), so being on two lists made it silently
 // required on Upper Body while reading, visually, like an Extra accessory.
 // Dropped from Upper Body for that reason; it still lives on Extra.
+// The preseason-only additions below (PRESEASON_ONLY) are hidden from the
+// pill rows, numbering and completion banner whenever Preseason Prep is off
+// - see activeDayOrder. Squat, Kettlebell Swings, Standing Calf Raise and
+// Farmer's Carry predate preseason and only carry preseason notes, so they
+// always show.
 const DAY_ORDER = {
   full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Kettlebell Swings","Seated Calf Raise"],
   upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
@@ -712,6 +729,10 @@ const DAY_ORDER = {
   // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
   extra: ["Farmer's Carry","Dead Hang","Zone 2 Ride","Incline Treadmill Walk","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch"],
 };
+const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
+function activeDayOrder(day){
+  return DAY_ORDER[day].filter(name => modes.preseason || !PRESEASON_ONLY.has(name));
+}
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
 const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
 
@@ -913,8 +934,8 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v38";
-const APP_UPDATED = "Sep 22, 2026";
+const APP_VERSION = "v39";
+const APP_UPDATED = "Oct 2, 2026";
 
 // ---------- state ----------
 let data = loadSaved() || JSON.parse(JSON.stringify(SEED));
@@ -946,6 +967,7 @@ let editing1RM = null;
 // equivalents, targetRepsSki/skiTempo for ski, and the preseason* fields
 // on individual exercises for preseason.
 const MODE_DEFS = [
+  { key: "deload", storageKey: "strength-tracker-deload-mode", column: "deload_mode" },
   { key: "ski", storageKey: "strength-tracker-ski-mode", column: "ski_season_mode" },
   { key: "knee", storageKey: "strength-tracker-knee-mode", column: "knee_care_mode" },
   { key: "back", storageKey: "strength-tracker-back-mode", column: "low_back_care_mode" },
@@ -975,10 +997,27 @@ function toggleDarkMode(){
   render();
 }
 
+// Deload week bookkeeping: when it was last switched on and off, so the
+// modifier can show the last deload and when the next one is due, and so
+// suggestions can skip the lighter deload sessions once it's over.
+const DELOAD_DATES_KEY = "strength-tracker-deload-dates";
+const DELOAD_EVERY_DAYS = 35; // a lighter week after roughly every 5 weeks of steady loading
+let deloadDates = (function(){
+  try{ return JSON.parse(window.localStorage.getItem(DELOAD_DATES_KEY)) || {}; }catch(e){ return {}; }
+})();
+function saveDeloadDates(){
+  try{ window.localStorage.setItem(DELOAD_DATES_KEY, JSON.stringify(deloadDates)); }catch(e){}
+}
+
 function toggleMode(key){
   const def = MODE_DEFS.find(m => m.key === key);
   modes[key] = !modes[key];
   try{ window.localStorage.setItem(def.storageKey, modes[key] ? "1" : "0"); }catch(e){}
+  if(key === "deload"){
+    if(modes.deload) deloadDates = { startedOn: todayISO(), endedOn: null };
+    else if(deloadDates.startedOn) deloadDates.endedOn = todayISO();
+    saveDeloadDates();
+  }
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
   render();
 }
@@ -1130,11 +1169,10 @@ function showCelebration(msg){
 // numbered), so it's excluded entirely.
 function checkCoreWorkoutComplete(day){
   if(day !== "full" && day !== "upper" && day !== "lower") return;
-  // DAY_ORDER is the fixed, always-numbered roster for this day - every name
-  // in it is a main lift regardless of preseason/ski/care-mode toggles (those
-  // only reorder pills or adjust prescriptions, never add/remove exercises -
-  // see getDisplayOrder). So toggle state must never affect this list.
-  const coreList = DAY_ORDER[day];
+  // Every numbered lift currently shown for this day is a main lift. Ski and
+  // care modes never change this list; Preseason Prep adds its preseason-only
+  // exercises while on (see activeDayOrder).
+  const coreList = activeDayOrder(day);
   if(!coreList.every(name => isLoggedToday(name))) return;
   const today = todayISO();
   if(celebratedToday[day] === today) return;
@@ -1476,7 +1514,26 @@ function computeRecoveryReadiness(){
 }
 
 
+// Deload week overlays every other modifier's math: ~10% lighter and about a
+// third fewer sets, reps back to the lift's base target. Lifts already cut for
+// an injury (Knee/Back Care) or by a miss-streak deload keep that weight
+// instead of being cut again, and only lose sets. Sets logged during a deload
+// are tagged (entry.deload) and skipped when computing suggestions, so
+// progression resumes from the pre-deload working weights.
 function computeSuggestion(ex, name){
+  if(!ex.entries.length) return null;
+  const baseline = ex.entries.filter(e => !e.deload);
+  const core = computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name);
+  if(!modes.deload || !core || ex.trackBy === "duration") return core;
+  const lastBase = (baseline.length ? baseline : ex.entries)[ (baseline.length ? baseline : ex.entries).length - 1 ];
+  const sets = Math.max(2, Math.round((lastBase.sets || core.sets || 3) * 2 / 3));
+  if(ex.trackBy !== "weight") return { ...core, sets, reps: lastBase.reps, deloadWeek: true };
+  const alreadyReduced = !!(core.careFlags && core.careFlags.length) || core.deload;
+  const weight = alreadyReduced ? core.weight : Math.round((lastBase.weight * 0.9) / 2.5) * 2.5;
+  return { ...core, weight, sets, reps: ex.targetReps || core.reps, readyToProgress: false, deloadWeek: true, deloadKeptReduction: alreadyReduced };
+}
+
+function computeSuggestionCore(ex, name){
   if(!ex.entries.length) return null;
   const last = ex.entries[ex.entries.length-1];
   const targetReps = effectiveTargetReps(ex);
@@ -1637,7 +1694,7 @@ function switchView(v){
 // can't shift the "opening a tab lands on your main lift" behavior or
 // anything else that depends on stable positions.
 function getDisplayOrder(day){
-  const order = DAY_ORDER[day];
+  const order = activeDayOrder(day);
   if(!modes.preseason) return order;
   const isPower = name => !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseasonPower);
   const power = order.filter(isPower);
@@ -1662,7 +1719,7 @@ function renderDay(day){
     if(day === "extra" && EXTRA_CATEGORY[name]) pillClasses.push('cat-' + EXTRA_CATEGORY[name]);
     if(selected===name) pillClasses.push('active');
     if(loggedToday) pillClasses.push('logged-today');
-    html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')">${(day !== "extra" && i < DAY_ORDER[day].length) ? (i+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
+    html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')">${(day !== "extra" && i < activeDayOrder(day).length) ? (i+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
   });
   html += `<div class="pill pill-add" onclick="toggleAddExercise()">+</div></div>`;
   html += `<div id="add-ex-row" style="display:none" class="add-ex-row">
@@ -1670,6 +1727,7 @@ function renderDay(day){
     <button onclick="addExercise()">Add</button>
   </div>`;
 
+  if(DAY_ORDER[day].includes(selected) && !activeDayOrder(day).includes(selected)) selected = activeDayOrder(day)[0];
   let ex = data[selected];
   if(!ex && DAY_ORDER[day].includes(selected)){
     ex = data[selected] = newExerciseShell(selected);
@@ -1803,6 +1861,7 @@ function renderExerciseCard(name, ex){
   const kneeActive = modes.knee && KNEE_SENSITIVE_EXERCISES.has(name);
   const backActive = modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name);
   const preseasonActive = modes.preseason && !!ex.preseason;
+  const deloadActive = modes.deload && ex.trackBy !== "duration";
 
   const isCustom = !allDayNames().includes(name);
 
@@ -1816,7 +1875,7 @@ function renderExerciseCard(name, ex){
       </span>
     </div>`;
   } else {
-    html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}${preseasonActive ? '<span class="preseason-badge">🏔️ Preseason</span>' : ''}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>`;
+    html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}${preseasonActive ? '<span class="preseason-badge">🏔️ Preseason</span>' : ''}${deloadActive ? '<span class="deload-badge">🔋 Deload</span>' : ''}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>`;
   }
   if(kneeActive && KNEE_CARE_TIP[name]){
     html += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
@@ -1867,13 +1926,17 @@ function renderExerciseCard(name, ex){
         // When the prior session's actual reps beat the target, call that out by
         // name with the real number instead of flattening it to a plain "hit
         // target" - going over is a stronger, more specific signal than a bare hit.
-        const wentOverTarget = suggestion.hitTarget && !suggestion.deload && last.reps > suggestion.reps;
+        const wentOverTarget = suggestion.hitTarget && !suggestion.deload && !suggestion.deloadWeek && last.reps > suggestion.reps;
         const actualAmt = ex.unit === "sec" ? `${last.reps} sec` : `${last.reps} reps`;
         const targetAmt = ex.unit === "sec" ? `${suggestion.reps} sec` : `${suggestion.reps} reps`;
         const hitLeadIn = wentOverTarget
           ? `Went over target ${unitWord} last time (did ${actualAmt}, target is ${targetAmt})`
           : `Hit target ${unitWord}`;
-        if(suggestion.deload){
+        if(suggestion.deloadWeek){
+          msg = suggestion.deloadKeptReduction
+            ? `Deload week - this lift is already reduced, so keeping that weight and just cutting sets.`
+            : `Deload week - about 10% lighter and a third fewer sets. Progression picks back up from your pre-deload weight once you turn it off.`;
+        } else if(suggestion.deload){
           msg = `Missed target ${unitWord} for ${suggestion.missStreak} sessions straight - that's a stall, not a bad day. Dropping ~15% to rebuild with clean reps.`;
         } else if(suggestion.noteConcern){
           msg = suggestion.hitTarget
@@ -1910,7 +1973,7 @@ function renderExerciseCard(name, ex){
           : `Held steady - log an RPE next time for a sharper call.`;
       } else {
         nextLabel = repLabel(suggestion.sets,suggestion.reps,ex.unit);
-        msg = `Bodyweight move, aiming for a couple more reps.`;
+        msg = suggestion.deloadWeek ? `Deload week - same reps, fewer sets.` : `Bodyweight move, aiming for a couple more reps.`;
       }
       const restPart = ex.trackBy !== "duration" ? ` <span style="font-weight:400;">· Rest ${restTimeFor(ex)}</span>` : "";
       const diffText = last.difficulty ? last.difficulty + "/10" : "not rated";
@@ -2101,9 +2164,11 @@ function renderForm(name, ex){
   }
   html += `<div class="form-row">`;
   const repsDefault = (ex.autoloadLastReps && ex.entries.length) ? ex.entries[ex.entries.length - 1].reps : effectiveTargetReps(ex);
+  const deloadSug = modes.deload && ex.entries.length ? computeSuggestion(ex, name) : null;
+  const setsDefault = deloadSug && deloadSug.deloadWeek ? deloadSug.sets : 3;
   if(ex.trackBy === "weight"){
     html += `<div class="field"><label>Weight</label><input type="number" inputmode="decimal" id="f-weight"></div>`;
-    html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="3"></div>`;
+    html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   } else if(ex.trackBy === "duration"){
     html += `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="f-minutes"></div>`;
@@ -2111,7 +2176,7 @@ function renderForm(name, ex){
     if(ex.trackSpeed) html += `<div class="field"><label>MPH</label><input type="number" inputmode="decimal" step="0.1" id="f-speed"></div>`;
     if(ex.trackIncline) html += `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="f-incline"></div>`;
   } else {
-    html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="3"></div>`;
+    html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   }
   html += `</div>`;
@@ -2584,13 +2649,14 @@ function compactEntry(e, ex){
   let s = `${e.date} ${formatEntryValue(e, ex)}`;
   if(e.difficulty) s += ` @${e.difficulty}`;
   if(e.note) s += ` "${String(e.note).slice(0, 100)}"`;
+  if(e.deload) s += " [deload]";
   return s;
 }
 function describeSuggestion(ex, name){
   const s = computeSuggestion(ex, name);
   if(!s) return null;
   if(ex.trackBy === "weight"){
-    const why = s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
+    const why = s.deloadWeek ? "deload week" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
       : s.noteConcern ? "hold, note flagged" : s.difficultyNote === "hard" ? "hold, last RPE high" : "hold";
     return `${s.weight} lb ${s.sets}x${s.reps} (${why})`;
   }
@@ -2679,7 +2745,7 @@ function buildSessionCoachPayload(date){
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
   const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
-  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), exercises, patterns: patternSummary(date) };
+  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), exercises, patterns: patternSummary(date) };
 }
 
 // The past week plus 6 weeks of history per lift, enough to judge loading blocks and deloads.
@@ -2695,7 +2761,7 @@ function buildWeeklyCoachPayload(){
     recent.forEach(e => sessionDates.add(e.date));
     exercises.push({ name, entries: recent.map(e => compactEntry(e, ex)), appSuggestion: describeSuggestion(ex, name), trend: liftTrend(name, ex, weekEnd) });
   });
-  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), sessionDates: [...sessionDates].sort(), exercises, patterns: patternSummary(weekEnd) };
+  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), exercises, patterns: patternSummary(weekEnd) };
 }
 
 async function generateCoach(kind){
@@ -2847,6 +2913,55 @@ function renderLastSessionBreakdown(){
   return html;
 }
 
+// Last deload and when the next one is due. With no deload on record, the
+// clock starts at the first logged session.
+function deloadStatus(){
+  let firstDate = null;
+  Object.values(data).forEach(ex => {
+    if(ex.trackBy === "checklist") return;
+    ex.entries.forEach(e => { if(e.date && (!firstDate || e.date < firstDate)) firstDate = e.date; });
+  });
+  const anchor = modes.deload ? null : (deloadDates.endedOn || firstDate);
+  const nextDue = anchor ? shiftISO(anchor, DELOAD_EVERY_DAYS) : null;
+  return {
+    on: !!modes.deload,
+    startedOn: deloadDates.startedOn || null,
+    endedOn: deloadDates.endedOn || null,
+    nextDue,
+    daysUntilDue: nextDue ? daysBetween(todayISO(), nextDue) : null,
+  };
+}
+
+function fmtShortDate(iso){
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function renderDeloadModifier(){
+  const st = deloadStatus();
+  let last, next;
+  if(st.on){
+    const days = daysBetween(st.startedOn, todayISO()) + 1;
+    last = `On since ${fmtShortDate(st.startedOn)} (day ${days}). A deload usually runs about a week.`;
+    next = `Next one: about 5 weeks after you switch this off.`;
+  } else {
+    last = st.startedOn ? `Last deload: ${fmtShortDate(st.startedOn)} to ${fmtShortDate(st.endedOn || st.startedOn)}.` : `No deload logged yet.`;
+    if(!st.nextDue) next = `Next recommended: after about 5 weeks of steady training.`;
+    else if(st.daysUntilDue > 0) next = `Next recommended: ${fmtShortDate(st.nextDue)} (in ${st.daysUntilDue} day${st.daysUntilDue === 1 ? "" : "s"}).`;
+    else if(st.daysUntilDue === 0) next = `Next recommended: today.`;
+    else next = `Next recommended: ${fmtShortDate(st.nextDue)} - <b>due now</b>, ${-st.daysUntilDue} day${st.daysUntilDue === -1 ? "" : "s"} overdue.`;
+  }
+  return `<div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
+      <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.4rem;">
+        🔋 A planned lighter week to let joints and tendons catch up and avoid injury: about 10% less weight and a third fewer sets on every lift. Overrides Ski and Preseason targets. Lifts already cut for Knee or Back Care keep that weight and just lose sets. When you switch it off, suggestions pick back up from your pre-deload weights.
+      </p>
+      <div class="deload-line" id="deload-status">${last}<br>${next}</div>
+      <button class="tool-btn" onclick="toggleMode('deload')" style="background:${modes.deload ? 'var(--deload)' : ''};color:${modes.deload ? 'var(--deload-on-text)' : ''};border-color:${modes.deload ? 'var(--deload)' : ''};">
+        ${modes.deload ? '🔋 Deload Week: ON' : '🔋 Deload Week: OFF'}
+      </button>
+    </div>`;
+}
+
 function renderOverview(){
   const app = document.getElementById("app");
   const overviewData = Object.entries(data).map(([name, ex]) => {
@@ -2866,7 +2981,7 @@ function renderOverview(){
   const declining = overviewData.filter(o=>o.pct<0).length;
 
   const dayAgg = ["full","upper","lower"].map(day => {
-    const names = DAY_ORDER[day];
+    const names = activeDayOrder(day);
     const relevant = overviewData.filter(o => names.includes(o.name));
     const avg = relevant.length ? relevant.reduce((s,o)=>s+o.pct,0)/relevant.length : null;
     return { day, title: DAY_TITLES[day], avg, count: relevant.length, total: names.length };
@@ -2970,6 +3085,7 @@ function renderOverview(){
 
   html += `<div class="card">
     <h3 class="section">Training Modifiers</h3>
+    ${renderDeloadModifier()}
     <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
         🎿 Squat, Bulgarian Split Squat, and Walking Lunge shift to lower rep targets with a slower eccentric tempo and more single-leg emphasis. Roughly Nov-March.
@@ -2980,7 +3096,7 @@ function renderOverview(){
     </div>
     <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
-        🏔️ Adds power/explosive, frontal plane, eccentric quad, and loaded calf accessories to your existing Full/Upper/Lower days for the ~7-10 week ramp into ski season. Independent of Ski Season mode above - run either or both. Power work goes first in the session, after warmup and before the heavy lifts; stop a power set the moment speed drops, it's not conditioning.
+        🏔️ Adds power/explosive, frontal plane, eccentric quad, and loaded calf accessories (hidden while this is off) to your existing Full/Upper/Lower days for the ~7-10 week ramp into ski season. Independent of Ski Season mode above - run either or both. Power work goes first in the session, after warmup and before the heavy lifts; stop a power set the moment speed drops, it's not conditioning.
       </p>
       <button class="tool-btn" onclick="toggleMode('preseason')" style="background:${modes.preseason ? 'var(--preseason)' : ''};color:${modes.preseason ? '#fff' : ''};border-color:${modes.preseason ? 'var(--preseason)' : ''};">
         ${modes.preseason ? '🏔️ Preseason Prep: ON' : '🏔️ Preseason Prep: OFF'}
@@ -3147,6 +3263,7 @@ function logEntry(){
       note: (noteEl.value || "").trim(),
     };
   }
+  if(modes.deload && ex.trackBy !== "duration") entry.deload = true;
   ex.entries.push(entry);
   persist();
   enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: selected, clientId: entry.clientId } });

@@ -521,10 +521,11 @@ async function main(){
 
   console.log('=== 26: core-workout-complete banner fires once all NUMBERED Full Body exercises are logged today, ignores custom exercises ===');
   await page.click('.tab:has-text("Full Body")');
-  // Every exercise in DAY_ORDER.full is required, regardless of any modifier
-  // toggle (preseason, ski season, knee/back care) - those only reorder pills
-  // or adjust prescriptions, they never add/remove exercises from the day.
-  const fullBodyCore = ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Kettlebell Swings","Seated Calf Raise"];
+  // Every numbered lift shown for the day is required. Ski and care modes
+  // never change that list; preseason-only lifts join it only while
+  // Preseason Prep is on (it's off here, so Seated Calf Raise is hidden).
+  const fullBodyCore = await page.evaluate(() => activeDayOrder('full'));
+  if(fullBodyCore.includes('Seated Calf Raise')) throw new Error('expected preseason-only Seated Calf Raise to be hidden while Preseason Prep is off');
   for(const exName of fullBodyCore){
     const escaped = exName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     await page.locator('.pill').filter({ hasText: new RegExp('^\\d+\\.\\s*' + escaped) }).click();
@@ -1341,7 +1342,7 @@ async function main(){
   const expectedOrder = [
     ["Farmer's Carry", 'cat-strength'], ['Dead Hang', 'cat-strength'],
     ['Zone 2 Ride', 'cat-cardio'], ['Incline Treadmill Walk', 'cat-cardio'],
-    ['5-Minute Core Routine', 'cat-core'], ['Copenhagen Plank', 'cat-core'],
+    ['5-Minute Core Routine', 'cat-core'],
     ['Thoracic Spine Stretch', 'cat-stretch'], ['Hip Stretch', 'cat-stretch'],
     ['Leg Stretch', 'cat-stretch'], ['Full Body Stretch', 'cat-stretch'],
   ];
@@ -1350,6 +1351,7 @@ async function main(){
     if(actualName !== name) throw new Error(`expected Extra pill ${i} to be "${name}", got: ${JSON.stringify(extraPills[i])}`);
     if(!extraPills[i].classes.includes(cls)) throw new Error(`expected "${name}" pill to carry class "${cls}", got: ${extraPills[i].classes}`);
   });
+  if(extraPills.some(p => p.text.startsWith('Copenhagen Plank'))) throw new Error('expected preseason-only Copenhagen Plank to be hidden while Preseason Prep is off');
   console.log('OK: Extra pills are ordered strength, cardio, core, stretch and each carries its category class');
 
   console.log('=== 57: logging with a required field empty flashes that field red instead of silently doing nothing ===');
@@ -1488,7 +1490,7 @@ async function main(){
 
   await page.click('.tab:has-text("Upper Body")');
   await sleep(150);
-  const upperList = await page.evaluate(() => DAY_ORDER.upper);
+  const upperList = await page.evaluate(() => activeDayOrder('upper'));
   if(upperList.includes("Farmer's Carry")) throw new Error('expected Farmer\'s Carry to no longer be required on Upper Body');
   for(const name of upperList){
     await page.locator('.pill').filter({ hasText: new RegExp('\\.\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($| )') }).first().click();
@@ -1499,12 +1501,16 @@ async function main(){
   await sleep(200);
   let upperLowerBannerHidden = await page.evaluate(() => document.getElementById('celebration-banner').hidden);
   let upperLowerBannerText = await page.evaluate(() => document.getElementById('celebration-banner').textContent);
-  if(upperLowerBannerHidden || !upperLowerBannerText.includes('Upper Body complete')) throw new Error('expected the Upper Body celebration banner to fire once every current Upper Body exercise is logged, got hidden=' + upperLowerBannerHidden + ' text=' + upperLowerBannerText);
+  // Earlier scenarios already logged most of these lifts today, so the banner
+  // can fire partway through the loop and fade out before this check. What
+  // must hold is that the day was celebrated, and any visible banner names it.
+  let celebrated = await page.evaluate(() => celebratedToday.upper === todayISO());
+  if(!celebrated || (!upperLowerBannerHidden && !upperLowerBannerText.includes('Upper Body complete'))) throw new Error('expected the Upper Body celebration to fire once every current Upper Body exercise is logged, got celebrated=' + celebrated + ' hidden=' + upperLowerBannerHidden + ' text=' + upperLowerBannerText);
   console.log('OK: Upper Body banner fires with its current (Farmer\'s-Carry-free) exercise list');
 
   await page.click('.tab:has-text("Lower Body")');
   await sleep(150);
-  const lowerList = await page.evaluate(() => DAY_ORDER.lower);
+  const lowerList = await page.evaluate(() => activeDayOrder('lower'));
   for(const name of lowerList){
     await page.locator('.pill').filter({ hasText: new RegExp('\\.\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($| )') }).first().click();
     await sleep(80);
@@ -1514,7 +1520,8 @@ async function main(){
   await sleep(200);
   upperLowerBannerHidden = await page.evaluate(() => document.getElementById('celebration-banner').hidden);
   upperLowerBannerText = await page.evaluate(() => document.getElementById('celebration-banner').textContent);
-  if(upperLowerBannerHidden || !upperLowerBannerText.includes('Lower Body complete')) throw new Error('expected the Lower Body celebration banner to fire once every Lower Body exercise is logged, got hidden=' + upperLowerBannerHidden + ' text=' + upperLowerBannerText);
+  celebrated = await page.evaluate(() => celebratedToday.lower === todayISO());
+  if(!celebrated || (!upperLowerBannerHidden && !upperLowerBannerText.includes('Lower Body complete'))) throw new Error('expected the Lower Body celebration to fire once every Lower Body exercise is logged, got celebrated=' + celebrated + ' hidden=' + upperLowerBannerHidden + ' text=' + upperLowerBannerText);
   console.log('OK: Lower Body banner fires too - all three main muscle-group days confirmed working');
 
   console.log('=== 62: AI breakdowns sync to the ai_breakdowns table and restore onto a wiped phone ===');
@@ -1591,6 +1598,70 @@ async function main(){
   if(await page.locator('text=Mock weekly verdict.').count() !== 0) throw new Error('expected tapping the button again to collapse the panel');
   if(aiBreakdownCallCount !== callsBeforeWeekly + 1) throw new Error('expected reload to reuse the cached check-in, not call the function again');
   console.log('OK: weekly check-in generates on its own button, syncs as kind "weekly", and stays cached for the week');
+
+  console.log('=== 64: preseason-only lifts hide when Preseason Prep is off; Deload Week sits first and overlays the other modifiers ===');
+  await page.click('.tab:has-text("Lower Body")');
+  await sleep(150);
+  const lowerPillsOff = await page.evaluate(() => [...document.querySelectorAll('.pill-row .pill:not(.pill-add)')].map(p => p.textContent));
+  if(lowerPillsOff.some(t => /Box Jumps|Trap Bar Jump|Skater Bound|Spanish Squat|Lateral Lunge/.test(t))) throw new Error('expected preseason-only lifts hidden with Preseason Prep off, got: ' + lowerPillsOff.join(' | '));
+  await page.evaluate(() => toggleMode('preseason'));
+  await sleep(150);
+  const lowerPillsOn = await page.evaluate(() => [...document.querySelectorAll('.pill-row .pill:not(.pill-add)')].map(p => p.textContent));
+  if(!lowerPillsOn.some(t => t.includes('Box Jumps'))) throw new Error('expected preseason-only lifts to appear once Preseason Prep is on');
+  await page.evaluate(() => toggleMode('preseason'));
+  await sleep(150);
+  console.log('OK: preseason-only lifts appear and disappear with the Preseason Prep toggle');
+
+  await page.click('.tab:has-text("Overview")');
+  await sleep(150);
+  const modOrder = await page.evaluate(() => {
+    const card = [...document.querySelectorAll('.card')].find(c => c.textContent.includes('Training Modifiers'));
+    const t = card.textContent;
+    return { deload: t.indexOf('Deload Week'), ski: t.indexOf('Ski Season'), status: document.getElementById('deload-status').textContent };
+  });
+  if(modOrder.deload < 0 || modOrder.deload > modOrder.ski) throw new Error('expected Deload Week to be the first modifier, got: ' + JSON.stringify(modOrder));
+  if(!/No deload logged yet/.test(modOrder.status) || !/Next recommended/.test(modOrder.status)) throw new Error('expected deload status to show no prior deload and a next recommended date, got: ' + modOrder.status);
+
+  const before = await page.evaluate(() => {
+    const ex = data['Bench Press']; const last = ex.entries[ex.entries.length - 1];
+    return { lastWeight: last.weight, lastSets: last.sets };
+  });
+  await page.click('button:has-text("Deload Week: OFF")');
+  await sleep(150);
+  const onStatus = await page.textContent('#deload-status');
+  if(!/On since/.test(onStatus)) throw new Error('expected the status to show when the deload started, got: ' + onStatus);
+  const deloadSug = await page.evaluate(() => computeSuggestion(data['Bench Press'], 'Bench Press'));
+  const expectedW = Math.round(before.lastWeight * 0.9 / 2.5) * 2.5;
+  if(!deloadSug.deloadWeek || deloadSug.weight !== expectedW || deloadSug.sets >= before.lastSets) throw new Error('expected ~10% lighter and fewer sets in deload, got: ' + JSON.stringify(deloadSug) + ' from ' + JSON.stringify(before));
+  const kneeWasOn = await page.evaluate(() => modes.knee);
+  if(!kneeWasOn) await page.evaluate(() => { toggleMode('knee'); });
+  const careSug = await page.evaluate(() => {
+    const normal = (() => { const m = modes.deload; modes.deload = false; const r = computeSuggestion(data['Squat'], 'Squat'); modes.deload = m; return r; })();
+    return { normal, deload: computeSuggestion(data['Squat'], 'Squat') };
+  });
+  if(!careSug.normal.careFlags || !careSug.deload.deloadKeptReduction || careSug.deload.weight !== careSug.normal.weight) throw new Error('expected a knee-care lift to keep its care weight under deload instead of a second cut, got: ' + JSON.stringify(careSug));
+  if(!kneeWasOn) await page.evaluate(() => { toggleMode('knee'); });
+
+  await page.click('.tab:has-text("Full Body")');
+  await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
+  await sleep(100);
+  if(await page.locator('.ex-name .deload-badge').count() !== 1) throw new Error('expected a Deload badge on the exercise card');
+  await page.fill('#f-weight', String(expectedW));
+  await page.fill('#f-sets', '2');
+  await page.fill('#f-reps', '8');
+  await page.click('button.log:has-text("Log set")');
+  await sleep(150);
+  await page.click('.tab:has-text("Overview")');
+  await page.click('button:has-text("Deload Week: ON")');
+  await sleep(150);
+  const afterSug = await page.evaluate(() => computeSuggestion(data['Bench Press'], 'Bench Press'));
+  if(afterSug.deloadWeek || afterSug.weight < before.lastWeight) throw new Error('expected progression to resume from the pre-deload weight after switching deload off, got: ' + JSON.stringify(afterSug));
+  const offStatus = await page.textContent('#deload-status');
+  if(!/Last deload:/.test(offStatus) || !/Next recommended: .*in \d+ day/.test(offStatus)) throw new Error('expected the last deload and the next due date after switching it off, got: ' + offStatus);
+  await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'deload settings sync');
+  const settingsRow = await page.evaluate(() => (JSON.parse(sessionStorage.getItem('__mock_supabase_db__')).user_settings || [])[0]);
+  if(!settingsRow || !settingsRow.deload_started_on || !settingsRow.deload_ended_on || settingsRow.deload_mode !== false) throw new Error('expected deload dates synced to user_settings, got: ' + JSON.stringify(settingsRow));
+  console.log('OK: Deload Week is first, cuts load and sets, respects care-mode cuts, skips deload sessions afterward, and syncs its dates');
 
   console.log('\nALL SCENARIOS PASSED');
   await browser.close();
