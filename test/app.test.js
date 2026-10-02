@@ -1787,7 +1787,39 @@ async function main(){
   if(storage.after.includes("Couldn't save")) throw new Error('expected the warning to clear once a save succeeds, got: ' + storage.after);
   console.log('OK: a refused local save shows "Couldn\'t save on this phone" and clears on the next good save');
 
-  console.log('=== 69: the page, stylesheet and every script load with matching versions and no page errors ===');
+  console.log('=== 69: with a modifier changing a lift\'s numbers, the log form starts on today\'s plan ===');
+  await page.evaluate(() => { MODE_DEFS.forEach(m => { if(modes[m.key]) toggleMode(m.key); }); });
+  await page.click('.tab:has-text("Full Body")');
+  const readForm = () => page.evaluate(() => ({
+    weight: document.getElementById('f-weight') && document.getElementById('f-weight').value,
+    sets: document.getElementById('f-sets') && document.getElementById('f-sets').value,
+    reps: document.getElementById('f-reps') && document.getElementById('f-reps').value,
+    note: (document.querySelector('.prefill-note') || {}).textContent || '',
+  }));
+  const planFor = name => page.evaluate(n => { const s = computeSuggestion(data[n], n); return { weight: String(s.weight), sets: String(s.sets), reps: String(s.reps) }; }, name);
+  await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
+  await sleep(100);
+  const plain = await readForm();
+  if(plain.weight !== '' || plain.note) throw new Error('expected no pre-fill with every modifier off, got: ' + JSON.stringify(plain));
+  await page.evaluate(() => toggleMode('knee'));
+  await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
+  await sleep(100);
+  const knee = await readForm(), kneePlan = await planFor('Squat');
+  if(knee.weight !== kneePlan.weight || knee.sets !== kneePlan.sets || knee.reps !== kneePlan.reps || !knee.note.includes('Knee Care')) throw new Error('expected Knee Care to pre-fill Squat with its plan ' + JSON.stringify(kneePlan) + ', got: ' + JSON.stringify(knee));
+  await page.evaluate(() => toggleMode('deload'));
+  await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
+  await sleep(100);
+  const both = await readForm(), bothPlan = await planFor('Squat');
+  if(both.weight !== bothPlan.weight || both.sets !== bothPlan.sets || both.reps !== bothPlan.reps || !both.note.includes('Deload Week, Knee Care')) throw new Error('expected Deload plus Knee Care to pre-fill the combined plan ' + JSON.stringify(bothPlan) + ', got: ' + JSON.stringify(both));
+  await page.evaluate(() => toggleMode('deload'));
+  await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
+  await sleep(100);
+  const bench = await readForm();
+  if(bench.weight !== '' || bench.note) throw new Error('expected Knee Care to leave Bench Press (not knee-flagged) un-filled, got: ' + JSON.stringify(bench));
+  await page.evaluate(() => toggleMode('knee'));
+  console.log('OK: Knee Care and Deload pre-fill weight, sets and reps with the plan and say so; unaffected lifts and no-modifier days stay as before');
+
+  console.log('=== 70: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
     srcs: [...document.querySelectorAll('script[src^="js/"], link[rel="stylesheet"][href^="styles"]')].map(e => e.getAttribute('src') || e.getAttribute('href')),

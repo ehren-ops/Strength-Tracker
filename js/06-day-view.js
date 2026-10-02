@@ -196,6 +196,19 @@ function renderChecklistCard(name, ex){
   return html;
 }
 
+// Modifiers that change this lift's numbers for today (weight, sets or reps), by display name.
+// Preseason only counts where it shifts the reps; elsewhere it adds notes, not numbers.
+function planModifiers(name, ex){
+  if(ex.trackBy === "duration" || ex.trackBy === "checklist") return [];
+  const on = [];
+  if(modes.deload) on.push("Deload Week");
+  if(modes.ski && ex.targetRepsSki) on.push("Ski Season");
+  if(modes.preseason && ex.preseason && ex.targetRepsPreseason) on.push("Preseason Prep");
+  if(modes.knee && KNEE_SENSITIVE_EXERCISES.has(name)) on.push("Knee Care");
+  if(modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name)) on.push("Low Back Care");
+  return on;
+}
+
 function renderExerciseCard(name, ex){
   if(ex.trackBy === "checklist") return renderChecklistCard(name, ex);
   const hasEntries = ex.entries.length > 0;
@@ -515,11 +528,20 @@ function renderForm(name, ex){
     html += `</div>`;
   }
   html += `<div class="form-row">`;
-  const repsDefault = (ex.autoloadLastReps && ex.entries.length) ? ex.entries[ex.entries.length - 1].reps : effectiveTargetReps(ex);
-  const deloadSug = modes.deload && ex.entries.length ? computeSuggestion(ex, name) : null;
-  const setsDefault = deloadSug && deloadSug.deloadWeek ? deloadSug.sets : 3;
+  // With a modifier changing today's numbers, the form starts on the session's recommendation so
+  // logging it as prescribed takes one tap. Otherwise weight starts blank, as before.
+  const mods = planModifiers(name, ex);
+  const plan = mods.length && ex.entries.length ? computeSuggestion(ex, name) : null;
+  let repsDefault = (ex.autoloadLastReps && ex.entries.length) ? ex.entries[ex.entries.length - 1].reps : effectiveTargetReps(ex);
+  let setsDefault = 3;
+  let weightDefault = "";
+  if(plan){
+    if(plan.sets != null) setsDefault = plan.sets;
+    if(plan.reps != null) repsDefault = plan.reps;
+    if(ex.trackBy === "weight" && plan.weight != null) weightDefault = plan.weight;
+  }
   if(ex.trackBy === "weight"){
-    html += `<div class="field"><label>Weight</label><input type="number" inputmode="decimal" id="f-weight"></div>`;
+    html += `<div class="field"><label>Weight</label><input type="number" inputmode="decimal" id="f-weight" value="${weightDefault}"></div>`;
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   } else if(ex.trackBy === "duration"){
@@ -532,6 +554,7 @@ function renderForm(name, ex){
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   }
   html += `</div>`;
+  if(plan) html += `<p class="prefill-note">Pre-filled with today's plan (${mods.join(", ")}).</p>`;
   html += `<div class="form-row">
     <div class="field" style="flex:0 0 68px;"><label>RPE / 10</label><input type="number" inputmode="numeric" id="f-difficulty" min="1" max="10" value="7"></div>
     <div class="field" style="flex:1 1 140px;"><label>Note</label><input type="text" id="f-note" placeholder="${ex.trackBy==='duration' ? 'e.g. easy spin' : 'e.g. felt heavy'}"></div>

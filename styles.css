@@ -123,6 +123,7 @@
   .action-btn-spacer{background:none;border:1.5px solid transparent;color:transparent;font-size:0.72rem;font-weight:600;padding:0.4rem 0.5rem;border-radius:7px;visibility:hidden;pointer-events:none;}
   svg.chart{width:100%;height:150px;display:block;margin-top:0.6rem;}
   .form-row{display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;}
+  .prefill-note{font-size:0.7rem;color:var(--slate);margin:0.35rem 0 0;}
   .field{flex:1 1 60px;}
   .field label{display:block;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);margin-bottom:0.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .field input{width:100%;padding:0.45rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--ink);}
