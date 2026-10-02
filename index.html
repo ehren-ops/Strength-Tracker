@@ -34,7 +34,7 @@
     --cat-cardio:#C2447D; --cat-cardio-bg:#FBEAF2; --cat-cardio-border:#F0C4DC; --cat-cardio-text:#8C2F5C;
     --cat-core:#1B8A7A; --cat-core-bg:#E3F5F2; --cat-core-border:#B8E3DC; --cat-core-text:#0F5C51;
     --cat-stretch:#6B8E4E; --cat-stretch-bg:#EEF3E6; --cat-stretch-border:#CFE0BB; --cat-stretch-text:#4A6134;
-    --ai-bg:#EEF0FD; --ai-border:#C9CDF3; --ai-text:#33378F; --ai-accent:#5357CF;
+    --ai-bg:#E6EEE3; --ai-border:#B9CCB4; --ai-text:#1F3A2A; --ai-accent:#0F6B4A;
     --font-display:'Fjalla One',sans-serif; --font-body:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
   }
   :root[data-theme="dark"]{
@@ -174,12 +174,12 @@
   .bar-fill{height:100%;border-radius:3px;}
   .save-note{text-align:center;font-size:0.7rem;color:var(--slate);margin-top:1rem;}
   h3.section{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);margin:0 0 0.6rem;}
-  .coach-head{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.45rem;align-items:stretch;margin-bottom:0.6rem;}
-  .coach-head h3.section{margin:0;align-self:center;}
-  .ai-btn{background:var(--ai-bg);border:1px solid var(--ai-border);color:var(--ai-text);border-radius:8px;padding:0.35rem 0.3rem;font-size:0.72rem;font-weight:600;line-height:1.2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.1rem;text-align:center;font-family:inherit;}
+  .coach-head{display:flex;align-items:center;justify-content:space-between;gap:0.3rem;margin-bottom:0.6rem;}
+  .coach-head h3.section{margin:0;white-space:nowrap;}
+  .ai-btn{background:var(--ai-bg);border:1px solid var(--ai-border);color:var(--ai-text);border-radius:999px;padding:0.2rem 0.45rem;font-size:0.64rem;font-weight:600;line-height:1.2;cursor:pointer;display:inline-flex;align-items:center;gap:0.2rem;flex-shrink:0;white-space:nowrap;font-family:inherit;}
   .ai-btn.open{box-shadow:inset 0 0 0 1px var(--ai-accent);}
   .ai-btn:disabled{opacity:0.6;cursor:default;}
-  .ai-tag{font-size:0.58rem;letter-spacing:0.06em;text-transform:uppercase;font-weight:700;color:var(--ai-accent);}
+  .ai-tag{font-size:0.6rem;letter-spacing:0.04em;font-weight:700;color:var(--ai-accent);}
   .ai-panel{margin-top:0.6rem;background:var(--ai-bg);border:1px solid var(--ai-border);border-radius:8px;padding:0.55rem 0.7rem;}
   .ai-panel-head{cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--ai-text);font-weight:600;}
   .ai-panel-head .ai-toggle{color:var(--ai-accent);white-space:nowrap;}
@@ -2731,6 +2731,7 @@ function currentCheckinKey(){
 }
 
 const COACH_LABELS = { session: "Session Breakdown", weekly: "Weekly Check-in" };
+const COACH_SHORT = { session: "Session", weekly: "Weekly" };
 function coachKey(kind){ return kind === "weekly" ? currentCheckinKey() : getLastSessionDate(); }
 
 // Header-row button: generates the first time, then opens and closes the panel below.
@@ -2746,7 +2747,7 @@ function renderCoachButton(kind){
   const loading = !!coachLoading[kind];
   return `<button class="ai-btn${open ? " open" : ""}" onclick="onCoachButton('${kind}')" ${loading ? "disabled" : ""}>
     <span class="ai-tag">✨ AI</span>
-    <span>${loading ? "Generating…" : COACH_LABELS[kind]}</span>
+    <span>${loading ? "Working…" : COACH_SHORT[kind]}</span>
   </button>`;
 }
 
@@ -2770,7 +2771,7 @@ function renderCoachPanel(kind){
     html += `<div style="margin-top:0.4rem;">
       <p style="font-size:0.85rem;line-height:1.5;color:var(--ink);margin:0;font-weight:600;">${escapeHtml(String(cached.verdict || ""))}</p>
       ${cached.sections.map(s => renderAiBreakdownList(s.title, s.items)).join("")}
-      <button class="ai-btn" style="margin-top:0.6rem;flex-direction:row;padding:0.35rem 0.7rem;" onclick="generateCoach('${kind}')" ${loading ? "disabled" : ""}>
+      <button class="ai-btn" style="margin-top:0.6rem;" onclick="generateCoach('${kind}')" ${loading ? "disabled" : ""}>
         ${loading ? "Regenerating…" : "↻ Regenerate"}
       </button>
     </div>`;

@@ -1421,9 +1421,9 @@ async function main(){
   console.log('=== 59: Session Breakdown button generates once, then stays cached and collapsible ===');
   await page.click('.tab:has-text("Overview")');
   await sleep(150);
-  if(await page.locator('button:has-text("Session Breakdown")').count() !== 1) throw new Error('expected a Session Breakdown button in Coach\'s Notes before any breakdown is generated');
-  if(await page.locator('button:has-text("Weekly Check-in")').count() !== 1) throw new Error('expected a separate Weekly Check-in button in Coach\'s Notes');
-  await page.click('button:has-text("Session Breakdown")');
+  if(await page.locator('.coach-head .ai-btn:has-text("Session")').count() !== 1) throw new Error('expected a Session Breakdown button in Coach\'s Notes before any breakdown is generated');
+  if(await page.locator('.coach-head .ai-btn:has-text("Weekly")').count() !== 1) throw new Error('expected a separate Weekly Check-in button in Coach\'s Notes');
+  await page.click('.coach-head .ai-btn:has-text("Session")');
   await waitForText(page, '.card', t => t.includes('Mock breakdown headline'), 5000, 'AI breakdown generation');
   if(await page.locator('text=Mock recovery item.').count() !== 1) throw new Error('expected the recovery item to render');
   if(await page.locator('text=Mock improve item.').count() !== 1) throw new Error('expected the how-to-improve item to render');
@@ -1551,7 +1551,7 @@ async function main(){
   await page.click('.tab:has-text("Overview")');
   await sleep(150);
   const callsBeforeWeekly = aiBreakdownCallCount;
-  await page.click('button:has-text("Weekly Check-in")');
+  await page.click('.coach-head .ai-btn:has-text("Weekly")');
   await waitForText(page, 'body', t => t.includes('Mock weekly verdict.'), 5000, 'weekly check-in generation');
   if(aiBreakdownCallCount !== callsBeforeWeekly + 1) throw new Error('expected exactly one coach call for the weekly check-in');
   const weeklyReq = coachRequests[coachRequests.length - 1];
@@ -1571,11 +1571,17 @@ async function main(){
     const row = document.querySelector('.coach-head');
     return row ? [...row.children].map(c => c.textContent.replace(/\s+/g, ' ').trim()) : [];
   });
-  if(headRow.length !== 3 || !/Coach's Notes/i.test(headRow[0]) || !/AI.*Session Breakdown/.test(headRow[1]) || !/AI.*Weekly Check-in/.test(headRow[2])) throw new Error('expected Coach\'s Notes and both AI buttons in one header row, got: ' + JSON.stringify(headRow));
-  await page.click('.ai-btn:has-text("Weekly Check-in")');
+  if(headRow.length !== 3 || !/Coach's Notes/i.test(headRow[0]) || !/AI Session$/.test(headRow[1]) || !/AI Weekly$/.test(headRow[2])) throw new Error('expected Coach\'s Notes and both AI buttons in one header row, got: ' + JSON.stringify(headRow));
+  const headBox = await page.evaluate(() => {
+    const row = document.querySelector('.coach-head');
+    const kids = [...row.children].map(c => c.getBoundingClientRect());
+    return { rowW: row.getBoundingClientRect().width, tops: kids.map(k => Math.round(k.top)), heights: kids.map(k => Math.round(k.height)), right: Math.round(Math.max(...kids.map(k => k.right)) - row.getBoundingClientRect().right) };
+  });
+  if(Math.max(...headBox.heights) > 30 || headBox.right > 1) throw new Error('expected the title and both AI buttons to fit on one line inside the card, got: ' + JSON.stringify(headBox));
+  await page.click('.coach-head .ai-btn:has-text("Weekly")');
   await sleep(150);
   if(await page.locator('text=Mock weekly verdict.').count() !== 1) throw new Error('expected tapping the Weekly Check-in button to open the cached panel');
-  await page.click('.ai-btn:has-text("Weekly Check-in")');
+  await page.click('.coach-head .ai-btn:has-text("Weekly")');
   await sleep(150);
   if(await page.locator('text=Mock weekly verdict.').count() !== 0) throw new Error('expected tapping the button again to collapse the panel');
   if(aiBreakdownCallCount !== callsBeforeWeekly + 1) throw new Error('expected reload to reuse the cached check-in, not call the function again');
