@@ -1883,9 +1883,9 @@ async function main(){
   });
   if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lbs\/hand 3x8\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
   if(!sides.squat.labels.includes('Lb total') || !/lbs total 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
-  if(!sides.fly.labels.includes('Lb / side')) throw new Error('expected Cable Chest Fly labeled per side, got: ' + JSON.stringify(sides.fly));
+  if(!sides.fly.labels.includes('Lb / hand')) throw new Error('expected Cable Chest Fly labeled per hand (each stack), got: ' + JSON.stringify(sides.fly));
   if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
-  console.log('OK: Bulgarian Split Squat reads lb/hand and reps/leg, Squat lb total, Cable Chest Fly lb/side, Copenhagen Plank seconds/side');
+  console.log('OK: Bulgarian Split Squat reads lb/hand and reps/leg, Squat lb total, Cable Chest Fly lb/hand, Copenhagen Plank seconds/side');
 
   console.log('=== 72: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

@@ -123,8 +123,8 @@ const EXERCISE_TIPS = {
 };
 
 // What the logged numbers mean, so a one-arm or one-leg lift is never ambiguous. weight: "hand"
-// (each dumbbell or handle), "side" (each stack of a two-stack cable) or "total" (bar, stack, bell,
-// ball or a single dumbbell held in both hands). reps: "leg" or "side" for one-sided work, else
+// (each dumbbell, or each cable stack on a two-handle fly) or "total" (bar, stack, bell, ball, a
+// single dumbbell held in both hands, or both dumbbells added together, as on calf raises). reps: "leg" or "side" for one-sided work, else
 // "total". Anything not listed is total for both. Shown on the form labels, the Next line, the big
 // number, the history header and in the coach's data.
 const EXERCISE_SIDES = {
@@ -135,8 +135,7 @@ const EXERCISE_SIDES = {
   "Farmer's Carry": { weight: "hand" },
   "Bicep Curl": { weight: "hand" },
   "Lateral Raise": { weight: "hand" },
-  "Cable Chest Fly": { weight: "side" },
-  "Standing Calf Raise": { weight: "hand" },
+  "Cable Chest Fly": { weight: "hand" },
   "Skater Bound": { reps: "side" },
   "Copenhagen Plank": { reps: "side" },
 };
@@ -179,7 +178,7 @@ const EXERCISE_DEFAULTS = {
   "Back Extension": { trackBy: "weight", autoloadLastReps: true },
   "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb, keep building load." },
   "Kettlebell Swings": { maxWeight: 35, preseason: true, preseasonPower: true, preseasonNote: "Power: do this first. 4x10 at 35 lb; add reps, then go single-arm." },
-  "Standing Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15, loaded (DBs 45-95 lb or bar 115-225 lb)." },
+  "Standing Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15, loaded. Log the total: both dumbbells added together, or the bar." },
   "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down, never jump down; stop if speed drops. Gentler: slow 3 sec step-down." },
   "Med Ball Slam": { trackBy: "weight", targetReps: 6, preseason: true, preseasonPower: true, preseasonNote: "3x6, 10-15 lb. Stop if speed drops." },
   "Lateral Lunge": { trackBy: "weight", targetReps: 8, preseason: true, preseasonNote: "3x8 per side, bodyweight up to 30 lb DB." },
@@ -305,6 +304,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v50";
+const APP_VERSION = "v51";
 const APP_UPDATED = "Oct 2, 2026";
 
