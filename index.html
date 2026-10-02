@@ -2610,13 +2610,16 @@ const LIFT_PATTERNS = {
 };
 
 // Pre-computed trend signals, so the model reasons over patterns instead of re-reading raw logs.
-// e1RM is Epley (weight x (1 + reps/30)); it puts 135x6 and 135x8 on one scale.
+// e1RM is Epley (weight x (1 + reps/30)); it puts 135x6 and 135x8 on one scale. Timed holds
+// (unit "sec", like Farmer's Carry) log seconds in the reps field, so they get no e1RM and their
+// change is reported in seconds instead.
 function liftTrend(name, ex, asOf){
   if(ex.trackBy === "checklist" || ex.trackBy === "duration") return null;
   const es = ex.entries.filter(e => e.date <= asOf);
   if(!es.length) return null;
   const last = es[es.length - 1];
-  const e1 = e => (e.weight > 0 && e.reps) ? e.weight * (1 + e.reps / 30) : null;
+  const timed = ex.unit === "sec";
+  const e1 = e => (!timed && e.weight > 0 && e.reps) ? e.weight * (1 + e.reps / 30) : null;
   const since = shiftISO(asOf, -28);
   const recent = es.filter(e => e.date >= since);
   const base = recent.length > 1 ? recent[0] : null;
@@ -2631,7 +2634,7 @@ function liftTrend(name, ex, asOf){
     pattern: LIFT_PATTERNS[name] || "other",
     sessionsLast4Weeks: recent.length,
     e1rmChange4WeeksPct: a && b ? Math.round((b - a) / a * 1000) / 10 : null,
-    repsChange4Weeks: base && !(last.weight > 0) && base.reps != null && last.reps != null ? last.reps - base.reps : null,
+    [timed ? "secondsChange4Weeks" : "repsChange4Weeks"]: base && (timed || !(last.weight > 0)) && base.reps != null && last.reps != null ? last.reps - base.reps : null,
     sessionsAtCurrentLoad: atLoad,
     rpeAtCurrentLoad: rpeAtLoad,
   };
