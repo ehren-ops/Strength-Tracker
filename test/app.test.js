@@ -1896,7 +1896,7 @@ async function main(){
   if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
   console.log('OK: Bulgarian Split Squat reads lb/hand and reps/leg, Squat lb total, Cable Chest Fly lb/hand, Copenhagen Plank seconds/side');
 
-  console.log('=== 72: preseason extras never block the workout-complete popup, Preseason Prep on or off ===');
+  console.log('=== 72: preseason extras never block the workout-complete popup on any day, and shared lifts complete a day from any tab ===');
   const gate = await page.evaluate(() => {
     const saved = JSON.stringify(data), savedCeleb = JSON.stringify(celebratedToday), savedPre = modes.preseason;
     const t = todayISO();
@@ -1913,13 +1913,46 @@ async function main(){
       return celebratedToday.lower === t;
     };
     const out = { on: run(true), off: run(false) };
+    // Same for Upper and Full: main lifts alone complete the day.
+    ['upper', 'full'].forEach(day => {
+      data = JSON.parse(saved);
+      Object.keys(data).forEach(n => { data[n].entries = data[n].entries.filter(e => e.date !== t); });
+      DAY_ORDER[day].filter(n => !PRESEASON_ONLY.has(n)).forEach(n => {
+        (data[n] ||= newExerciseShell(n)).entries.push({ clientId: 'gate-' + day + n, date: t, weight: 50, sets: 3, reps: 8 });
+      });
+      if(!modes.preseason) toggleMode('preseason');
+      celebratedToday = {};
+      checkCoreWorkoutComplete(day);
+      dismissCelebration();
+      out[day] = celebratedToday[day] === t;
+    });
     data = JSON.parse(saved); celebratedToday = JSON.parse(savedCeleb);
     if(modes.preseason !== savedPre) toggleMode('preseason');
     render();
     return out;
   });
-  if(!gate.on || !gate.off) throw new Error('expected logging only the main Lower Body lifts to complete the day with Preseason Prep on and off, got: ' + JSON.stringify(gate));
-  console.log('OK: main lifts alone complete Lower Body; jumps, bounds and other preseason extras are optional');
+  if(!gate.on || !gate.off || !gate.upper || !gate.full) throw new Error('expected main lifts alone to complete Lower (Preseason on and off), Upper and Full, got: ' + JSON.stringify(gate));
+  console.log('OK: main lifts alone complete Lower, Upper and Full; preseason extras are optional');
+
+  // The last Upper lift logged from the Full Body tab still completes Upper.
+  const crossTab = await page.evaluate(() => {
+    const saved = JSON.stringify(data), savedCeleb = JSON.stringify(celebratedToday);
+    const t = todayISO();
+    Object.keys(data).forEach(n => { data[n].entries = data[n].entries.filter(e => e.date !== t); });
+    DAY_ORDER.upper.filter(n => !PRESEASON_ONLY.has(n) && n !== 'Bench Press').forEach(n => {
+      (data[n] ||= newExerciseShell(n)).entries.push({ clientId: 'x-' + n, date: t, weight: 50, sets: 3, reps: 8 });
+    });
+    celebratedToday = {};
+    view = 'full'; selected = 'Bench Press'; render();
+    document.getElementById('f-weight').value = '135';
+    logEntry();
+    const done = celebratedToday.upper === t;
+    dismissCelebration();
+    data = JSON.parse(saved); celebratedToday = JSON.parse(savedCeleb); persist(); render();
+    return done;
+  });
+  if(!crossTab) throw new Error('expected logging the last Upper Body lift from the Full Body tab to still complete Upper Body');
+  console.log('OK: finishing a day from another tab (shared lift) still fires that day\'s popup');
 
   console.log('=== 73: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

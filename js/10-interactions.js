@@ -97,7 +97,9 @@ function logEntry(){
   ex.entries.push(entry);
   persist();
   enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: selected, clientId: entry.clientId } });
-  checkCoreWorkoutComplete(view);
+  // Check every day this lift belongs to, not just the open tab: Upper and Full share lifts, so
+  // the last one of a day can be logged from the other tab.
+  ["full", "upper", "lower"].filter(d => d === view || DAY_ORDER[d].includes(selected)).forEach(checkCoreWorkoutComplete);
   render();
 
   const btn = document.querySelector(".log");
