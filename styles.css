@@ -113,13 +113,16 @@
   .onerm-edit{display:flex;align-items:center;gap:0.25rem;}
   .onerm-edit input{width:58px;padding:0.2rem 0.35rem;border:1px solid var(--line);border-radius:5px;font-size:0.85rem;background:var(--input-bg);color:var(--ink);}
   .rec-box{margin-top:0.5rem;background:var(--rec-bg);border:1px solid var(--amber-light);border-radius:8px;padding:0.45rem 0.65rem;color:var(--rec-text);
-    font-family:var(--font-body);box-sizing:border-box;height:6.1rem;overflow:hidden;display:flex;flex-direction:column;gap:0.15rem;}
+    font-family:var(--font-body);box-sizing:border-box;height:calc(5.31rem + 2px);overflow:hidden;display:flex;flex-direction:column;gap:0.15rem;}
   /* Fixed rows: one line, two lines, one line. Long text is clipped, never grows the tile. */
-  .rec-headline{font-size:0.86rem;font-weight:600;color:var(--rec-headline);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .rec-headline{display:flex;align-items:baseline;gap:0.5rem;font-size:0.86rem;font-weight:600;color:var(--rec-headline);line-height:1.35;white-space:nowrap;}
+  .rec-plan{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
   .rec-headline b{font-weight:700;}
-  .rec-rest{font-weight:500;}
-  .rec-desc{font-size:0.74rem;line-height:1.35;height:2.7em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
-  .rec-load{font-size:0.7rem;line-height:1.35;color:var(--slate);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:auto;}
+  .rec-rest{flex:0 0 auto;margin-left:auto;font-weight:500;font-size:0.76rem;}
+  .rec-desc{font-size:0.74rem;line-height:1.35;max-height:2.7em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .rec-load{font-size:0.7rem;line-height:1.35;color:var(--slate);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* plate-line marks barbell plate math (tests use it); keep the tile's body font, not the old mono. */
+  .rec-load.plate-line{font-family:var(--font-body);font-size:0.7rem;margin-top:0;}
   .ex-tips{font-size:0.7rem;line-height:1.3;color:var(--slate);margin:0.4rem 0.1rem 0.2rem;}
   /* One height for the action buttons, every log field and the Log button, so the rows line up. */
   .card{--input-h:2.3rem;}

@@ -213,14 +213,39 @@ function planModifiers(name, ex){
 // The Next tile: always four rows at one fixed size on every lift, so the card never shifts.
 // 1: weight, sets x reps, rest. 2-3: the call and a short read of recent notes. 4: the load.
 function renderNextTile(headline, ex, guidance, load){
-  const rest = ex.trackBy !== "duration" ? ` · <span class="rec-rest">Rest ${restTimeFor(ex)}</span>` : "";
+  const rest = ex.trackBy !== "duration" ? `<span class="rec-rest">Rest ${restTimeFor(ex)}</span>` : "";
   return `<div class="rec-box">
-    <div class="rec-headline">${headline}${rest}</div>
+    <div class="rec-headline"><span class="rec-plan">${headline}</span>${rest}</div>
     <div class="rec-desc">${guidance}</div>
     <div class="rec-load${/ per side/.test(load) ? " plate-line" : ""}">${load}</div>
   </div>`;
 }
-// When no note gives anything to act on, row 3 falls back to last session's numbers and RPE.
+// Rows 2-3: the call first, then whatever else the history says, most useful first, while whole
+// sentences still fit in two lines (about 105 characters on a narrow phone), so nothing is cut
+// mid-sentence and the second line carries something: a read of recent notes, last session, the trend.
+function composeGuidance(msg, name, ex, last){
+  const FIT = 105;
+  const parts = [msg];
+  const add = t => { if(t && parts.join(" ").length + t.length + 1 <= FIT) parts.push(t); };
+  add(noteInsight(ex.entries, FIT - msg.length - 1));
+  add(lastSessionLine(ex, last));
+  add(trendLine(name, ex));
+  return parts.join(" ");
+}
+// How the lift has moved: e1RM over four weeks, sessions at this weight, or sessions this month.
+function trendLine(name, ex){
+  const t = typeof liftTrend === "function" ? liftTrend(name, ex, todayISO()) : null;
+  const bits = [];
+  if(t && t.e1rmChange4WeeksPct != null && t.e1rmChange4WeeksPct !== 0) bits.push(`Est. 1RM ${t.e1rmChange4WeeksPct > 0 ? "up" : "down"} ${Math.round(Math.abs(t.e1rmChange4WeeksPct))}% in 4 weeks`);
+  if(t && t.sessionsAtCurrentLoad > 1) bits.push(`${t.sessionsAtCurrentLoad} sessions at this weight`);
+  if(!bits.length){
+    const since = shiftISO(todayISO(), -28);
+    const n = ex.entries.filter(e => e.date >= since).length;
+    if(n) bits.push(`${n} session${n > 1 ? "s" : ""} in the last 4 weeks`);
+  }
+  return bits.length ? bits.join(", ") + "." : "";
+}
+// Last session's numbers and RPE, the fallback detail when notes give nothing to act on.
 function lastSessionLine(ex, last){
   if(!last) return "";
   const what = ex.trackBy === "weight" ? `${last.weight} lb, ${repLabel(last.sets, last.reps, ex.unit)}` : formatEntryValue(last, ex);
@@ -394,8 +419,7 @@ function renderExerciseCard(name, ex){
           : suggestion.powerHold ? `Power: hold reps; go higher or farther only while every rep stays fast.`
           : `Add 2 reps.`;
       }
-      // Two lines hold about 100 characters on a phone; the note read gets what the call leaves.
-      recHtml = renderNextTile(`Next: ${nextLabel}`, ex, `${msg} ${noteInsight(ex.entries, 100 - msg.length) || lastSessionLine(ex, last)}`, loadText(name, ex, suggestion));
+      recHtml = renderNextTile(`Next: ${nextLabel}`, ex, composeGuidance(msg, name, ex, last), loadText(name, ex, suggestion));
     }
 
     html += recHtml;
