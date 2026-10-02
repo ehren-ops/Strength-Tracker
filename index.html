@@ -1287,7 +1287,6 @@ function restTimerChoicesFor(name){
 // it by accident" without needing a separate cancel control: just keep
 // pressing the button you already pressed.
 function startRestTimer(name){
-  requestRestTimerNotificationPermission();
   if(restTimer && restTimer.exerciseName === name && restTimer.phase === "running"){
     advanceRestTimer();
     return;
@@ -1314,7 +1313,7 @@ function tickRestTimer(){
 // visibilitychange listener (the moment the app is reopened or
 // foregrounded again). Comparing against the wall clock rather than a
 // counter makes this safe to call from either place, or both: it only
-// ever fires the completion side effects (vibrate/notify) once, since
+// ever fires the completion side effect (vibrate) once, since
 // phase is no longer "running" the second time either caller checks.
 function checkRestTimerCompletion(){
   if(!restTimer || restTimer.phase !== "running") return;
@@ -1331,31 +1330,12 @@ document.addEventListener("visibilitychange", () => {
   if(document.visibilityState === "visible") checkRestTimerCompletion();
 });
 
-// The Vibration API is spec'd to silently no-op whenever the document
-// isn't visible (backgrounded tab, screen locked, another app in front),
-// so a plain navigator.vibrate() call can't be the "isn't open" case at
-// all - only a system Notification can surface anything then, and only if
-// permission was already granted and the browser/OS actually supports it
-// (no support in iOS Safari home-screen web apps as of this writing, since
-// that requires a push subscription and a server to trigger it - a closed
-// app can't wake itself up with client-side code alone). This does the
-// best available thing in each case rather than silently doing nothing.
+// In-app only: a buzz where the browser supports it (Android; iOS Safari has no Vibration
+// API), plus the red pulsing badge. A system banner was tried, but a home-screen web app
+// can't fire one while closed without a push server, so it only ever showed up on return.
 function notifyRestOver(){
-  if(document.visibilityState === "visible"){
-    try{ if(navigator.vibrate) navigator.vibrate([200, 100, 200]); }catch(e){}
-    return;
-  }
-  try{
-    if(typeof Notification !== "undefined" && Notification.permission === "granted"){
-      new Notification("Rest over", { body: "Time to get back to it.", vibrate: [200, 100, 200], tag: "rest-timer" });
-    }
-  }catch(e){}
-}
-
-function requestRestTimerNotificationPermission(){
-  try{
-    if(typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission();
-  }catch(e){}
+  if(document.visibilityState !== "visible") return;
+  try{ if(navigator.vibrate) navigator.vibrate([200, 100, 200]); }catch(e){}
 }
 
 // Shared by the floating badge tap and by re-pressing "Start Rest" while
