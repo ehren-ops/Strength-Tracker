@@ -1127,18 +1127,17 @@ async function main(){
   if(!badgeClassAtZero.includes('done')) throw new Error('expected the finished badge to carry the red "done" state, got class: ' + badgeClassAtZero);
   console.log('OK: the badge turns into a big "Rest over" indicator once the countdown reaches zero');
 
-  // force: true - the finished badge pulses continuously (CSS animation)
-  // to draw the eye, so it never satisfies Playwright's "stable" check.
+  if(await page.evaluate(() => getComputedStyle(document.getElementById('rest-timer-badge')).animationName) !== 'none') throw new Error('expected the finished badge to stay still, with no pulse animation');
   // First tap on finished badge should restart the SAME duration that had
   // just been running (90 sec here, the fresh-start default) - not a
   // shorter/earlier choice, and not clear immediately.
-  await page.click("#rest-timer-badge", { force: true });
+  await page.click("#rest-timer-badge");
   await sleep(150);
   const badgeAfterFirstTapDone = await page.locator("#rest-timer-badge").textContent();
   if(badgeAfterFirstTapDone.trim() !== "1:30") throw new Error("expected first tap on finished badge to restart the prior 90 sec duration, got: " + badgeAfterFirstTapDone);
   console.log("OK: first tap on finished badge restarts the prior duration");
   // Second tap dismisses
-  await page.click("#rest-timer-badge", { force: true });
+  await page.click("#rest-timer-badge");
   await sleep(150);
   if(await page.locator("#rest-timer-badge:visible").count() !== 0) throw new Error("expected second tap on finished badge to dismiss it");
   console.log("OK: second tap on finished badge dismisses it");
