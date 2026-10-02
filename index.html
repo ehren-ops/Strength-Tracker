@@ -35,7 +35,7 @@
     --cat-core:#1B8A7A; --cat-core-bg:#E3F5F2; --cat-core-border:#B8E3DC; --cat-core-text:#0F5C51;
     --cat-stretch:#6B8E4E; --cat-stretch-bg:#EEF3E6; --cat-stretch-border:#CFE0BB; --cat-stretch-text:#4A6134;
     --ai-bg:#E6EEE3; --ai-border:#B9CCB4; --ai-text:#1F3A2A; --ai-accent:#0F6B4A;
-    --deload:#3D6B7D; --deload-on-text:#FFFFFF; --deload-bg:#E6EFF2; --deload-border:#B7CDD5; --deload-text:#24495A;
+    --deload:#3D6B7D; --deload-on-text:#FFFFFF; --deload-border:#B7CDD5; --deload-text:#24495A;
     --font-display:'Fjalla One',sans-serif; --font-body:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
   }
   :root[data-theme="dark"]{
@@ -50,7 +50,7 @@
     --sync-muted:#6a5d94; --danger:#ff2054;
     --rec-bg:rgba(185,103,255,0.10); --rec-text:#d8cff2; --rec-headline:#fee440;
     --ai-bg:rgba(0,240,255,0.07); --ai-border:rgba(0,240,255,0.32); --ai-text:#bff9ff; --ai-accent:#00f0ff;
-    --deload:#fee440; --deload-on-text:#050308; --deload-bg:rgba(254,228,64,0.10); --deload-border:#fee440; --deload-text:#fff3a6;
+    --deload:#fee440; --deload-on-text:#050308; --deload-border:#fee440; --deload-text:#fff3a6;
     --panel-soft:#150c26; --panel-soft-active:#1c1430; --hairline:#241a3a; --track-bg:#1c1430;
     --chart-grid:#241a3a; --chart-axis:#6a5d94; --chart-line:#00f0ff; --chart-label-halo:#0e0a1a;
     --chart-white:#050308; --chart-under:#b967ff; --chart-missed:#ff2d95; --chart-extra:#fee440;
@@ -236,7 +236,8 @@
   .back-badge{background:var(--back);}
   .preseason-badge{background:var(--preseason);}
   .deload-badge{background:var(--deload);color:var(--deload-on-text);}
-  .deload-line{font-size:0.76rem;color:var(--deload-text);background:var(--deload-bg);border:1px solid var(--deload-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
+  .deload-status{font-size:0.76rem;line-height:1.45;color:var(--ink);margin:0 0 0.55rem;}
+  .deload-status div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .ski-tempo-line{font-size:0.76rem;color:var(--ski-text);background:var(--ski-bg);border:1px solid var(--ski-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
   .preseason-line{font-size:0.76rem;color:var(--preseason-text);background:var(--preseason-bg);border:1px solid var(--preseason-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
   .preseason-line + .preseason-line{margin-top:-0.35rem;}
@@ -2998,25 +2999,26 @@ function keepDeloadOn(){
   render();
 }
 
+// Always exactly two short lines, so the block stays the same size on or off.
 function renderDeloadModifier(){
   const st = deloadStatus();
   let last, next;
   if(st.on){
     const days = daysBetween(st.startedOn, todayISO()) + 1;
-    last = `On since ${fmtShortDate(st.startedOn)} (day ${days}).${deloadDates.plannedEndOn ? ` Switches off on ${fmtShortDate(deloadDates.plannedEndOn)} unless you keep it on.` : ""}`;
-    next = `Next one: about 5 weeks after you switch this off.`;
+    last = `On since ${fmtShortDate(st.startedOn)} · day ${days}`;
+    next = deloadDates.plannedEndOn ? `Switches off ${fmtShortDate(deloadDates.plannedEndOn)} unless you keep it on` : `Switch off when the week is up`;
   } else {
-    last = st.startedOn ? `Last deload: ${fmtShortDate(st.startedOn)} to ${fmtShortDate(st.endedOn || st.startedOn)}.` : `No deload logged yet.`;
-    if(!st.nextDue) next = `Next recommended: after about 5 weeks of steady training.`;
-    else if(st.daysUntilDue > 0) next = `Next recommended: ${fmtShortDate(st.nextDue)} (in ${st.daysUntilDue} day${st.daysUntilDue === 1 ? "" : "s"}).`;
-    else if(st.daysUntilDue === 0) next = `Next recommended: today.`;
-    else next = `Next recommended: ${fmtShortDate(st.nextDue)} - <b>due now</b>, ${-st.daysUntilDue} day${st.daysUntilDue === -1 ? "" : "s"} overdue.`;
+    last = st.startedOn ? `Last deload: ${fmtShortDate(st.startedOn)} to ${fmtShortDate(st.endedOn || st.startedOn)}` : `No deload logged yet`;
+    if(!st.nextDue) next = `Next recommended: after ~5 weeks of training`;
+    else if(st.daysUntilDue > 0) next = `Next recommended: ${fmtShortDate(st.nextDue)} (in ${st.daysUntilDue} day${st.daysUntilDue === 1 ? "" : "s"})`;
+    else if(st.daysUntilDue === 0) next = `Next recommended: today`;
+    else next = `Next recommended: ${fmtShortDate(st.nextDue)} · <b>due now</b>`;
   }
   return `<div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
       <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.4rem;">
         🔋 A planned lighter week to let joints and tendons catch up and avoid injury: about 10% less weight and a third fewer sets on every lift. Overrides Ski and Preseason targets. Lifts already cut for Knee or Back Care keep that weight and just lose sets. It switches itself off after a week unless you choose to keep it on, and suggestions pick back up from your pre-deload weights.
       </p>
-      <div class="deload-line" id="deload-status">${last}<br>${next}</div>
+      <div class="deload-status" id="deload-status"><div>${last}</div><div>${next}</div></div>
       <button class="tool-btn" onclick="toggleMode('deload')" style="background:${modes.deload ? 'var(--deload)' : ''};color:${modes.deload ? 'var(--deload-on-text)' : ''};border-color:${modes.deload ? 'var(--deload)' : ''};">
         ${modes.deload ? '🔋 Deload Week: ON' : '🔋 Deload Week: OFF'}
       </button>
