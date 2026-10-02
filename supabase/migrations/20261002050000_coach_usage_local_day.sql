@@ -1,7 +1,7 @@
 -- The coach's daily cap resets at the caller's local midnight instead of UTC midnight. The edge
 -- function works out the caller's local date from their time zone and passes it in. Any real time
 -- zone is within a day of UTC, so anything further out falls back to the UTC date.
--- The one-argument coach_bump(uuid) from 20261002030000 is left in place (service role only, no
+-- The one-argument coach_bump(uuid) from 20261002030000 was left in place here, then dropped in 20261003000000 (service role only, no
 -- longer called) to keep this migration non-destructive; drop it whenever convenient.
 
 create or replace function public.coach_bump(p_user uuid, p_day date)
