@@ -407,7 +407,7 @@ async function main(){
   console.log('recommendation shown:', careRec.replace(/\s+/g, ' ').trim());
   const careNextMatch = careRec.match(/Next:\s*(\d+(?:\.\d+)?)\s*lbs/);
   if(!careNextMatch || Number(careNextMatch[1]) !== 45) throw new Error('expected next weight to be cut to 45 lbs (10% off 50), got: ' + (careNextMatch && careNextMatch[1]));
-  if(!careRec.includes('Knee Care mode is on')) throw new Error('expected the knee care message in the recommendation');
+  if(!careRec.includes('Knee Care: ~10% lighter, holding')) throw new Error('expected the knee care message in the recommendation');
   const tipText = await page.locator('.knee-care-line').textContent();
   if(!tipText.toLowerCase().includes('rear-foot elevation')) throw new Error('expected the knee care variation tip near the exercise name, got: ' + tipText);
   console.log('OK: Bulgarian Split Squat suggests 45 lbs (a cut, not a progression) with the knee care message and tip');
@@ -1801,7 +1801,7 @@ async function main(){
   await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
   await sleep(100);
   const plain = await readForm(), plainPlan = await planFor('Squat');
-  if(plain.weight !== plainPlan.weight || plain.sets !== plainPlan.sets || plain.reps !== plainPlan.reps || plain.note !== 'Pre-filled with your next progression.') throw new Error('expected every modifier off to pre-fill the next progression ' + JSON.stringify(plainPlan) + ', got: ' + JSON.stringify(plain));
+  if(plain.weight !== plainPlan.weight || plain.sets !== plainPlan.sets || plain.reps !== plainPlan.reps || plain.note !== 'Pre-filled: next progression') throw new Error('expected every modifier off to pre-fill the next progression ' + JSON.stringify(plainPlan) + ', got: ' + JSON.stringify(plain));
   await page.evaluate(() => toggleMode('knee'));
   await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
   await sleep(100);
@@ -1816,7 +1816,7 @@ async function main(){
   await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
   await sleep(100);
   const bench = await readForm(), benchPlan = await planFor('Bench Press');
-  if(bench.weight !== benchPlan.weight || bench.note !== 'Pre-filled with your next progression.') throw new Error('expected Bench Press (not knee-flagged) to pre-fill its plain progression under Knee Care, got: ' + JSON.stringify(bench));
+  if(bench.weight !== benchPlan.weight || bench.note !== 'Pre-filled: next progression') throw new Error('expected Bench Press (not knee-flagged) to pre-fill its plain progression under Knee Care, got: ' + JSON.stringify(bench));
   await page.evaluate(() => toggleMode('knee'));
   const backExt = await page.evaluate(() => {
     const ex = data['Back Extension'] ||= newExerciseShell('Back Extension');
@@ -1836,8 +1836,9 @@ async function main(){
     ['next 155', 150], ['try 52.5', 50], ['drop back to 135', 155], ['Next time 47.5', 45],
     ['60 sec intervals', 175], ['Felt heavy, stay', 150], ['Good to move up', 150], ['Stay one set', 150], ['Go to 10 reps', 40],
     ['3x8 felt easy', 135], ['Maxing out, deload again next', 37.5], ['Pail in left front shoulder on curl', 30], ['move up to 500', 175], ['try 90 sec rest', 60],
+    ['felt heavy, next: 185', 175], ['Next: 3 sets', 175],
   ].map(([note, w]) => noteTargetWeight(note, w)));
-  const wantNotes = [50, 180, 150, 15, 155, 52.5, 135, 47.5, null, null, null, null, null, null, null, null, null, null];
+  const wantNotes = [50, 180, 150, 15, 155, 52.5, 135, 47.5, null, null, null, null, null, null, null, null, null, null, 185, null];
   if(JSON.stringify(noteCases) !== JSON.stringify(wantNotes)) throw new Error('note weight parsing mismatch: ' + JSON.stringify(noteCases));
   const noteSug = await page.evaluate(() => {
     const mk = (entries, extra) => Object.assign({ trackBy: 'weight', targetReps: 8, increment: 5, entries }, extra || {});

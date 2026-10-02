@@ -257,7 +257,7 @@ const NOTE_WEIGHT_PATTERNS = [
   new RegExp(String.raw`\b(?:dial|drop|go|move|bump|jump|step|come|increase|decrease|reduce|cut|switch|try|use|start|stay|hold|stick|load)(?:\s+(?:it\s+)?(?:up|down|back))?\s+(?:to|at|with)\s+` + NOTE_NUM, "i"),
   new RegExp(String.raw`\b(?:good|ok|okay|ready|fine)\s+(?:for|with|at)\s+` + NOTE_NUM, "i"),
   new RegExp(String.raw`\b(\d+(?:\.\d+)?)\s*(?:lbs?|pounds)?\s+next\b`, "i"),
-  new RegExp(String.raw`\bnext\s+(?:time\s+|session\s+)?(?:at\s+|try\s+)?` + NOTE_NUM, "i"),
+  new RegExp(String.raw`\bnext\b\s*:?\s*(?:time\s+|session\s+)?(?:at\s+|try\s+)?` + NOTE_NUM, "i"),
   new RegExp(String.raw`\btry\s+` + NOTE_NUM, "i"),
 ];
 function noteTargetWeight(note, lastWeight){

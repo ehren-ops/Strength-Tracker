@@ -111,8 +111,9 @@ function render1RMInline(name, ex, last){
 
 function renderProgressionToggle(name, ex){
   if(ex.trackBy !== "weight") return `<button class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;
-  return `<button class="progression-btn" onclick="toggleConservative('${name.replace(/'/g,"\\'")}')">
-    Progression: ${ex.conservative ? "Conservative" : "Standard"}
+  // Short label so the action row stays one line tall; the aria-label keeps the full meaning.
+  return `<button class="progression-btn" onclick="toggleConservative('${name.replace(/'/g,"\\'")}')" aria-label="Progression: ${ex.conservative ? "Conservative" : "Standard"}">
+    ↗ ${ex.conservative ? "Conservative" : "Standard"}
   </button>`;
 }
 
@@ -209,6 +210,13 @@ function planModifiers(name, ex){
   return on;
 }
 
+// One line of form, one line of swap, under the Next box.
+function renderTips(name){
+  const t = EXERCISE_TIPS[name];
+  if(!t) return "";
+  return `<div class="ex-tips"><div><b>Form</b> ${t[0]}</div><div><b>Swap</b> ${t[1]}</div></div>`;
+}
+
 function renderExerciseCard(name, ex){
   if(ex.trackBy === "checklist") return renderChecklistCard(name, ex);
   const hasEntries = ex.entries.length > 0;
@@ -235,9 +243,6 @@ function renderExerciseCard(name, ex){
   } else {
     html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}${preseasonActive ? '<span class="preseason-badge">🏔️ Preseason</span>' : ''}${deloadActive ? '<span class="deload-badge">🔋 Deload</span>' : ''}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>`;
   }
-  if(EXERCISE_CUES[name]){
-    html += `<p style="font-size:0.74rem;color:var(--slate);margin:0 0 0.6rem;">${EXERCISE_CUES[name]}</p>`;
-  }
   if(kneeActive && KNEE_CARE_TIP[name]){
     html += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
   }
@@ -245,20 +250,21 @@ function renderExerciseCard(name, ex){
     html += `<div class="care-line back-care-line">${LOW_BACK_CARE_TIP[name]}</div>`;
   }
   if(kneeActive || backActive){
-    html += `<p style="font-size:0.64rem;color:var(--slate);margin:0 0 0.6rem;font-style:italic;">Adjusts training load only - not a substitute for a PT or doctor's evaluation.</p>`;
+    html += `<p class="care-disclaimer">Load adjustment only, not a substitute for a PT or doctor.</p>`;
   }
   if(skiActive && ex.skiTempo){
-    html += `<div class="ski-tempo-line">Tempo: ${ex.skiTempo} - target reps shifted to ${ex.targetRepsSki} for ski season</div>`;
+    html += `<div class="ski-tempo-line">Ski tempo: ${ex.skiTempo} · target ${ex.targetRepsSki} reps</div>`;
   }
   if(preseasonActive && ex.preseasonTempo){
-    html += `<div class="preseason-line">Tempo: ${ex.preseasonTempo} - target reps shifted to ${ex.targetRepsPreseason} for preseason prep</div>`;
+    html += `<div class="preseason-line">Preseason tempo: ${ex.preseasonTempo} · target ${ex.targetRepsPreseason} reps</div>`;
   }
   if(preseasonActive && ex.preseasonNote){
     html += `<div class="preseason-line">${ex.preseasonNote}${ex.preseasonWeek3 ? ' <b>Add from week 3.</b>' : ''}</div>`;
   }
 
   if(!hasEntries){
-    html += `<p style="color:var(--slate);font-size:0.85rem;">No entries yet - log your first set below.</p>`;
+    html += `<p style="color:var(--slate);font-size:0.8rem;margin:0.2rem 0;">No entries yet - log your first set below.</p>`;
+    html += renderTips(name);
   } else {
     const delta = ex.entries.length > 1
       ? (ex.trackBy==="weight" ? last.weight-first.weight : ex.trackBy==="duration" ? last.minutes-first.minutes : last.reps-first.reps)
@@ -291,72 +297,71 @@ function renderExerciseCard(name, ex){
         const actualAmt = ex.unit === "sec" ? `${last.reps} sec` : `${last.reps} reps`;
         const targetAmt = ex.unit === "sec" ? `${suggestion.reps} sec` : `${suggestion.reps} reps`;
         const hitLeadIn = wentOverTarget
-          ? `Went over target ${unitWord} last time (did ${actualAmt}, target is ${targetAmt})`
+          ? `Went over target ${unitWord} (did ${actualAmt}, target is ${targetAmt})`
           : `Hit target ${unitWord}`;
         if(suggestion.deloadWeek){
           msg = suggestion.deloadKeptReduction
-            ? `Deload week - this lift is already reduced, so keeping that weight and just cutting sets. Stop around RPE 6, 3 to 4 reps short of failure.`
-            : `Deload week - about 10% lighter and a third fewer sets. Stop around RPE 6, 3 to 4 reps short of failure. Progression picks back up from your pre-deload weight once you turn it off.`;
+            ? `Deload: already reduced, so same weight, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`
+            : `Deload: ~10% lighter, a third fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`;
         } else if(suggestion.atRepCap){
-          msg = `${suggestion.weight} lb is the heaviest available and you're at ${MAX_WEIGHT_REP_CAP} reps. Next step up: single-arm swings at ${suggestion.weight} lb (roughly double the load per side), or a 1 second hold at the top with a harder hip snap.`;
+          msg = `Heaviest bell at ${MAX_WEIGHT_REP_CAP} reps: go single-arm, or add a 1 sec hold at the top.`;
         } else if(suggestion.atMaxWeight && suggestion.readyToProgress){
-          msg = `${suggestion.weight} lb is the heaviest available, so progressing by reps instead: aim for ${suggestion.reps}. At ${MAX_WEIGHT_REP_CAP} reps, move to single-arm swings.`;
+          msg = `Heaviest bell: add reps. Go single-arm at ${MAX_WEIGHT_REP_CAP}.`;
         } else if(suggestion.noteTarget != null && !(suggestion.careFlags && suggestion.careFlags.length)){
-          msg = `Going with ${suggestion.noteTarget} lb from last session's note ("${escapeHtml(suggestion.noteText)}").`;
+          msg = `From your note: "${escapeHtml(suggestion.noteText)}"`;
         } else if(suggestion.deload){
-          msg = `Missed target ${unitWord} for ${suggestion.missStreak} sessions straight - that's a stall, not a bad day. Dropping ~15% to rebuild with clean reps.`;
+          msg = `Missed target ${unitWord} ${suggestion.missStreak} sessions straight: drop ~15% and rebuild.`;
         } else if(suggestion.noteConcern){
           msg = suggestion.hitTarget
-            ? `${hitLeadIn}, but last session's note flagged "${escapeHtml(suggestion.noteConcern)}" - holding weight here until that clears up before adding more load.`
-            : `Missed target ${unitWord}, and last session's note flagged "${escapeHtml(suggestion.noteConcern)}" - hold weight and keep an eye on that.`;
+            ? `${hitLeadIn}, but your note said "${escapeHtml(suggestion.noteConcern)}": hold.`
+            : `Missed target ${unitWord}, note said "${escapeHtml(suggestion.noteConcern)}": hold.`;
         } else if(suggestion.careFlags && suggestion.careFlags.length){
           const flagLabel = suggestion.careFlags.map(f => f === "knee" ? "Knee Care" : "Low Back Care").join(" + ");
           msg = suggestion.noteTarget != null
-            ? `${flagLabel} mode is on, and last session's note asked for ${suggestion.noteTarget} lb, which is lighter still - going with that.`
-            : `${flagLabel} mode is on - cutting load ~10% and holding here while that settles down.`;
+            ? `${flagLabel}: your note's lighter ${suggestion.noteTarget} lb.`
+            : `${flagLabel}: ~10% lighter, holding.`;
         } else if(suggestion.difficultyNote === "hard"){
-          msg = `${hitLeadIn}, but rated 9-10/10 - holding here until it feels more manageable.`;
+          msg = `${hitLeadIn}, but rated 9-10: hold.`;
         } else if(suggestion.difficultyNote === "easy"){
-          msg = `${hitLeadIn} and rated it easy - fast-tracking the increase.`;
+          msg = `${hitLeadIn}, felt easy: add weight early.`;
         } else if(suggestion.readyToProgress){
           if(ex.conservative){
             msg = wentOverTarget
-              ? `Hit target ${unitWord} for ${suggestion.streak} sessions straight, including ${actualAmt} last time (target is ${targetAmt}) - progress it.`
-              : `Hit target ${unitWord} for ${suggestion.streak} sessions straight, progress it.`;
+              ? `Hit target ${unitWord} ${suggestion.streak} sessions straight (${actualAmt} last time): add weight.`
+              : `Hit target ${unitWord} ${suggestion.streak} sessions straight: add weight.`;
           } else {
-            msg = wentOverTarget
-              ? `Went over target ${unitWord} last time (did ${actualAmt}, target is ${targetAmt}), progress the weight.`
-              : `Hit target ${unitWord} last time, progress the weight.`;
+            msg = `${hitLeadIn}: add weight.`;
           }
         } else if(suggestion.hitTarget){
-          msg = `${hitLeadIn}, but only ${suggestion.streak} session${suggestion.streak>1?'s':''} at this weight - hold one more before adding.`;
+          msg = `${hitLeadIn}, ${suggestion.streak} of ${suggestion.requiredStreak} sessions: hold one more.`;
         } else {
-          msg = `Missed target ${unitWord} last time, hold weight and chase it.`;
+          msg = `Missed target ${unitWord}: hold and chase it.`;
         }
       } else if(ex.trackBy === "duration"){
         nextLabel = `${suggestion.minutes} min`;
         msg = suggestion.difficultyNote === "easy"
-          ? `Felt easy last time - adding 5 minutes.`
+          ? `Felt easy: +5 min.`
           : suggestion.difficultyNote === "hard"
-          ? `Rated hard last time - pulling back 5 minutes to stay sustainable.`
-          : `Held steady - log an RPE next time for a sharper call.`;
+          ? `Rated hard: 5 min shorter.`
+          : `Holding steady.`;
       } else {
         nextLabel = repLabel(suggestion.sets,suggestion.reps,ex.unit);
-        msg = suggestion.deloadWeek ? `Deload week - same reps, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`
-          : suggestion.powerHold ? `Power move: keep it at ${suggestion.reps} fast reps. Progress with a higher box or a longer bound, and only while every rep stays quick and every landing is quiet.`
-          : `Bodyweight move, aiming for a couple more reps.`;
+        msg = suggestion.deloadWeek ? `Deload: same reps, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`
+          : suggestion.powerHold ? `Power: hold reps; go higher or farther only while every rep stays fast.`
+          : `Add 2 reps.`;
       }
       const restPart = ex.trackBy !== "duration" ? ` <span style="font-weight:400;">· Rest ${restTimeFor(ex)}</span>` : "";
-      const diffText = last.difficulty ? last.difficulty + "/10" : "not rated";
-      const loadLine = ex.equipment === "barbell" ? `<div class="plate-line" style="margin-top:0.4rem;">Load: ${platesLabel(suggestion.weight, ex.equipment)}</div>` : "";
+      const rpePart = last.difficulty ? ` <span class="rec-rpe">Last RPE ${last.difficulty}</span>` : "";
+      const loadLine = ex.equipment === "barbell" ? `<div class="plate-line">Load: ${platesLabel(suggestion.weight, ex.equipment)}</div>` : "";
       recHtml = `<div class="rec-box">
         <div class="rec-headline">Next: ${nextLabel}${restPart}</div>
-        <div class="rec-desc">${msg} Last RPE: <b>${diffText}</b></div>
+        <div class="rec-desc">${msg}${rpePart}</div>
         ${loadLine}
       </div>`;
     }
 
     html += recHtml;
+    html += renderTips(name);
     html += renderChart(ex, suggestion, true, name);
   }
 
@@ -550,6 +555,8 @@ function renderForm(name, ex){
     if(ex.trackBy === "weight" && plan.weight != null) weightDefault = plan.weight;
     if(ex.trackBy === "duration" && plan.minutes != null) minutesDefault = plan.minutes;
   }
+  // RPE rides in the numbers row, so the form is three short rows: numbers, note, date and log.
+  const rpeField = `<div class="field field-rpe"><label>RPE</label><input type="number" inputmode="numeric" id="f-difficulty" min="1" max="10" value="7"></div>`;
   if(ex.trackBy === "weight"){
     html += `<div class="field"><label>Weight</label><input type="number" inputmode="decimal" id="f-weight" value="${weightDefault}"></div>`;
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
@@ -563,11 +570,12 @@ function renderForm(name, ex){
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
     html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   }
+  // Cardio already fills its row (minutes, miles, speed, incline), so RPE moves next to Note.
+  if(ex.trackBy !== "duration") html += rpeField;
   html += `</div>`;
-  if(plan) html += `<p class="prefill-note">${mods.length ? `Pre-filled with today's plan (${mods.join(", ")}).` : "Pre-filled with your next progression."}</p>`;
+  if(plan) html += `<p class="prefill-note">${mods.length ? `Pre-filled: ${mods.join(", ")} plan` : "Pre-filled: next progression"}</p>`;
   html += `<div class="form-row">
-    <div class="field" style="flex:0 0 68px;"><label>RPE / 10</label><input type="number" inputmode="numeric" id="f-difficulty" min="1" max="10" value="7"></div>
-    <div class="field" style="flex:1 1 140px;"><label>Note</label><input type="text" id="f-note" placeholder="${ex.trackBy==='duration' ? 'e.g. easy spin' : 'e.g. felt heavy'}"></div>
+    ${ex.trackBy === "duration" ? rpeField : ""}<div class="field field-note"><label>Note</label><input type="text" id="f-note" placeholder="${ex.trackBy==='duration' ? 'e.g. easy spin' : 'e.g. felt heavy, or next: 185'}"></div>
   </div>`;
   html += `<div class="date-log-row">
     <div class="field"><label>Date</label><input type="date" id="f-date" value="${todayISO()}"></div>
