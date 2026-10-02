@@ -44,7 +44,8 @@ Until `ANTHROPIC_API_KEY` is set, tapping a button shows these setup steps inste
 Only signed-in accounts can run it. `verify_jwt` is off so browser CORS preflights pass, and the
 function verifies the caller's Supabase session itself before anything else: no session, no
 Anthropic call (`401 not_signed_in`). Logging still works with no account; only the AI buttons need
-one. Each account is also capped at 10 calls per UTC day (`429 daily_limit_reached`), counted by
-`coach_bump()` in the `coach_usage` table (migration `20261002030000_coach_usage.sql`), so an account
+one. Each account is also capped at 10 calls a day (`429 daily_limit_reached`), resetting at
+midnight in the time zone the app sends, counted by `coach_bump()` in the `coach_usage` table
+(migrations `20261002030000_coach_usage.sql` and `20261002050000_coach_usage_local_day.sql`), so an account
 made through the open sign-up form can't run up the bill. Outlive data is read only for the
 caller's own email. A spend cap on the Anthropic key is still a sensible backstop.

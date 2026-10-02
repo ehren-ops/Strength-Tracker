@@ -5,7 +5,7 @@
 // POST {mode, payload} -> {breakdown: {verdict, sections: [{title, items}]}, generatedAt, context}
 //
 // payload is built client-side from the app's own log (buildSessionCoachPayload and
-// buildWeeklyCoachPayload in index.html). When the caller is signed in and this project has
+// buildWeeklyCoachPayload in js/09-coach-overview.js). When the caller is signed in and this project has
 // OUTLIVE_SUPABASE_SECRET_KEY set, the function also reads that person's goals and phases, recent
 // recovery and rides (used only to explain a lift result), and the bodyweight trend (weekly only)
 // from the Outlive project, matched by email (the mirror image of Outlive's strength-sync). Outlive
@@ -14,8 +14,9 @@
 //
 // Signed-in callers only. verify_jwt stays false so CORS preflights pass, and the function checks
 // the caller's Supabase session itself: no session, no Anthropic call. Each account is also capped
-// at DAILY_CALL_CAP calls per UTC day (coach_bump in the database), so an account made through the
-// open sign-up form can't run up the Anthropic bill. Requires ANTHROPIC_API_KEY.
+// at DAILY_CALL_CAP calls per day, resetting at midnight in the time zone the app sends
+// (coach_bump in the database), so an account made through the open sign-up form can't run up the
+// Anthropic bill. Requires ANTHROPIC_API_KEY.
 
 import Anthropic from "npm:@anthropic-ai/sdk@0.129.0";
 import { betaZodOutputFormat } from "npm:@anthropic-ai/sdk@0.129.0/helpers/beta/zod";
@@ -65,6 +66,12 @@ async function caller(req: Request): Promise<{ id: string; email: string | null 
 
 // ---------- Outlive context ----------
 type Row = Record<string, unknown>;
+
+// A time zone the runtime knows, else UTC. It comes from the caller, so it is checked before use.
+function validTz(tz: unknown) {
+  if (typeof tz !== "string") return "UTC";
+  try { new Intl.DateTimeFormat("en-CA", { timeZone: tz }); return tz; } catch (_e) { return "UTC"; }
+}
 
 function localDay(ts: unknown, tz: string) {
   try { return new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date(String(ts))); }
@@ -248,9 +255,11 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) return json({ error: "anthropic_key_not_configured" }, 500);
 
+    const tz = validTz(payload.tz);
     const who = await caller(req).catch(() => null);
     if (!who) return json({ error: "not_signed_in" }, 401);
-    const { data: calls, error: capErr } = await serviceClient().rpc("coach_bump", { p_user: who.id });
+    // The day is counted in the caller's own time zone, so the cap resets at their midnight.
+    const { data: calls, error: capErr } = await serviceClient().rpc("coach_bump", { p_user: who.id, p_day: localDay(new Date().toISOString(), tz) });
     if (capErr) {
       console.error("coach_bump failed:", capErr.message);
       return json({ error: "usage_check_failed" }, 503);
@@ -258,7 +267,6 @@ Deno.serve(async (req) => {
     if (Number(calls) > DAILY_CALL_CAP) return json({ error: "daily_limit_reached", cap: DAILY_CALL_CAP }, 429);
 
     const end = isDate(payload.weekEnd) ? payload.weekEnd : isDate(payload.date) ? payload.date : new Date().toISOString().slice(0, 10);
-    const tz = typeof payload.tz === "string" ? payload.tz : "UTC";
 
     let context: { status: string; data: Row | null } = { status: "no_email", data: null };
     if (who.email) {
