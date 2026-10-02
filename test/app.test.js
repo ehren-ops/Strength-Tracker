@@ -1042,13 +1042,9 @@ async function main(){
   if(correctedTempo !== '4 sec lowering') throw new Error('expected Squat preseasonTempo to self-correct to the current copy, got: ' + correctedTempo);
   console.log('OK: stale preseason copy from an older version is refreshed on load instead of sticking forever:', correctedTempo);
 
-  console.log('=== 46: Rest Timer toggle adds a global countdown badge with a per-exercise 60/90/upper-limit cycle ===');
+  console.log('=== 46: the rest timer is always on: a global countdown badge with a per-exercise 60/90/upper-limit cycle ===');
   await page.click('.tab:has-text("Overview")');
-  if(await page.locator('.theme-toggle[aria-label="Toggle rest timer"]').count() !== 1) throw new Error('expected a Rest Timer toggle in Appearance, above Neon Dark Mode');
-  await page.click('.theme-toggle[aria-label="Toggle rest timer"]');
-  await sleep(150);
-  const restTimerStored = await page.evaluate(() => localStorage.getItem('strength-tracker-rest-timer-enabled'));
-  if(restTimerStored !== '1') throw new Error('expected the rest timer preference to persist to localStorage');
+  if(await page.locator('.theme-toggle[aria-label="Toggle rest timer"]').count() !== 0) throw new Error('expected no Rest Timer toggle now that the timer is permanent');
 
   await page.click('.tab:has-text("Full Body")');
   await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
@@ -1155,11 +1151,13 @@ async function main(){
   await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
   await page.click('.rest-action-btn');
   await sleep(150);
-  await page.click('.tab:has-text("Overview")');
-  await page.click('.theme-toggle[aria-label="Toggle rest timer"]');
-  await sleep(150);
-  if(await page.locator('#rest-timer-badge:visible').count() !== 0) throw new Error('expected turning off Rest Timer mid-countdown to clear the badge immediately');
-  console.log('OK: turning off the Rest Timer setting clears an in-progress countdown immediately');
+  for(const tab of ['Upper Body', 'Lower Body', 'Extra']){
+    await page.click(`.tab:has-text("${tab}")`);
+    await sleep(100);
+    if(!(await page.locator('#rest-timer-badge').isVisible())) throw new Error('expected the running rest timer badge on the ' + tab + ' tab too');
+  }
+  await page.evaluate(() => clearRestTimer());
+  console.log('OK: the rest timer badge stays up on every tab while a countdown runs');
 
   console.log('=== 47: calendar day-guessing weighs distinctive exercises over shared ones, and defaults ties to Extra ===');
   // Mirrors a real bug: Sept 17 logged Squat/RDL/Bulgarian Split Squat
@@ -1190,9 +1188,6 @@ async function main(){
   // having fired. Proven here by disabling the interval outright before
   // simulating the return, so only the visibilitychange listener can
   // possibly catch it.
-  await page.click('.tab:has-text("Overview")');
-  await page.click('.theme-toggle[aria-label="Toggle rest timer"]'); // scenario 47 left this OFF
-  await sleep(150);
   await page.click('.tab:has-text("Full Body")');
   await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
   await page.click('.rest-action-btn');

@@ -976,19 +976,6 @@ function toggleDarkMode(){
   render();
 }
 
-// Also a local display/UX preference, not training data - no cloud sync.
-const REST_TIMER_ENABLED_KEY = "strength-tracker-rest-timer-enabled";
-let restTimerEnabled = (function(){
-  try{ return window.localStorage.getItem(REST_TIMER_ENABLED_KEY) === "1"; }catch(e){ return false; }
-})();
-function toggleRestTimerEnabled(){
-  restTimerEnabled = !restTimerEnabled;
-  try{ window.localStorage.setItem(REST_TIMER_ENABLED_KEY, restTimerEnabled ? "1" : "0"); }catch(e){}
-  if(restTimerEnabled) requestRestTimerNotificationPermission();
-  else clearRestTimer();
-  render();
-}
-
 function toggleMode(key){
   const def = MODE_DEFS.find(m => m.key === key);
   modes[key] = !modes[key];
@@ -1300,6 +1287,7 @@ function restTimerChoicesFor(name){
 // it by accident" without needing a separate cancel control: just keep
 // pressing the button you already pressed.
 function startRestTimer(name){
+  requestRestTimerNotificationPermission();
   if(restTimer && restTimer.exerciseName === name && restTimer.phase === "running"){
     advanceRestTimer();
     return;
@@ -2125,7 +2113,7 @@ function renderForm(name, ex){
     html += `<div class="action-row">`;
     html += `<button type="button" class="tool-btn" onclick="repeatLast('${name.replace(/'/g,"\\'")}')">↻ Repeat set</button>`;
     html += renderProgressionToggle(name, ex);
-    if(restTimerEnabled && ex.trackBy !== "duration"){
+    if(ex.trackBy !== "duration"){
       html += `<button type="button" class="rest-action-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')">⏱ ${restTimeFor(ex)}</button>`;
     } else {
       html += `<button type="button" class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;
@@ -3019,13 +3007,6 @@ function renderBackupSyncCard(){
 
   html += `<div style="border-top:1px dashed var(--line);padding-top:0.7rem;margin-top:0.7rem;">
     <h3 class="section">Appearance</h3>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.7rem;padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
-      <div>
-        <div style="font-size:0.85rem;font-weight:600;">Rest Timer</div>
-        <div style="font-size:0.68rem;color:var(--slate);margin-top:0.1rem;">Adds a "Start Rest" button that counts down in a badge at the top of the app - tap it to cycle 60 sec / 90 sec / this exercise's own upper limit.</div>
-      </div>
-      <button class="theme-toggle${restTimerEnabled ? ' on' : ''}" onclick="toggleRestTimerEnabled()" aria-label="Toggle rest timer" aria-pressed="${restTimerEnabled}"><span class="knob"></span></button>
-    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:0.7rem;">
       <div>
         <div style="font-size:0.85rem;font-weight:600;">Neon Dark Mode</div>
