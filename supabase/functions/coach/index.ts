@@ -25,7 +25,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 const MODEL = "claude-sonnet-5-5";
 const OUTLIVE_URL = Deno.env.get("OUTLIVE_SUPABASE_URL") ?? "https://szsgxlbvleviuzobhuty.supabase.co";
 const MAX_PAYLOAD_CHARS = 80_000;
-const DAILY_CALL_CAP = 20;
+const DAILY_CALL_CAP = 10;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",

@@ -208,7 +208,7 @@ async function generateCoach(kind){
       : e.message === "not_signed_in"
       ? "Your sign-in expired. Sign in again under Backup & Restore at the bottom of Overview, then retry."
       : e.message === "daily_limit_reached"
-      ? "Daily AI limit reached (20 a day). It resets at midnight UTC."
+      ? "Daily AI limit reached (10 a day). It resets at midnight UTC."
       : "Couldn't generate this right now - try again in a moment.";
   }finally{
     coachLoading[kind] = false;
