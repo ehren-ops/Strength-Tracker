@@ -50,7 +50,7 @@
     --sync-muted:#6a5d94; --danger:#ff2054;
     --rec-bg:rgba(185,103,255,0.10); --rec-text:#d8cff2; --rec-headline:#fee440;
     --ai-bg:rgba(0,240,255,0.07); --ai-border:rgba(0,240,255,0.32); --ai-text:#bff9ff; --ai-accent:#00f0ff;
-    --deload:#fee440; --deload-on-text:#050308; --deload-border:#fee440; --deload-text:#fff3a6;
+    --deload:#39ff88; --deload-on-text:#050308; --deload-border:#39ff88; --deload-text:#b8ffd6;
     --panel-soft:#150c26; --panel-soft-active:#1c1430; --hairline:#241a3a; --track-bg:#1c1430;
     --chart-grid:#241a3a; --chart-axis:#6a5d94; --chart-line:#00f0ff; --chart-label-halo:#0e0a1a;
     --chart-white:#050308; --chart-under:#b967ff; --chart-missed:#ff2d95; --chart-extra:#fee440;
@@ -236,7 +236,7 @@
   .back-badge{background:var(--back);}
   .preseason-badge{background:var(--preseason);}
   .deload-badge{background:var(--deload);color:var(--deload-on-text);}
-  .deload-status{font-size:0.76rem;line-height:1.45;color:var(--ink);margin:0 0 0.55rem;}
+  .deload-status{font-size:0.76rem;line-height:1.45;color:var(--ink);margin:0.35rem 0 0;}
   .deload-status div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .ski-tempo-line{font-size:0.76rem;color:var(--ski-text);background:var(--ski-bg);border:1px solid var(--ski-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
   .preseason-line{font-size:0.76rem;color:var(--preseason-text);background:var(--preseason-bg);border:1px solid var(--preseason-border);border-radius:8px;padding:0.45rem 0.65rem;margin:0.5rem 0 0.7rem;}
@@ -248,6 +248,13 @@
   .theme-toggle .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.25s ease;box-shadow:0 1px 3px rgba(0,0,0,0.3);}
   .theme-toggle.on{background:linear-gradient(90deg,#ff2d95,#b967ff,#00f0ff);}
   .theme-toggle.on .knob{left:27px;}
+  .theme-toggle.mod-switch.on{background:var(--mod-color);}
+  .mod-row{padding-bottom:0.75rem;margin-bottom:0.75rem;border-bottom:1px dashed var(--line);}
+  .mod-row:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+  .mod-head{display:flex;align-items:center;justify-content:space-between;gap:0.7rem;}
+  .mod-title{font-size:0.9rem;font-weight:600;color:var(--ink);}
+  .mod-desc{font-size:0.76rem;line-height:1.45;color:var(--slate);margin:0.3rem 0 0;}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
   :root[data-theme="dark"] .pill.active{color:#050308;}
   :root[data-theme="dark"] .pill.preseason-pill.active{color:#050308;}
   :root[data-theme="dark"] .pill.cat-strength.active,
@@ -2999,7 +3006,21 @@ function keepDeloadOn(){
   render();
 }
 
-// Always exactly two short lines, so the block stays the same size on or off.
+// One modifier: a title row with its on/off switch, then a short description.
+// The hidden label keeps "Name: ON/OFF" readable for screen readers.
+function renderModifierRow(key, emoji, name, desc, extraHtml){
+  const on = !!modes[key];
+  return `<div class="mod-row">
+      <div class="mod-head">
+        <span class="mod-title">${emoji} ${name}</span>
+        <button class="theme-toggle mod-switch${on ? " on" : ""}" style="--mod-color:var(--${key})" onclick="toggleMode('${key}')" aria-pressed="${on}" aria-label="${name}"><span class="knob"></span><span class="sr-only">${name}: ${on ? "ON" : "OFF"}</span></button>
+      </div>
+      <p class="mod-desc">${desc}</p>
+      ${extraHtml || ""}
+    </div>`;
+}
+
+// Deload status is always exactly two short lines, so the row stays the same size on or off.
 function renderDeloadModifier(){
   const st = deloadStatus();
   let last, next;
@@ -3014,15 +3035,9 @@ function renderDeloadModifier(){
     else if(st.daysUntilDue === 0) next = `Next recommended: today`;
     else next = `Next recommended: ${fmtShortDate(st.nextDue)} · <b>due now</b>`;
   }
-  return `<div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
-      <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.4rem;">
-        🔋 A planned lighter week to let joints and tendons catch up and avoid injury: about 10% less weight and a third fewer sets on every lift. Overrides Ski and Preseason targets. Lifts already cut for Knee or Back Care keep that weight and just lose sets. It switches itself off after a week unless you choose to keep it on, and suggestions pick back up from your pre-deload weights.
-      </p>
-      <div class="deload-status" id="deload-status"><div>${last}</div><div>${next}</div></div>
-      <button class="tool-btn" onclick="toggleMode('deload')" style="background:${modes.deload ? 'var(--deload)' : ''};color:${modes.deload ? 'var(--deload-on-text)' : ''};border-color:${modes.deload ? 'var(--deload)' : ''};">
-        ${modes.deload ? '🔋 Deload Week: ON' : '🔋 Deload Week: OFF'}
-      </button>
-    </div>`;
+  return renderModifierRow("deload", "🔋", "Deload Week",
+    "A planned lighter week so joints and tendons catch up: about 10% less weight and a third fewer sets on every lift. Lifts already cut for Knee or Back Care just lose sets. Ends itself after 7 days.",
+    `<div class="deload-status" id="deload-status"><div>${last}</div><div>${next}</div></div>`);
 }
 
 function renderOverview(){
@@ -3149,38 +3164,10 @@ function renderOverview(){
   html += `<div class="card">
     <h3 class="section">Training Modifiers</h3>
     ${renderDeloadModifier()}
-    <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
-      <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
-        🎿 Squat, Bulgarian Split Squat, and Walking Lunge shift to lower rep targets with a slower eccentric tempo and more single-leg emphasis. Roughly Nov-March.
-      </p>
-      <button class="tool-btn" onclick="toggleMode('ski')" style="background:${modes.ski ? 'var(--ski)' : ''};color:${modes.ski ? '#fff' : ''};border-color:${modes.ski ? 'var(--ski)' : ''};">
-        ${modes.ski ? '🎿 Ski Season: ON' : '🎿 Ski Season: OFF'}
-      </button>
-    </div>
-    <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
-      <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
-        🏔️ Adds power/explosive, frontal plane, eccentric quad, and loaded calf accessories (hidden while this is off) to your existing Full/Upper/Lower days for the ~7-10 week ramp into ski season. Independent of Ski Season mode above - run either or both. Power work goes first in the session, after warmup and before the heavy lifts; stop a power set the moment speed drops, it's not conditioning.
-      </p>
-      <button class="tool-btn" onclick="toggleMode('preseason')" style="background:${modes.preseason ? 'var(--preseason)' : ''};color:${modes.preseason ? '#fff' : ''};border-color:${modes.preseason ? 'var(--preseason)' : ''};">
-        ${modes.preseason ? '🏔️ Preseason Prep: ON' : '🏔️ Preseason Prep: OFF'}
-      </button>
-    </div>
-    <div style="padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px dashed var(--line);">
-      <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
-        🦵 Squat, Bulgarian Split Squat, and Walking Lunge hold and cut load ~10% while your knee settles down. Everything else trains as normal.
-      </p>
-      <button class="tool-btn" onclick="toggleMode('knee')" style="background:${modes.knee ? 'var(--knee)' : ''};color:${modes.knee ? '#fff' : ''};border-color:${modes.knee ? 'var(--knee)' : ''};">
-        ${modes.knee ? '🦵 Knee Care: ON' : '🦵 Knee Care: OFF'}
-      </button>
-    </div>
-    <div>
-      <p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.5rem;">
-        🩺 Squat, RDL, Barbell Row, and Kettlebell Swings hold and cut load ~10% while your lower back settles down. Everything else trains as normal.
-      </p>
-      <button class="tool-btn" onclick="toggleMode('back')" style="background:${modes.back ? 'var(--back)' : ''};color:${modes.back ? '#fff' : ''};border-color:${modes.back ? 'var(--back)' : ''};">
-        ${modes.back ? '🩺 Low Back Care: ON' : '🩺 Low Back Care: OFF'}
-      </button>
-    </div>
+    ${renderModifierRow("ski", "🎿", "Ski Season", "Squat, Bulgarian Split Squat and Walking Lunge shift to lower reps with a slower lowering phase. Roughly Nov to March.")}
+    ${renderModifierRow("preseason", "🏔️", "Preseason Prep", "Adds power, lateral, lowering-phase and calf work to your lift days for the 7 to 10 week ramp into ski season. Power work goes first; stop a set when speed drops.")}
+    ${renderModifierRow("knee", "🦵", "Knee Care", "Squat, Bulgarian Split Squat and Walking Lunge hold and drop about 10% while your knee settles. Everything else trains as normal.")}
+    ${renderModifierRow("back", "🩺", "Low Back Care", "Squat, RDL, Barbell Row and Kettlebell Swings hold and drop about 10% while your lower back settles. Everything else trains as normal.")}
   </div>`;
 
   html += renderBackupSyncCard();
