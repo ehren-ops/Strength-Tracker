@@ -2597,6 +2597,59 @@ function describeSuggestion(ex, name){
   if(ex.trackBy === "duration") return `${s.minutes} min`;
   return `${s.sets}x${s.reps}`;
 }
+// Movement pattern per lift, so the coach can compare push vs pull, squat vs hinge, etc.
+const LIFT_PATTERNS = {
+  "Bench Press": "push", "Incline DB Press": "push", "Cable Chest Fly": "push", "Tricep Pushdown": "push", "Lateral Raise": "push",
+  "Barbell Row": "pull", "Cable Lat Pulldown": "pull", "Face Pulls": "pull", "Bicep Curl": "pull", "Dead Hang": "pull",
+  "RDL": "hinge", "Back Extension": "hinge", "Kettlebell Swings": "hinge",
+  "Squat": "squat", "Spanish Squat": "squat",
+  "Bulgarian Split Squat": "single-leg", "Walking Lunge": "single-leg", "Lateral Lunge": "single-leg",
+  "Box Jumps": "power", "Trap Bar Jump": "power", "Skater Bound": "power", "Med Ball Slam": "power",
+  "Standing Calf Raise": "calves", "Seated Calf Raise": "calves",
+  "Farmer's Carry": "carry and grip", "Copenhagen Plank": "core", "5-Minute Core Routine": "core",
+};
+
+// Pre-computed trend signals, so the model reasons over patterns instead of re-reading raw logs.
+// e1RM is Epley (weight x (1 + reps/30)); it puts 135x6 and 135x8 on one scale.
+function liftTrend(name, ex, asOf){
+  if(ex.trackBy === "checklist" || ex.trackBy === "duration") return null;
+  const es = ex.entries.filter(e => e.date <= asOf);
+  if(!es.length) return null;
+  const last = es[es.length - 1];
+  const e1 = e => (e.weight > 0 && e.reps) ? e.weight * (1 + e.reps / 30) : null;
+  const since = shiftISO(asOf, -28);
+  const recent = es.filter(e => e.date >= since);
+  const base = recent.length > 1 ? recent[0] : null;
+  let atLoad = 0;
+  const rpeAtLoad = [];
+  for(let i = es.length - 1; i >= 0 && es[i].weight === last.weight; i--){
+    atLoad++;
+    if(es[i].difficulty) rpeAtLoad.unshift(es[i].difficulty);
+  }
+  const a = base && e1(base), b = e1(last);
+  return {
+    pattern: LIFT_PATTERNS[name] || "other",
+    sessionsLast4Weeks: recent.length,
+    e1rmChange4WeeksPct: a && b ? Math.round((b - a) / a * 1000) / 10 : null,
+    repsChange4Weeks: base && !(last.weight > 0) && base.reps != null && last.reps != null ? last.reps - base.reps : null,
+    sessionsAtCurrentLoad: atLoad,
+    rpeAtCurrentLoad: rpeAtLoad,
+  };
+}
+
+function patternSummary(asOf){
+  const by = {};
+  Object.entries(data).forEach(([name, ex]) => {
+    const t = liftTrend(name, ex, asOf);
+    if(!t || t.e1rmChange4WeeksPct == null) return;
+    (by[t.pattern] ||= []).push(`${name} ${t.e1rmChange4WeeksPct > 0 ? "+" : ""}${t.e1rmChange4WeeksPct}%`);
+  });
+  return Object.fromEntries(Object.entries(by).map(([p, lifts]) => {
+    const pcts = lifts.map(l => parseFloat(l.split(" ").pop()));
+    return [p, { avgE1rmChange4WeeksPct: Math.round(pcts.reduce((x, y) => x + y, 0) / pcts.length * 10) / 10, lifts }];
+  }));
+}
+
 function coachTz(){
   try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }catch(e){ return "UTC"; }
 }
@@ -2618,11 +2671,12 @@ function buildSessionCoachPayload(date){
       targetReps: ex.trackBy === "weight" ? effectiveTargetReps(ex) : null,
       history: ex.entries.slice(Math.max(0, idx - 8), idx).map(e => compactEntry(e, ex)),
       appSuggestion: describeSuggestion(ex, name),
+      trend: liftTrend(name, ex, date),
     });
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
   const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
-  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), exercises };
+  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), exercises, patterns: patternSummary(date) };
 }
 
 // The past week plus 6 weeks of history per lift, enough to judge loading blocks and deloads.
@@ -2636,9 +2690,9 @@ function buildWeeklyCoachPayload(){
     const recent = ex.entries.filter(e => e.date >= since && e.date <= weekEnd);
     if(!recent.length) return;
     recent.forEach(e => sessionDates.add(e.date));
-    exercises.push({ name, entries: recent.map(e => compactEntry(e, ex)), appSuggestion: describeSuggestion(ex, name) });
+    exercises.push({ name, entries: recent.map(e => compactEntry(e, ex)), appSuggestion: describeSuggestion(ex, name), trend: liftTrend(name, ex, weekEnd) });
   });
-  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), sessionDates: [...sessionDates].sort(), exercises };
+  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), sessionDates: [...sessionDates].sort(), exercises, patterns: patternSummary(weekEnd) };
 }
 
 async function generateCoach(kind){

@@ -30,7 +30,7 @@ It started as a simple lift log, but it's grown into a real coaching and data sy
 - Training calendar: see which day-type you trained on any date this month, tap a day to see exactly what you logged
 - Recovery readiness score based on days rested and how hard recent sessions were, with a recommended number of rest days
 - Auto-generated "Coach's Notes" summarizing your last session in plain English, including flags for notes like "tender," "sore," or "pain" so nothing gets buried
-- Two on-demand AI coach buttons inside Coach's Notes, powered by Claude: **Session Breakdown** (right after a workout: verdict, recovery context, how to improve each lift next session, what to be mindful of) and **Weekly Check-in** (a deeper weekly review of training, recovery, body composition, fueling, phase and deload timing, plus next week's plan). Signed in with a linked Outlive account, both draw on Whoop recovery, sleep, rides, weight and nutrition. Results are cached and synced, never re-run automatically
+- Two on-demand AI coach buttons in the Coach's Notes header, powered by Claude: **Session** (right after a workout: a verdict, 2 to 3 insights connecting lifts and weeks, and only the lifts to change next time) and **Weekly** (what's moving, what's lagging, imbalances and risks, block and deload timing, next week's focus). Written as coaching insights, not a readback of logged numbers. Results are cached and synced, never re-run automatically
 
 **Seasonal programming**
 - One-tap Ski Season mode shifts target reps and tempo on key lower-body lifts toward strength-endurance, with a visual badge on affected exercises, then switches back just as easily

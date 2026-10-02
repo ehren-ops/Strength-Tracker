@@ -2,11 +2,14 @@
 
 Supabase Edge Function behind the two buttons in Coach's Notes:
 
-- **Session Breakdown**: a short post-workout note about the very next session. A verdict,
-  recovery context, how to improve each lift that needs a decision, and what to be mindful of.
-- **Weekly Check-in**: the deeper weekly review, still in bullets. Training by movement pattern,
-  recovery trend, body composition and fueling against goals, phase and deload call, and a plan
-  for next week.
+- **Session Breakdown**: a short post-workout note. A one-line verdict, 2 to 3 insights that
+  connect lifts and weeks, and only the lifts whose plan should change next session.
+- **Weekly Check-in**: the big-picture strength review. What's moving, what's lagging, imbalances
+  and risks, block and deload timing, next week's focus, and at most one bodyweight line.
+
+Both are written as insights, not a readback of logged numbers: the app pre-computes each lift's
+movement pattern, 4-week e1RM change, sessions at the current load and RPE at that load, plus a
+summary per movement pattern, so the model reasons over trends.
 
 Both are generated only when tapped, cached on the device, and synced to the `ai_breakdowns`
 table (`kind` = `session` or `weekly`) when signed in. Model: Claude Sonnet 5.5.
@@ -18,9 +21,9 @@ table (`kind` = `session` or `weekly`) when signed in. Model: Claude Sonnet 5.5.
   app's own next-session suggestion.
 - **Optionally, from an Outlive project:** when the caller is signed in and
   `OUTLIVE_SUPABASE_SECRET_KEY` is set, the function finds the Outlive account with the same email
-  and reads Whoop recovery, HRV, resting HR, sleep vs need, strain, rides, weigh-ins, logged meals,
-  and the goals row (`page_content`, page `coach`, key `goals`). Without it, the analysis still
-  runs on training data alone and the recovery and body comp parts say the data is missing.
+  and reads the goals row (`page_content`, page `coach`, key `goals`), 14 days of Whoop recovery,
+  sleep and rides (used only to explain a specific lift result), and the bodyweight trend (weekly
+  only). Recovery and nutrition analysis itself lives in Outlive.
 
 ## Setup after cloning this repo
 

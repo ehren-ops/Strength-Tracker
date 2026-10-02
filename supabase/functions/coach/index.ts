@@ -1,14 +1,16 @@
-// Strength Tracker coach: two on-demand analyses from one function.
-//   mode "session": short post-workout note, only about the very next session.
-//   mode "weekly":  the deeper weekly check-in, still in bullets.
+// Strength Tracker coach: two on-demand, strength-focused analyses from one function.
+//   mode "session": post-workout note. A verdict, 2-3 insights, and only the lifts to change next time.
+//   mode "weekly":  weekly check-in. What's moving, what's lagging, imbalances, block and deload,
+//                   next week's focus, and at most one bodyweight line.
 // POST {mode, payload} -> {breakdown: {verdict, sections: [{title, items}]}, generatedAt, context}
 //
 // payload is built client-side from the app's own log (buildSessionCoachPayload and
 // buildWeeklyCoachPayload in index.html). When the caller is signed in and this project has
-// OUTLIVE_SUPABASE_SECRET_KEY set, the function also reads that person's recovery, sleep, strain,
-// rides, weight, meals and goals from the Outlive project, matched by email (the mirror image of
-// Outlive's strength-sync). Without either it still runs on training data alone; `context` in the
-// response says which.
+// OUTLIVE_SUPABASE_SECRET_KEY set, the function also reads that person's goals and phases, recent
+// recovery and rides (used only to explain a lift result), and the bodyweight trend (weekly only)
+// from the Outlive project, matched by email (the mirror image of Outlive's strength-sync). Outlive
+// itself owns recovery and nutrition analysis. Without the link it still runs on training data
+// alone; `context` in the response says which.
 //
 // Unauthenticated on purpose (verify_jwt: false): the app works with no account at all. The abuse
 // guard is a spend cap on the Anthropic key. Requires ANTHROPIC_API_KEY.
@@ -97,17 +99,15 @@ async function outliveContext(email: string, mode: "session" | "weekly", end: st
   }
   if (!userId) return { status: "no_outlive_account", data: null };
 
-  const days = mode === "weekly" ? 42 : 30;
-  const from = shiftDate(end, -days);
+  const from = shiftDate(end, -14);
   const weekly = mode === "weekly";
   const none = Promise.resolve({ data: null as Row[] | null });
-  const [hrv, sleep, strain, workouts, body, meals, goals] = await Promise.all([
+  const [hrv, sleep, strain, workouts, body, goals] = await Promise.all([
     ol.from("hrv").select("recorded_date, hrv_ms, resting_hr, recovery_score, source").eq("user_id", userId).gte("recorded_date", from).lte("recorded_date", end),
     ol.from("sleep").select("sleep_date, total_sleep_min, sleep_need_min, source").eq("user_id", userId).gte("sleep_date", from).lte("sleep_date", end),
     ol.from("daily_strain").select("cycle_date, strain, source").eq("user_id", userId).gte("cycle_date", from).lte("cycle_date", end),
     ol.from("workouts").select("start_time, activity_type, duration_min, avg_hr").eq("user_id", userId).gte("start_time", from).lt("start_time", shiftDate(end, 2)),
-    weekly ? ol.from("daily_body").select("metric_date, weight_lb, body_fat_pct").eq("user_id", userId).gte("metric_date", from).lte("metric_date", end).not("weight_lb", "is", null) : none,
-    weekly ? ol.from("meals").select("logged_at, calories, protein_g").eq("user_id", userId).gte("logged_at", shiftDate(end, -15)).lt("logged_at", shiftDate(end, 2)) : none,
+    weekly ? ol.from("daily_body").select("metric_date, weight_lb").eq("user_id", userId).gte("metric_date", shiftDate(end, -35)).lte("metric_date", end).not("weight_lb", "is", null) : none,
     ol.from("page_content").select("value").eq("user_id", userId).eq("page", "coach").eq("key", "goals").maybeSingle(),
   ]);
 
@@ -124,7 +124,6 @@ async function outliveContext(email: string, mode: "session" | "weekly", end: st
 
   // One compact line per day: cheaper and easier for the model than nested objects.
   const recoveryDays: string[] = [];
-  const hrvSeries: { d: string; v: number | null; rhr: number | null; sleepH: number | null; needH: number | null }[] = [];
   for (let d = from; d <= end; d = shiftDate(d, 1)) {
     const h = hrvBy.get(d), s = sleepBy.get(d), st = strainBy.get(d), acts = actBy.get(d);
     if (!h && !s && !st && !acts) continue;
@@ -136,126 +135,93 @@ async function outliveContext(email: string, mode: "session" | "weekly", end: st
     if (st) parts.push(`strain ${round(num(st.strain), 1)}`);
     if (acts) parts.push(acts.join(", "));
     recoveryDays.push(parts.join(" | "));
-    hrvSeries.push({ d, v: num(h?.hrv_ms), rhr: num(h?.resting_hr), sleepH, needH });
   }
-  const last7 = hrvSeries.filter((x) => x.d > shiftDate(end, -7));
-  const last30 = hrvSeries.filter((x) => x.d > shiftDate(end, -30));
-  const averages = {
-    hrv30: round(avg(last30.map((x) => x.v))), hrv7: round(avg(last7.map((x) => x.v))),
-    rhr30: round(avg(last30.map((x) => x.rhr)), 1), rhr7: round(avg(last7.map((x) => x.rhr)), 1),
-    sleepH7: round(avg(last7.map((x) => x.sleepH)), 1), sleepNeedH7: round(avg(last7.map((x) => x.needH)), 1),
-  };
-
   const data: Row = {
     goals: goals.data?.value ?? null,
     recoveryDays,
-    recoveryAverages: averages,
   };
 
   if (weekly) {
-    const weights = ((body.data as Row[]) ?? []).map((r) => ({ d: String(r.metric_date), w: num(r.weight_lb), bf: num(r.body_fat_pct) }));
-    weights.sort((a, b) => (a.d < b.d ? -1 : 1));
+    const weights = ((body.data as Row[]) ?? []).map((r) => ({ d: String(r.metric_date), w: num(r.weight_lb) }));
     const windowAvg = (lo: number, hi: number) =>
       round(avg(weights.filter((x) => x.d > shiftDate(end, -hi) && x.d <= shiftDate(end, -lo)).map((x) => x.w)), 1);
-    const avgNow = windowAvg(0, 7), avgPrev = windowAvg(7, 14), avg4wAgo = windowAvg(28, 35);
-    const g = (goals.data?.value ?? {}) as { weight?: { targetLb?: number; by?: string } };
-    let neededPerWeek: number | null = null;
-    if (avgNow != null && g.weight?.targetLb && isDate(g.weight.by)) {
-      const weeksLeft = (new Date(g.weight.by + "T00:00:00Z").getTime() - new Date(end + "T00:00:00Z").getTime()) / 604800000;
-      if (weeksLeft > 0) neededPerWeek = round((avgNow - g.weight.targetLb) / weeksLeft, 2);
-    }
-    data.weight = {
-      weighIns: weights.map((x) => `${x.d} ${x.w}${x.bf != null ? ` (bf ${x.bf}%)` : ""}`),
-      avg7: avgNow, avgPrior7: avgPrev, avg4WeeksAgo: avg4wAgo,
-      changePerWeek: avgNow != null && avgPrev != null ? round(avgNow - avgPrev, 1) : null,
-      lossNeededPerWeekForGoal: neededPerWeek,
-    };
-
-    const dayTotals = new Map<string, { kcal: number; protein: number; entries: number }>();
-    for (const m of (meals.data as Row[]) ?? []) {
-      const d = localDay(m.logged_at, tz);
-      if (d < shiftDate(end, -13) || d > end) continue;
-      const t = dayTotals.get(d) ?? { kcal: 0, protein: 0, entries: 0 };
-      t.kcal += num(m.calories) ?? 0;
-      t.protein += num(m.protein_g) ?? 0;
-      t.entries += 1;
-      dayTotals.set(d, t);
-    }
-    const days14 = [...dayTotals.entries()].sort(([a], [b]) => (a < b ? -1 : 1));
-    const week = days14.filter(([d]) => d > shiftDate(end, -7));
-    data.nutrition = {
-      days: days14.map(([d, t]) => `${d} ${Math.round(t.kcal)} kcal, ${Math.round(t.protein)} g protein, ${t.entries} entries`),
-      last7: {
-        daysLogged: week.length,
-        avgKcal: round(avg(week.map(([, t]) => t.kcal))),
-        avgProtein: round(avg(week.map(([, t]) => t.protein))),
-      },
-    };
+    data.bodyweight = { avg7: windowAvg(0, 7), avg4WeeksAgo: windowAvg(28, 35) };
   }
   return { status: "outlive_ok", data };
 }
 
 // ---------- prompts and output shapes ----------
-const SESSION_SYSTEM = `You are the athlete's strength coach. Right after a lifting session they tap a button for your post-workout note. Its only job: what to change and watch for in the very next session. A separate weekly check-in covers the big picture, so stay narrow.
+const PRINCIPLES = `Your value is synthesis the athlete cannot see on the log screen. They already see every weight, set, rep and RPE they logged, so never hand those back. Every bullet must be an insight: a pattern across sessions, a comparison between lifts or movement patterns, a likely cause, or a decision. Numbers appear only as brief evidence for the insight, never as the point.
+Bad: "Bench Press: 170 lb 3x8 at RPE 7."
+Good: "Pressing is outrunning pulling: bench is up about 17% in 4 weeks while rows and pulldowns have sat still for 3."
 
-Input is JSON: each exercise in the session with today's result, its last 8 results (date, weight and sets x reps, RPE after @, note in quotes) and the app's own next-session suggestion; active training modes; days since the previous session. When available, an "outlive" block adds goals and training phases, daily recovery lines (Whoop recovery %, HRV, resting HR, sleep vs need, day strain, rides and other workouts) and 30-day vs 7-day averages.
-
-Write:
-- verdict: one or two sentences. The so-what of this session, in light of the goal and current phase.
-- recovery: up to 3 bullets linking recovery, sleep, strain or rides to how this session went or how hard the next one should be. Cite specific numbers and dates. Look for patterns, such as hard or failed sets that follow low recovery, short sleep or big ride days. Empty list when there is no recovery data or nothing notable.
-- howToImprove: 3 to 5 bullets, one per lift that needs a decision, written "Lift: target. Reason." with a concrete weight and sets x reps. The app suggestion is the default; override it only with a stated reason (RPE, a note, pain, recovery, phase). Favor the lifts that matter most for the current phase.
-- mindfulNextTime: 1 to 3 bullets, most important first. Recurring pain or injury notes (name the dates), a recovery rule for the next session (for example, repeat weights instead of adding when recovery is under 35% or sleep under 5 hours), fueling only if it plausibly affected this session.
+Look for:
+- Divergence between movement patterns (push vs pull, squat vs hinge, upper vs lower, compounds vs accessories). Use the "patterns" summary and each lift's "trend".
+- Stalled vs unpushed: several sessions at one load with RPE 7 or below is unpushed, not stalled. Rising RPE at the same load is real fatigue. Falling e1RM while related lifts climb points to a shared limiter (grip, a joint, fatigue from earlier exercises).
+- Notes that cluster by body region or keep repeating across weeks.
+- Progressions that jumped too far, and lifts that matter most for the current training phase and goal.
+- Recovery data, when present, is only an explainer: use it only when it explains a specific lift result (for example a hard set the day after a long ride or a short night). Never summarize recovery, sleep or HRV trends on their own; another app covers that.
 
 Rules:
-- Each bullet under 25 words. No intro, no filler.
-- Never restate a number without saying what it means for the next session.
-- Skip accessories that are on track. Skip generic advice such as warming up, hydrating or sleeping more.
+- Short bullets, under 28 words. Lead with the finding.
 - Use only the data given. Never invent a reading, weight or date.
-- No medical diagnosis. If pain recurs, say to get it checked by a physio or doctor.
+- No generic advice (warm up, hydrate, sleep more, listen to your body).
+- No medical diagnosis. If pain notes recur, say to get it checked by a physio or doctor.
 - Never use em dashes. Use commas, periods or colons instead.`;
 
-const WEEKLY_SYSTEM = `You are the athlete's strength and conditioning coach writing the weekly check-in they request once a week. It is the holistic review: training, recovery, body composition, fueling and where they are in the plan. Go deep, but always in short bullets, never paragraphs. The post-workout note already handles next-session tweaks, so think in weeks and phases.
+const SESSION_SYSTEM = `You are the athlete's strength coach writing a short note right after a lifting session. Think about how this session fits the last several weeks before writing.
 
-Input is JSON: the week (weekStart to weekEnd), session dates, and up to 6 weeks of history per lift (date, weight and sets x reps, RPE after @, note in quotes) with the app's next-session suggestion. When available, an "outlive" block adds goals (weight target and date, calorie and protein targets, training phases with their focus), daily recovery lines (Whoop recovery %, HRV, resting HR, sleep vs need, strain, rides and other workouts) with 30-day vs 7-day averages, weigh-ins with 7-day averages and the loss per week the goal needs, and daily logged calories and protein.
+Input is JSON: each lift done today with today's result, its last 8 results (date, weight and sets x reps, RPE after @, note in quotes), the app's own next-session suggestion and a pre-computed "trend" (movement pattern, 4-week e1RM change, sessions at the current load, RPE at that load); a "patterns" summary across all lifts; active training modes. When available, an "outlive" block adds goals and training phases plus 14 days of recovery lines.
+
+${PRINCIPLES}
 
 Write:
-- verdict: one or two sentences on the week, in light of the goal and phase.
-- training: 3 to 5 bullets. Progress by movement pattern (push, pull, hinge, squat and single-leg, power), push vs pull balance, stalls, and the lifts that matter most for the current phase.
-- recovery: 2 to 4 bullets. HRV and resting HR this week vs the 30-day baseline, sleep vs need, how rides and lifts stacked, and any link between low recovery and hard or failed sets.
-- bodyComp: 2 to 4 bullets. 7-day average weight vs the goal pace (loss per week needed vs actual), average calories and protein vs targets, and how many days protein was hit. When days look incomplete (few entries, very low totals), call it a logging gap rather than real intake.
-- phase: 1 to 3 bullets. Where they are in the plan and what should shift soon (such as the move into ski prep), plus a deload call: count the weeks of steady loading since the last lighter week and say when a deload is due, especially if HRV is trending down or pain notes are piling up.
-- nextWeek: 3 to 5 bullets. A concrete plan: which days to lift relative to big rides, priority lifts with targets, one nutrition fix, one recovery rule.
+- verdict: one sentence, the so-what of this session in the context of the last few weeks and the current phase.
+- insights: 2 to 3 bullets, the most important things you see. Connect lifts and weeks. Today's session should be the lens, but the insight can reach across the whole program.
+- nextSession: 2 to 4 bullets, only lifts whose plan should change or that need a deliberate decision, written "Lift: action. Why." The app already shows its default next weight for every lift, so skip lifts where you agree with it unless the reason matters.`;
 
-Rules:
-- Each bullet under 30 words. Lead with the finding, then the action.
-- Never restate a number without saying what it means. No generic advice.
-- Use only the data given. Never invent a reading, weight or date. If an area has no data, give one bullet saying what is missing.
-- No medical diagnosis. If pain recurs, say to get it checked by a physio or doctor.
-- Never use em dashes. Use commas, periods or colons instead.`;
+const WEEKLY_SYSTEM = `You are the athlete's strength coach writing the weekly check-in. It is the big-picture strength review: how the program is moving as a whole, where it is lopsided, and what to prioritize next week. Think it through across all lifts and weeks before writing.
+
+Input is JSON: the week (weekStart to weekEnd), session dates, up to 6 weeks of history per lift (date, weight and sets x reps, RPE after @, note in quotes), the app's next-session suggestion and a pre-computed "trend" per lift, and a "patterns" summary. When available, an "outlive" block adds goals and training phases, 14 days of recovery lines, and a bodyweight trend.
+
+${PRINCIPLES}
+
+Write:
+- verdict: one or two sentences on where the program stands this week, in the context of the goal and phase.
+- moving: 1 to 3 bullets on what is progressing well and why it is working.
+- lagging: 1 to 3 bullets on what is stalled, regressing or unpushed, and the likely reason.
+- risks: 1 to 3 bullets on imbalances, recurring pain or limiters (grip, a joint, exercise order) that could stall progress.
+- block: 1 to 2 bullets on the training block: weeks of steady loading since the last lighter week, whether a deload is due and why, and what should shift for the coming phase.
+- nextWeek: 3 to 4 bullets of priorities for next week, written as focus points, not a full workout list.
+- bodyweight: one short sentence only if bodyweight changes the strength picture (for example strength rising while weight drops means relative strength is up). Otherwise an empty string.`;
 
 const SessionOut = z.object({
   verdict: z.string(),
-  recovery: z.array(z.string()),
-  howToImprove: z.array(z.string()),
-  mindfulNextTime: z.array(z.string()),
+  insights: z.array(z.string()),
+  nextSession: z.array(z.string()),
 });
 const WeeklyOut = z.object({
   verdict: z.string(),
-  training: z.array(z.string()),
-  recovery: z.array(z.string()),
-  bodyComp: z.array(z.string()),
-  phase: z.array(z.string()),
+  moving: z.array(z.string()),
+  lagging: z.array(z.string()),
+  risks: z.array(z.string()),
+  block: z.array(z.string()),
   nextWeek: z.array(z.string()),
+  bodyweight: z.string(),
 });
 
 function toSections(mode: "session" | "weekly", out: Record<string, unknown>) {
   const titles: [string, string][] = mode === "session"
-    ? [["recovery", "Recovery context"], ["howToImprove", "How to improve next session"], ["mindfulNextTime", "Be mindful of"]]
-    : [["training", "Training"], ["recovery", "Recovery"], ["bodyComp", "Body comp and fuel"], ["phase", "Phase and deload"], ["nextWeek", "Next week"]];
+    ? [["insights", "What I'm seeing"], ["nextSession", "Next session"]]
+    : [["moving", "What's moving"], ["lagging", "What's lagging"], ["risks", "Imbalances and risks"], ["block", "Block and deload"], ["nextWeek", "Next week's focus"], ["bodyweight", "Bodyweight"]];
   return {
     verdict: String(out.verdict ?? ""),
     sections: titles
-      .map(([k, title]) => ({ title, items: (out[k] as string[] | undefined) ?? [] }))
+      .map(([k, title]) => {
+        const v = out[k];
+        const items = Array.isArray(v) ? v : typeof v === "string" && v.trim() ? [v.trim()] : [];
+        return { title, items };
+      })
       .filter((s) => s.items.length),
   };
 }
@@ -289,11 +255,11 @@ Deno.serve(async (req) => {
     const client = new Anthropic({ apiKey });
     const response = await client.beta.messages.parse({
       model: MODEL,
-      max_tokens: mode === "weekly" ? 12000 : 8000,
+      max_tokens: 16000,
       system: mode === "weekly" ? WEEKLY_SYSTEM : SESSION_SYSTEM,
       messages: [{ role: "user", content: "Data (JSON):\n" + JSON.stringify({ ...payload, outlive: context.data }) }],
       output_config: {
-        effort: mode === "weekly" ? "medium" : "low",
+        effort: mode === "weekly" ? "high" : "medium",
         format: betaZodOutputFormat(mode === "weekly" ? WeeklyOut : SessionOut),
       },
       // On a safety-classifier decline, the API reruns the request on Anthropic's recommended

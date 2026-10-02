@@ -1431,6 +1431,8 @@ async function main(){
   if(sessionReq.mode !== 'session' || !sessionReq.payload.date || !sessionReq.payload.tz) throw new Error('expected a session-mode request with the session date and time zone, got: ' + JSON.stringify(sessionReq).slice(0, 300));
   const squatPayload = sessionReq.payload.exercises.find(e => e.name === 'Squat');
   if(!squatPayload || !Array.isArray(squatPayload.history) || squatPayload.history.length > 8 || !squatPayload.appSuggestion) throw new Error('expected each lift to carry up to 8 prior results and the app suggestion, got: ' + JSON.stringify(squatPayload));
+  if(!squatPayload.trend || squatPayload.trend.pattern !== 'squat' || typeof squatPayload.trend.sessionsAtCurrentLoad !== 'number') throw new Error('expected a pre-computed trend with the movement pattern per lift, got: ' + JSON.stringify(squatPayload.trend));
+  if(!sessionReq.payload.patterns || typeof sessionReq.payload.patterns !== 'object') throw new Error('expected a movement-pattern summary in the session payload');
   if(aiBreakdownCallCount !== 1) throw new Error('expected exactly one call to the breakdown function, got ' + aiBreakdownCallCount);
   console.log('OK: clicking Session Breakdown calls the function once and renders the verdict and all three sections');
 
@@ -1555,6 +1557,7 @@ async function main(){
   if(aiBreakdownCallCount !== callsBeforeWeekly + 1) throw new Error('expected exactly one coach call for the weekly check-in');
   const weeklyReq = coachRequests[coachRequests.length - 1];
   if(weeklyReq.mode !== 'weekly' || !weeklyReq.payload.weekEnd || !weeklyReq.payload.weekStart || !weeklyReq.payload.exercises.length) throw new Error('expected a weekly-mode request with the week window and lift history, got: ' + JSON.stringify(weeklyReq).slice(0, 300));
+  if(!weeklyReq.payload.patterns || !weeklyReq.payload.exercises.every(e => 'trend' in e)) throw new Error('expected pattern summary and per-lift trends in the weekly payload');
   if(!weeklyReq.payload.exercises.every(e => Array.isArray(e.entries) && e.entries.every(x => x.slice(0, 10) >= weeklyReq.payload.weekEnd.slice(0, 4)))) throw new Error('expected compact dated entries per lift');
   if(await page.locator('text=Mock weekly training item.').count() !== 1 || await page.locator('text=Mock next-week item.').count() !== 1) throw new Error('expected the weekly sections to render');
   if(await page.locator('text=Mock breakdown headline').count() !== 0) throw new Error('expected the session breakdown to stay collapsed while the weekly check-in shows');
