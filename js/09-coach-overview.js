@@ -166,6 +166,7 @@ function buildSessionCoachPayload(date){
       history: ex.entries.slice(Math.max(0, idx - 8), idx).map(e => compactEntry(e, ex)),
       appSuggestion: describeSuggestion(ex, name),
       trend: liftTrend(name, ex, date),
+      units: sidesText(name),
     });
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
@@ -184,7 +185,7 @@ function buildWeeklyCoachPayload(){
     const recent = ex.entries.filter(e => e.date >= since && e.date <= weekEnd);
     if(!recent.length) return;
     recent.forEach(e => sessionDates.add(e.date));
-    exercises.push({ name, entries: recent.map(e => compactEntry(e, ex)), appSuggestion: describeSuggestion(ex, name), trend: liftTrend(name, ex, weekEnd) });
+    exercises.push({ name, units: sidesText(name), entries: recent.map(e => compactEntry(e, ex)), appSuggestion: describeSuggestion(ex, name), trend: liftTrend(name, ex, weekEnd) });
   });
   const orderSince = shiftISO(weekEnd, -13);
   const sessionOrders = Object.fromEntries([...sessionDates].filter(d => d >= orderSince).sort()

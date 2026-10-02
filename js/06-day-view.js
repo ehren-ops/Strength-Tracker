@@ -270,7 +270,9 @@ function renderExerciseCard(name, ex){
       ? (ex.trackBy==="weight" ? last.weight-first.weight : ex.trackBy==="duration" ? last.minutes-first.minutes : last.reps-first.reps)
       : 0;
     const deltaColor = delta>0 ? "color:var(--emerald)" : delta<0 ? "color:var(--amber)" : "color:var(--slate)";
-    const bigVal = ex.trackBy==="weight" ? last.weight+" lbs" : ex.trackBy==="duration" ? last.minutes+" min" : last.reps+" reps";
+    const sideTag = s => s ? `<span class="side-tag">${s}</span>` : "";
+    const bigVal = ex.trackBy==="weight" ? last.weight+" lbs" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
+      : ex.trackBy==="duration" ? last.minutes+" min" : last.reps+" reps" + sideTag(repsSuffix(name));
 
     html += `<div class="weight-row">
       <div class="weight-main">
@@ -289,7 +291,7 @@ function renderExerciseCard(name, ex){
       let msg;
       let nextLabel;
       if(ex.trackBy === "weight"){
-        nextLabel = `${suggestion.weight} lbs ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}`;
+        nextLabel = `${suggestion.weight} lbs${weightSuffix(name)} ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}${repsSuffix(name)}`;
         // When the prior session's actual reps beat the target, call that out by
         // name with the real number instead of flattening it to a plain "hit
         // target" - going over is a stronger, more specific signal than a bare hit.
@@ -345,7 +347,7 @@ function renderExerciseCard(name, ex){
           ? `Rated hard: 5 min shorter.`
           : `Holding steady.`;
       } else {
-        nextLabel = repLabel(suggestion.sets,suggestion.reps,ex.unit);
+        nextLabel = repLabel(suggestion.sets,suggestion.reps,ex.unit) + repsSuffix(name);
         msg = suggestion.deloadWeek ? `Deload: same reps, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`
           : suggestion.powerHold ? `Power: hold reps; go higher or farther only while every rep stays fast.`
           : `Add 2 reps.`;
@@ -377,7 +379,7 @@ function renderExerciseCard(name, ex){
 
     html += `<div style="margin-top:0.9rem;">`;
     html += `<h3 class="section" style="margin-bottom:0.4rem;">Recent History</h3>`;
-    const histColLabel = ex.trackBy==="duration" ? "Cardio" : ex.trackBy==="weight" ? "Load" : "Sets";
+    const histColLabel = ex.trackBy==="duration" ? "Cardio" : ex.trackBy==="weight" ? "Load" + (sidesOf(name).weight === "total" ? "" : "/" + sidesOf(name).weight) : "Sets" + repsSuffix(name);
     const cardioCls = ex.trackBy==="duration" ? " cardio" : "";
     html += `<div class="hist-row header${cardioCls}"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;
     recent.forEach((r, idx) => { html += renderHistRow(r.e, r.i, idx === 0, ex, name); });
@@ -402,17 +404,16 @@ function renderHistRow(e, idx, isLatest, ex, name){
   const key = name + "|" + idx;
 
   if(editingKey === key){
-    const unitLabel = ex.unit === "sec" ? "Seconds" : "Reps";
     return `<div class="hist-edit-box">
       <div class="form-row">
-        ${ex.trackBy==="weight" ? `<div class="field"><label>Weight</label><input type="number" inputmode="decimal" id="edit-weight" value="${e.weight}"></div>` : ""}
+        ${ex.trackBy==="weight" ? `<div class="field"><label>${weightFieldLabel(name)}</label><input type="number" inputmode="decimal" id="edit-weight" value="${e.weight}"></div>` : ""}
         ${ex.trackBy==="duration"
           ? `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="edit-minutes" value="${e.minutes}"></div>`
             + (ex.trackDistance ? `<div class="field"><label>Miles</label><input type="number" inputmode="decimal" step="0.1" id="edit-distance" value="${e.distance ?? ''}"></div>` : "")
             + (ex.trackSpeed ? `<div class="field"><label>MPH</label><input type="number" inputmode="decimal" step="0.1" id="edit-speed" value="${e.speed ?? ''}"></div>` : "")
             + (ex.trackIncline ? `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="edit-incline" value="${e.incline ?? ''}"></div>` : "")
           : `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="edit-sets" value="${e.sets}"></div>
-             <div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="edit-reps" value="${e.reps}"></div>`
+             <div class="field"><label>${repsFieldLabel(name, ex.unit)}</label><input type="number" inputmode="numeric" id="edit-reps" value="${e.reps}"></div>`
         }
       </div>
       <div class="form-row">
@@ -526,7 +527,6 @@ function confirmDeleteEntry(name, idx){
 }
 
 function renderForm(name, ex){
-  const unitLabel = ex.unit === "sec" ? "Seconds" : "Reps";
   let html = "";
   if(ex.entries.length){
     html += `<div class="action-row">`;
@@ -559,9 +559,9 @@ function renderForm(name, ex){
   // RPE rides in the numbers row, so the form is three short rows: numbers, note, date and log.
   const rpeField = `<div class="field field-rpe"><label>RPE</label><input type="number" inputmode="numeric" id="f-difficulty" min="1" max="10" value="7"></div>`;
   if(ex.trackBy === "weight"){
-    html += `<div class="field"><label>Weight</label><input type="number" inputmode="decimal" id="f-weight" value="${weightDefault}"></div>`;
+    html += `<div class="field"><label>${weightFieldLabel(name)}</label><input type="number" inputmode="decimal" id="f-weight" value="${weightDefault}"></div>`;
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
-    html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
+    html += `<div class="field"><label>${repsFieldLabel(name, ex.unit)}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   } else if(ex.trackBy === "duration"){
     html += `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="f-minutes" value="${minutesDefault}"></div>`;
     if(ex.trackDistance) html += `<div class="field"><label>Miles</label><input type="number" inputmode="decimal" step="0.1" id="f-distance"></div>`;
@@ -569,7 +569,7 @@ function renderForm(name, ex){
     if(ex.trackIncline) html += `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="f-incline"></div>`;
   } else {
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
-    html += `<div class="field"><label>${unitLabel}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
+    html += `<div class="field"><label>${repsFieldLabel(name, ex.unit)}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   }
   // Cardio already fills its row (minutes, miles, speed, incline), so RPE moves next to Note.
   if(ex.trackBy !== "duration") html += rpeField;

@@ -38,13 +38,13 @@ const SEED = {
 const DAY_ORDER = {
   full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Seated Calf Raise"],
   upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
-  lower: ["Squat","RDL","Bulgarian Split Squat","Hip Thrust","Kettlebell Swings","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat"],
+  lower: ["Squat","RDL","Bulgarian Split Squat","Hip Thrust","Kettlebell Swings","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound"],
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
   // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
-  extra: ["Farmer's Carry","Dead Hang","Zone 2 Ride","Incline Treadmill Walk","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch"],
+  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Zone 2 Ride","Incline Treadmill Walk","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch"],
 };
-const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Spanish Squat","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
+const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
 function activeDayOrder(day){
   return DAY_ORDER[day].filter(name => modes.preseason || !PRESEASON_ONLY.has(name));
 }
@@ -57,6 +57,7 @@ const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
 const EXTRA_CATEGORY = {
   "Farmer's Carry": "strength",
   "Dead Hang": "strength",
+  "Spanish Squat": "strength",
   "Zone 2 Ride": "cardio",
   "Incline Treadmill Walk": "cardio",
   "5-Minute Core Routine": "core",
@@ -112,13 +113,32 @@ const EXERCISE_TIPS = {
   "Lateral Lunge": ["Sit back into the bent hip, other leg straight, chest up.", "Cossack squat or lateral band walk."],
   "Trap Bar Jump": ["Jump tall, land soft, reset before each rep.", "DB jump or bodyweight squat jump."],
   "Skater Bound": ["Push sideways off the outside leg, stick the landing.", "Lateral line hops or lateral step-ups."],
-  "Spanish Squat": ["Band behind the knees, sit straight down, shins vertical.", "Wall sit or slow box squat."],
+  "Spanish Squat": ["3x10 banded: band behind the knees, sit straight down, 3 sec hold.", "Wall sit or slow box squat."],
   "Farmer's Carry": ["Tall posture, shoulders packed, short quick steps.", "Suitcase carry or trap bar hold."],
   "Dead Hang": ["Active shoulders, full grip, steady breathing.", "Assisted hang with feet on a box."],
   "Copenhagen Plank": ["Hips high, body straight, top leg does the work.", "Knee-on-bench version or side plank."],
   "Lateral Raise": ["Slight lean, lead with the elbows, stop at shoulder height.", "Cable or machine lateral raise."],
   "Zone 2 Ride": ["Conversational pace, steady cadence.", "Rower or incline walk at the same effort."],
   "Incline Treadmill Walk": ["No handrails, tall posture, steady pace.", "Stair climber or Zone 2 bike."],
+};
+
+// What the logged numbers mean, so a one-arm or one-leg lift is never ambiguous. weight: "hand"
+// (each dumbbell or handle), "side" (each stack of a two-stack cable) or "total" (bar, stack, bell,
+// ball or a single dumbbell held in both hands). reps: "leg" or "side" for one-sided work, else
+// "total". Anything not listed is total for both. Shown on the form labels, the Next line, the big
+// number, the history header and in the coach's data.
+const EXERCISE_SIDES = {
+  "Incline DB Press": { weight: "hand" },
+  "Bulgarian Split Squat": { weight: "hand", reps: "leg" },
+  "Walking Lunge": { weight: "hand", reps: "leg" },
+  "Lateral Lunge": { reps: "side" },
+  "Farmer's Carry": { weight: "hand" },
+  "Bicep Curl": { weight: "hand" },
+  "Lateral Raise": { weight: "hand" },
+  "Cable Chest Fly": { weight: "side" },
+  "Standing Calf Raise": { weight: "hand" },
+  "Skater Bound": { reps: "side" },
+  "Copenhagen Plank": { reps: "side" },
 };
 
 // Every value ex.trackBy can ever hold. This list MUST stay in sync by hand
@@ -168,7 +188,7 @@ const EXERCISE_DEFAULTS = {
   "Seated Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15, soleus for boot control." },
   "Trap Bar Jump": { trackBy: "weight", targetReps: 3, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "4x3 @ 95-135 lb. Stop if speed drops." },
   "Skater Bound": { trackBy: "reps", targetReps: 4, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "3x4 per side, stick each landing 2 sec." },
-  "Spanish Squat": { trackBy: "reps", targetReps: 10, preseason: true, preseasonWeek3: true, preseasonNote: "3x10, banded, 3 sec hold." },
+  "Spanish Squat": { trackBy: "reps", targetReps: 10, preseason: false, preseasonWeek3: false },
   "Thoracic Spine Stretch": { trackBy: "checklist" },
   "Hip Stretch": { trackBy: "checklist" },
   "Leg Stretch": { trackBy: "checklist" },
@@ -253,7 +273,7 @@ const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "target
 // otherwise a later wording or number edit (e.g. dropping a knee-specific
 // load reduction once the knee wasn't an issue anymore) would silently
 // never reach anyone who already had the exercise locally.
-const ALWAYS_SYNC_KEYS = ["preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps"];
+const ALWAYS_SYNC_KEYS = ["preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
 }
@@ -285,6 +305,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v49";
+const APP_VERSION = "v50";
 const APP_UPDATED = "Oct 2, 2026";
 

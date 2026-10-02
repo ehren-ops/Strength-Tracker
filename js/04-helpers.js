@@ -122,6 +122,20 @@ function platesLabel(totalWeight, equipment){
   const parts = plates.map(p => `${p.count}×${p.plate}`).join(" + ");
   return `${parts} per side${unreachable ? " - closest with standard plates" : ""}`;
 }
+// Labels that say whether a number is per hand, per side, per leg or total (EXERCISE_SIDES).
+function sidesOf(name){
+  const s = EXERCISE_SIDES[name] || {};
+  return { weight: s.weight || "total", reps: s.reps || "total" };
+}
+function weightSuffix(name){ const w = sidesOf(name).weight; return w === "total" ? " total" : "/" + w; }
+function repsSuffix(name){ const r = sidesOf(name).reps; return r === "total" ? "" : "/" + r; }
+function weightFieldLabel(name){ const w = sidesOf(name).weight; return w === "total" ? "Lb total" : "Lb / " + w; }
+function repsFieldLabel(name, unit){ const r = sidesOf(name).reps; const base = unit === "sec" ? "Seconds" : "Reps"; return r === "total" ? base : `${base} / ${r}`; }
+function sidesText(name){
+  const s = sidesOf(name), words = { hand: "each hand", side: "each side", leg: "each leg", total: "total" };
+  return `weight ${words[s.weight]}, reps ${words[s.reps]}`;
+}
+
 function repLabel(sets, reps, unit){
   return unit === "sec" ? `${sets}x${reps}sec` : `${sets}x${reps}`;
 }

@@ -957,7 +957,7 @@ async function main(){
 
   console.log('=== 42: new preseason exercises appear on the right days without disturbing the default landing lift ===');
   // Day mapping: Lower Body = squat day (Box Jumps/Lateral Lunge/Trap Bar
-  // Jump/Skater Bound/Spanish Squat - all quad-dominant/squat-pattern work
+  // Jump/Skater Bound - all quad-dominant/squat-pattern work
   // now lives here, not spread across days), Upper Body = upper day (Med
   // Ball Slam), Full Body = hinge day (Seated Calf Raise; Kettlebell Swings
   // moved back to Lower Body next to RDL).
@@ -980,20 +980,27 @@ async function main(){
   if(await page.locator('.pill').filter({ hasText: /Box Jumps/ }).count() !== 1) throw new Error('expected a single Box Jumps pill on Lower Body (squat day)');
   if(await page.locator('.pill').filter({ hasText: /Lateral Lunge/ }).count() !== 1) throw new Error('expected Lateral Lunge pill on Lower Body (squat day)');
   if(await page.locator('.pill').filter({ hasText: /Skater Bound/ }).count() !== 1) throw new Error('expected Skater Bound pill on Lower Body (moved from Full Body - it is quad/glute-med dominant, not hinge-pattern)');
-  if(await page.locator('.pill').filter({ hasText: /Spanish Squat/ }).count() !== 1) throw new Error('expected Spanish Squat pill on Lower Body (moved from Full Body - it is a quad isometric, not hinge-pattern)');
+  if(await page.locator('.pill').filter({ hasText: /Spanish Squat/ }).count() !== 0) throw new Error('expected Spanish Squat off Lower Body (it moved to Extra, outside preseason)');
   console.log('OK: preseason pills are grouped by movement pattern with each day\'s main lift, not spread evenly; opening a tab still lands on its original main lift');
 
   await page.click('.tab:has-text("Extra")');
   if(await page.locator('.pill').filter({ hasText: /Copenhagen Plank/ }).count() !== 1) throw new Error('expected Copenhagen Plank to now live on the Extra day');
-  console.log('OK: Copenhagen Plank now lives on Extra instead of Upper Body');
+  await page.locator('.pill').filter({ hasText: /Spanish Squat/ }).click();
+  await sleep(100);
+  const spanish = await page.evaluate(() => ({ pill: !!document.querySelector('.pill.active.cat-strength'), preseasonBadge: !!document.querySelector('.preseason-badge'), flag: !!data['Spanish Squat'].preseason }));
+  if(!spanish.pill || spanish.preseasonBadge || spanish.flag) throw new Error('expected Spanish Squat on Extra as a plain strength lift with no preseason flag, got: ' + JSON.stringify(spanish));
+  await page.evaluate(() => toggleMode('preseason'));
+  await page.click('.tab:has-text("Extra")');
+  if(await page.locator('.pill').filter({ hasText: /Spanish Squat/ }).count() !== 1) throw new Error('expected Spanish Squat to stay on Extra with Preseason Prep off');
+  await page.evaluate(() => toggleMode('preseason'));
+  console.log('OK: Copenhagen Plank and Spanish Squat live on Extra; Spanish Squat is no longer a preseason lift');
 
   console.log('=== 42b: power exercises are visually bumped to the front of the pill row while Preseason Prep is on ===');
   // getDisplayOrder only affects the pill row's rendering order - selected/
   // DAY_ORDER/completion-banner logic all still read the static array, so
   // this only checks the visible pill text order, not any of that other state.
   // Lower Body's power exercises are Kettlebell Swings, Box Jumps, Trap Bar
-  // Jump and Skater Bound (Spanish Squat is an isometric hold, not
-  // power-flagged), in their DAY_ORDER order, then the rest.
+  // Jump and Skater Bound, in their DAY_ORDER order, then the rest.
   await page.click('.tab:has-text("Lower Body")');
   const lowerPillOrder = await page.locator('.pill-row .pill').allTextContents();
   const lowerNonAddPills = lowerPillOrder.filter(t => t.trim() !== '+');
@@ -1358,7 +1365,7 @@ async function main(){
   await sleep(150);
   const extraPills = await page.evaluate(() => Array.from(document.querySelectorAll('.pill-row .pill:not(.pill-add)')).map(el => ({ text: el.textContent.trim(), classes: el.className })));
   const expectedOrder = [
-    ["Farmer's Carry", 'cat-strength'], ['Dead Hang', 'cat-strength'],
+    ["Farmer's Carry", 'cat-strength'], ['Dead Hang', 'cat-strength'], ['Spanish Squat', 'cat-strength'],
     ['Zone 2 Ride', 'cat-cardio'], ['Incline Treadmill Walk', 'cat-cardio'],
     ['5-Minute Core Routine', 'cat-core'],
     ['Thoracic Spine Stretch', 'cat-stretch'], ['Hip Stretch', 'cat-stretch'],
@@ -1861,7 +1868,26 @@ async function main(){
   if(JSON.stringify(noteSug) !== JSON.stringify(wantSug)) throw new Error('expected note targets and power holds ' + JSON.stringify(wantSug) + ', got: ' + JSON.stringify(noteSug));
   console.log('OK: "Dial to 50!" sets 50, "move up to 180" sets 180, Knee Care lets a note lower but not raise the load, and jumps/bounds hold their target reps');
 
-  console.log('=== 71: the page, stylesheet and every script load with matching versions and no page errors ===');
+  console.log('=== 71: every exercise says whether its weight and reps are per hand, per side, per leg or total ===');
+  const sides = await page.evaluate(() => {
+    const read = name => {
+      const ex = data[name] || (data[name] = newExerciseShell(name));
+      const saved = ex.entries;
+      ex.entries = [{ clientId: 'sd-' + name, date: '2026-09-20', weight: 40, sets: 3, reps: 8, difficulty: 7 }];
+      const div = document.createElement('div');
+      div.innerHTML = renderExerciseCard(name, ex);
+      ex.entries = saved;
+      return { labels: [...div.querySelectorAll('.form-row .field label')].map(l => l.textContent), next: div.querySelector('.rec-headline').textContent };
+    };
+    return { bss: read('Bulgarian Split Squat'), squat: read('Squat'), fly: read('Cable Chest Fly'), copen: read('Copenhagen Plank') };
+  });
+  if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lbs\/hand 3x8\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
+  if(!sides.squat.labels.includes('Lb total') || !/lbs total 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
+  if(!sides.fly.labels.includes('Lb / side')) throw new Error('expected Cable Chest Fly labeled per side, got: ' + JSON.stringify(sides.fly));
+  if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
+  console.log('OK: Bulgarian Split Squat reads lb/hand and reps/leg, Squat lb total, Cable Chest Fly lb/side, Copenhagen Plank seconds/side');
+
+  console.log('=== 72: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
     srcs: [...document.querySelectorAll('script[src^="js/"], link[rel="stylesheet"][href^="styles"]')].map(e => e.getAttribute('src') || e.getAttribute('href')),
