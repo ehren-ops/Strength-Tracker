@@ -372,6 +372,13 @@ function renderExerciseCard(name, ex){
   const deloadActive = modes.deload && ex.trackBy !== "duration";
 
   const isCustom = !allDayNames().includes(name);
+  // "+20 since first" rides at the right end of the title row, so the Next tile sits right under
+  // the weight and 1RM instead of below a line of its own.
+  const delta = ex.entries.length > 1
+    ? (ex.trackBy==="weight" ? last.weight-first.weight : ex.trackBy==="duration" ? last.minutes-first.minutes : last.reps-first.reps)
+    : 0;
+  const deltaColor = delta>0 ? "color:var(--emerald)" : delta<0 ? "color:var(--amber)" : "color:var(--slate)";
+  const deltaHtml = ex.entries.length > 1 ? `<span class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</span>` : "";
 
   let html = `<div class="card${skiActive ? ' ski-mode' : ''}${kneeActive ? ' knee-mode' : ''}${backActive ? ' back-mode' : ''}${preseasonActive ? ' preseason-mode' : ''}">`;
   if(isCustom && deletingExercise === name){
@@ -383,7 +390,7 @@ function renderExerciseCard(name, ex){
       </span>
     </div>`;
   } else {
-    html += `<h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}${preseasonActive ? '<span class="preseason-badge">🏔️ Preseason</span>' : ''}${deloadActive ? '<span class="deload-badge">🔋 Deload</span>' : ''}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>`;
+    html += `<div class="ex-title-row"><h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}${preseasonActive ? '<span class="preseason-badge">🏔️ Preseason</span>' : ''}${deloadActive ? '<span class="deload-badge">🔋 Deload</span>' : ''}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>${deltaHtml}</div>`;
   }
   if(kneeActive && KNEE_CARE_TIP[name]){
     html += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
@@ -409,10 +416,6 @@ function renderExerciseCard(name, ex){
     html += renderNextTile("Next: first session", ex, firstSessionGuidance(name, ex), loadText(name, ex, null));
     html += renderTips(name);
   } else {
-    const delta = ex.entries.length > 1
-      ? (ex.trackBy==="weight" ? last.weight-first.weight : ex.trackBy==="duration" ? last.minutes-first.minutes : last.reps-first.reps)
-      : 0;
-    const deltaColor = delta>0 ? "color:var(--emerald)" : delta<0 ? "color:var(--amber)" : "color:var(--slate)";
     const sideTag = s => s ? `<span class="side-tag">${s}</span>` : "";
     const bigVal = ex.trackBy==="weight" ? last.weight+" lbs" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
       : ex.trackBy==="duration" ? last.minutes+" min" : last.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
@@ -423,10 +426,6 @@ function renderExerciseCard(name, ex){
       </div>
       ${ex.trackBy === "weight" ? render1RMInline(name, ex, last) : ''}
     </div>`;
-
-    if(ex.entries.length>1){
-      html += `<div class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</div>`;
-    }
 
     let recHtml = "";
     if(suggestion){

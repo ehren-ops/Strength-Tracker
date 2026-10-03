@@ -2048,6 +2048,21 @@ async function main(){
   if(short.length) throw new Error('expected two full lines of whole-sentence guidance on every tile, got: ' + JSON.stringify(short));
   console.log('OK: guidance fills exactly two lines at 300px and 400px, e.g. "' + guide[0].text + '"');
 
+  // "+N since first" sits at the right end of the title row; the Next tile follows the weight row directly.
+  const head = await page.evaluate(() => {
+    const ex = data['Squat'];
+    const saved = ex.entries;
+    ex.entries = [{date: shiftISO(todayISO(), -7), weight: 165, sets: 3, reps: 8, difficulty: 7}, {date: shiftISO(todayISO(), -3), weight: 175, sets: 3, reps: 8, difficulty: 7}];
+    const div = document.createElement('div');
+    div.innerHTML = renderExerciseCard('Squat', ex);
+    ex.entries = saved;
+    const d = div.querySelector('.delta-line');
+    const w = div.querySelector('.weight-row');
+    return { inTitle: !!(d && d.parentElement.classList.contains('ex-title-row')), text: d && d.textContent, next: w && w.nextElementSibling && w.nextElementSibling.className };
+  });
+  if(!head.inTitle || head.text !== '+10 since first' || head.next !== 'rec-box') throw new Error('expected "+10 since first" in the title row and the Next tile right under the weight row, got: ' + JSON.stringify(head));
+  console.log('OK: "+10 since first" sits top right in the title row; the Next tile follows the weight row');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

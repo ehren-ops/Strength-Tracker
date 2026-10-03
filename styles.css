@@ -102,7 +102,9 @@
   .ex-name-row{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;margin:0 0 0.6rem;flex-wrap:wrap;}
   .big-val{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:1.7rem;font-weight:600;}
   .delta{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.82rem;font-weight:600;}
-  .delta-line{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.78rem;font-weight:600;margin-top:0.2rem;}
+  .ex-title-row{display:flex;align-items:baseline;justify-content:space-between;gap:0.6rem;margin:0 0 0.6rem;}
+  .ex-title-row .ex-name{margin:0;flex:1 1 auto;min-width:0;}
+  .delta-line{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.78rem;font-weight:600;white-space:nowrap;flex:0 0 auto;}
   .side-tag{font-size:0.5em;font-weight:600;color:var(--slate);margin-left:0.15rem;letter-spacing:0;}
   .plate-line{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.72rem;color:var(--slate);margin-top:0.15rem;}
   .weight-row{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem 0.9rem;}
