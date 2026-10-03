@@ -115,7 +115,7 @@ function renderProgressionToggle(name, ex){
   if(ex.trackBy !== "weight") return `<button class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;
   // Short label so the action row stays one line tall; the aria-label keeps the full meaning.
   return `<button class="progression-btn" onclick="toggleConservative('${name.replace(/'/g,"\\'")}')" aria-label="Progression: ${ex.conservative ? "Conservative" : "Standard"}">
-    ↗ ${ex.conservative ? "Conservative" : "Standard"}
+    ${ex.conservative ? "Conservative" : "Standard"}
   </button>`;
 }
 
@@ -380,6 +380,30 @@ function renderExerciseCard(name, ex){
   const deltaColor = delta>0 ? "color:var(--emerald)" : delta<0 ? "color:var(--amber)" : "color:var(--slate)";
   const deltaHtml = ex.entries.length > 1 ? `<span class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</span>` : "";
 
+  // Active modifiers: badges, then their notes, under the current weight rather than above it.
+  const badges = [skiActive && '<span class="ski-badge">🎿 Ski</span>', kneeActive && '<span class="knee-badge">🦵 Knee Care</span>',
+    backActive && '<span class="back-badge">🩺 Back Care</span>', preseasonActive && '<span class="preseason-badge">🏔️ Preseason</span>',
+    deloadActive && '<span class="deload-badge">🔋 Deload</span>'].filter(Boolean).join("");
+  let modHtml = badges ? `<div class="mod-badges">${badges}</div>` : "";
+  if(kneeActive && KNEE_CARE_TIP[name]){
+    modHtml += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
+  }
+  if(backActive && LOW_BACK_CARE_TIP[name]){
+    modHtml += `<div class="care-line back-care-line">${LOW_BACK_CARE_TIP[name]}</div>`;
+  }
+  if(kneeActive || backActive){
+    modHtml += `<p class="care-disclaimer">Load adjustment only, not a substitute for a PT or doctor.</p>`;
+  }
+  if(skiActive && ex.skiTempo){
+    modHtml += `<div class="ski-tempo-line">Ski tempo: ${ex.skiTempo} · target ${ex.targetRepsSki} reps</div>`;
+  }
+  if(preseasonActive && ex.preseasonTempo){
+    modHtml += `<div class="preseason-line">Preseason tempo: ${ex.preseasonTempo} · target ${ex.targetRepsPreseason} reps</div>`;
+  }
+  if(preseasonActive && ex.preseasonNote){
+    modHtml += `<div class="preseason-line">${ex.preseasonNote}${ex.preseasonWeek3 ? ' <b>Add from week 3.</b>' : ''}</div>`;
+  }
+
   let html = `<div class="card${skiActive ? ' ski-mode' : ''}${kneeActive ? ' knee-mode' : ''}${backActive ? ' back-mode' : ''}${preseasonActive ? ' preseason-mode' : ''}">`;
   if(isCustom && deletingExercise === name){
     html += `<div class="ex-name-row">
@@ -390,28 +414,10 @@ function renderExerciseCard(name, ex){
       </span>
     </div>`;
   } else {
-    html += `<div class="ex-title-row"><h2 class="ex-name">${name}${skiActive ? '<span class="ski-badge">🎿 Ski</span>' : ''}${kneeActive ? '<span class="knee-badge">🦵 Knee Care</span>' : ''}${backActive ? '<span class="back-badge">🩺 Back Care</span>' : ''}${preseasonActive ? '<span class="preseason-badge">🏔️ Preseason</span>' : ''}${deloadActive ? '<span class="deload-badge">🔋 Deload</span>' : ''}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>${deltaHtml}</div>`;
+    html += `<div class="ex-title-row"><h2 class="ex-name">${name}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>${deltaHtml}</div>`;
   }
-  if(kneeActive && KNEE_CARE_TIP[name]){
-    html += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
-  }
-  if(backActive && LOW_BACK_CARE_TIP[name]){
-    html += `<div class="care-line back-care-line">${LOW_BACK_CARE_TIP[name]}</div>`;
-  }
-  if(kneeActive || backActive){
-    html += `<p class="care-disclaimer">Load adjustment only, not a substitute for a PT or doctor.</p>`;
-  }
-  if(skiActive && ex.skiTempo){
-    html += `<div class="ski-tempo-line">Ski tempo: ${ex.skiTempo} · target ${ex.targetRepsSki} reps</div>`;
-  }
-  if(preseasonActive && ex.preseasonTempo){
-    html += `<div class="preseason-line">Preseason tempo: ${ex.preseasonTempo} · target ${ex.targetRepsPreseason} reps</div>`;
-  }
-  if(preseasonActive && ex.preseasonNote){
-    html += `<div class="preseason-line">${ex.preseasonNote}${ex.preseasonWeek3 ? ' <b>Add from week 3.</b>' : ''}</div>`;
-  }
-
   if(!hasEntries){
+    html += modHtml;
     // Same tile as every other lift, so the card never changes shape.
     html += renderNextTile("Next: first session", ex, firstSessionGuidance(name, ex), loadText(name, ex, null));
     html += renderTips(name);
@@ -426,6 +432,7 @@ function renderExerciseCard(name, ex){
       </div>
       ${ex.trackBy === "weight" ? render1RMInline(name, ex, last) : ''}
     </div>`;
+    html += modHtml;
 
     let recHtml = "";
     if(suggestion){
@@ -666,14 +673,16 @@ function confirmDeleteEntry(name, idx){
   render();
 }
 
+// A thin line stopwatch in the button's own color, in place of the emoji.
+const STOPWATCH_ICON = `<svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9.2" r="5.3"/><path d="M8 9.2V6.4M6.4 1.8h3.2M8 1.8v2.1M12.4 4.6l1-1"/></svg>`;
 function renderForm(name, ex){
   let html = "";
   if(ex.entries.length){
     html += `<div class="action-row">`;
-    html += `<button type="button" class="tool-btn" onclick="repeatLast('${name.replace(/'/g,"\\'")}')">↻ Repeat set</button>`;
+    html += `<button type="button" class="tool-btn" onclick="repeatLast('${name.replace(/'/g,"\\'")}')">Repeat set</button>`;
     html += renderProgressionToggle(name, ex);
     if(ex.trackBy !== "duration"){
-      html += `<button type="button" class="rest-action-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')">⏱ ${restTimeFor(ex)}</button>`;
+      html += `<button type="button" class="rest-action-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start rest timer, ${restTimeFor(ex)}">${STOPWATCH_ICON}${restTimeFor(ex)}</button>`;
     } else {
       html += `<button type="button" class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;
     }

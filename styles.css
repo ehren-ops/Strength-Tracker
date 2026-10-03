@@ -22,7 +22,7 @@
     --cat-stretch:#6B8E4E; --cat-stretch-bg:#EEF3E6; --cat-stretch-border:#CFE0BB; --cat-stretch-text:#4A6134;
     --ai-bg:#E6EEE3; --ai-border:#B9CCB4; --ai-text:#1F3A2A; --ai-accent:#0F6B4A;
     --deload:#3D6B7D; --deload-on-text:#FFFFFF; --deload-border:#B7CDD5; --deload-text:#24495A;
-    --font-display:'Fjalla One',sans-serif; --font-body:'IBM Plex Sans',sans-serif;
+    --font-display:'Fjalla One',sans-serif; --name-size:1.475rem; --font-body:'IBM Plex Sans',sans-serif;
   }
   :root[data-theme="dark"]{
     color-scheme: dark;
@@ -48,7 +48,7 @@
     --cat-cardio:#FF6A00; --cat-cardio-bg:rgba(255,106,0,0.12); --cat-cardio-border:#FF6A00; --cat-cardio-text:#FFB37A;
     --cat-core:#39FF6A; --cat-core-bg:rgba(57,255,106,0.12); --cat-core-border:#39FF6A; --cat-core-text:#A8FFC0;
     --cat-stretch:#2DD4BF; --cat-stretch-bg:rgba(45,212,191,0.12); --cat-stretch-border:#2DD4BF; --cat-stretch-text:#99F6EC;
-    --font-display:'Orbitron',sans-serif; --font-body:'Rajdhani',sans-serif;
+    --font-display:'Orbitron',sans-serif; --name-size:1.72rem; --font-body:'Rajdhani',sans-serif;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--stone);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom);}
@@ -98,11 +98,13 @@
   .pill.cat-stretch.active{background:var(--cat-stretch);border-color:var(--cat-stretch);color:#fff;}
   .pill.logged-today:not(.active){opacity:0.55;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:0.7rem;}
-  .ex-name{font-family:var(--font-display);font-size:1.1rem;text-transform:uppercase;color:var(--accent-2);margin:0 0 0.6rem;}
+  .ex-name{font-family:var(--font-display);font-size:var(--name-size);line-height:1.1;text-transform:uppercase;color:var(--accent-2);margin:0 0 0.6rem;}
   .ex-name-row{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;margin:0 0 0.6rem;flex-wrap:wrap;}
   .big-val{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:1.7rem;font-weight:600;}
   .delta{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.82rem;font-weight:600;}
   .ex-title-row{display:flex;align-items:baseline;justify-content:space-between;gap:0.6rem;margin:0 0 0.6rem;}
+  /* Name capitals match the current weight's digits (1.7rem body font): Fjalla One's capitals run
+     about 15% taller than IBM Plex Sans digits, Orbitron's about the same as Rajdhani's. */
   .ex-title-row .ex-name{margin:0;flex:1 1 auto;min-width:0;}
   .delta-line{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.78rem;font-weight:600;white-space:nowrap;flex:0 0 auto;}
   .side-tag{font-size:0.5em;font-weight:600;color:var(--slate);margin-left:0.15rem;letter-spacing:0;}
@@ -253,6 +255,9 @@
   .card.preseason-mode{border-color:var(--preseason);box-shadow:0 0 0 1px rgba(106,63,160,0.18);}
   /* Shared shape for all four mode badges - only the background differs
      per mode, so each class below is just a one-line color override. */
+  .mod-badges{display:flex;flex-wrap:wrap;gap:0.3rem;margin:0.35rem 0 0.1rem;}
+  .mod-badges > span{margin-left:0 !important;}
+  .btn-icon{width:0.95em;height:0.95em;margin-right:0.3em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;}
   .ski-badge, .knee-badge, .back-badge, .preseason-badge, .deload-badge{display:inline-block;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
   .ski-badge{background:var(--ski);}
   .knee-badge{background:var(--knee);}

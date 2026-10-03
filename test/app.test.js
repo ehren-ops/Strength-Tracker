@@ -1712,7 +1712,10 @@ async function main(){
   await page.click('.tab:has-text("Full Body")');
   await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
   await sleep(100);
-  if(await page.locator('.ex-name .deload-badge').count() !== 1) throw new Error('expected a Deload badge on the exercise card');
+  if(await page.locator('.mod-badges .deload-badge').count() !== 1) throw new Error('expected a Deload badge on the exercise card');
+  // Modifier badges sit under the current weight, not in the title.
+  const badgePlace = await page.evaluate(() => { const m = document.querySelector('.mod-badges'); return { prev: m.previousElementSibling && m.previousElementSibling.className, inTitle: !!document.querySelector('.ex-name .deload-badge') }; });
+  if(badgePlace.prev !== 'weight-row' || badgePlace.inTitle) throw new Error('expected modifier badges right under the weight row, got: ' + JSON.stringify(badgePlace));
   await page.fill('#f-weight', String(expectedW));
   await page.fill('#f-sets', '2');
   await page.fill('#f-reps', '8');
