@@ -85,7 +85,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
   tickValues.forEach(v => {
     const y = yAt(v);
     svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--chart-grid)" stroke-width="1"/>`;
-    svg += `<text x="${padL-6}" y="${y+3}" font-size="8" fill="var(--chart-axis)" text-anchor="end" font-family="var(--font-mono)">${v}</text>`;
+    svg += `<text x="${padL-6}" y="${y+3}" font-size="8" fill="var(--chart-axis)" text-anchor="end" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${v}</text>`;
   });
 
   // solid line through actual points
@@ -109,7 +109,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
       const labelY = Math.max(padT + 7, yAt(p.y) - 8);
       const w = text.length * 4.6 + 3;
       svg += `<rect x="${(xAt(i)-w/2).toFixed(1)}" y="${(labelY-6.5).toFixed(1)}" width="${w.toFixed(1)}" height="9" rx="2" fill="var(--chart-label-halo)" opacity="0.85"/>`;
-      svg += `<text x="${xAt(i).toFixed(1)}" y="${labelY.toFixed(1)}" font-size="7.5" fill="${color}" font-weight="700" text-anchor="middle" font-family="var(--font-mono)">${text}</text>`;
+      svg += `<text x="${xAt(i).toFixed(1)}" y="${labelY.toFixed(1)}" font-size="7.5" fill="${color}" font-weight="700" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${text}</text>`;
     }
 
     if(isDeload){
@@ -127,7 +127,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     } else {
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="var(--chart-line)"><title>${titleText}</title></circle>`;
     }
-    svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'var(--danger)':'var(--chart-axis)'}" text-anchor="middle" font-family="var(--font-mono)">${isDeload?'D':p.entry.label}</text>`;
+    svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'var(--danger)':'var(--chart-axis)'}" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${isDeload?'D':p.entry.label}</text>`;
   });
 
   // dashed projection segment
@@ -138,7 +138,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     svg += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="var(--chart-line)" stroke-width="2" stroke-dasharray="5 4"/>`;
     const projLabel = ex.trackBy==="weight" ? `${suggestion.weight}lbs ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}` : ex.trackBy==="duration" ? `${suggestion.minutes} min` : repLabel(suggestion.sets,suggestion.reps,ex.unit);
     svg += `<circle cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="4" fill="var(--chart-white)" stroke="var(--chart-line)" stroke-width="2"><title>Suggested next: ${projLabel}</title></circle>`;
-    svg += `<text x="${x2.toFixed(1)}" y="${H-4}" font-size="8" fill="var(--chart-line)" text-anchor="middle" font-family="var(--font-mono)">Next</text>`;
+    svg += `<text x="${x2.toFixed(1)}" y="${H-4}" font-size="8" fill="var(--chart-line)" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">Next</text>`;
   }
 
   svg += `</svg>`;

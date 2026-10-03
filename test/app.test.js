@@ -493,13 +493,31 @@ async function main(){
   if(squatPillClassNextDay.includes('logged-today')) throw new Error('expected the indicator to clear once no entries are dated today, class was: ' + squatPillClassNextDay);
   console.log('OK: indicator is date-scoped, not "ever logged" - clears once nothing is dated today (i.e. resets on a new day)');
 
-  console.log('=== 23: text inputs no longer use IBM Plex Mono ===');
+  console.log('=== 23: inputs, buttons and every number on the card use the body font, never mono ===');
   await page.click('.tab:has-text("Full Body")');
   await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
   const inputFont = await page.locator('#f-weight').evaluate(el => getComputedStyle(el).fontFamily);
   console.log('input font-family:', inputFont);
   if(inputFont.toLowerCase().includes('ibm plex mono')) throw new Error('expected input font to NOT be IBM Plex Mono, got: ' + inputFont);
   console.log('OK: text inputs use the app\'s normal font, not mono');
+  // Every number on the card (weight, since first, 1RM, Next tile, chart, history, inputs, date,
+  // buttons) uses the body font; the old mono font's dotted zero gave it away.
+  const offFont = await page.evaluate(() => {
+    const body = getComputedStyle(document.body).fontFamily.split(',')[0].trim();
+    const bad = [];
+    const card = document.querySelector('.card');
+    const w = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+    let n; while((n = w.nextNode())){
+      const el = n.parentElement;
+      if(!/\d/.test(n.textContent) || el.closest('.ex-name')) continue;
+      const f = getComputedStyle(el).fontFamily.split(',')[0].trim();
+      if(f !== body) bad.push(f + ' on "' + n.textContent.trim().slice(0, 20) + '"');
+    }
+    card.querySelectorAll('input, button').forEach(el => { const f = getComputedStyle(el).fontFamily.split(',')[0].trim(); if(f !== body) bad.push(f + ' on ' + (el.id || el.className)); });
+    return { body, bad, monoVar: getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() };
+  });
+  if(offFont.bad.length || offFont.monoVar) throw new Error('expected every number on the card in the body font ' + offFont.body + ', got: ' + JSON.stringify(offFont));
+  console.log('OK: every number on the card, inputs and buttons included, uses ' + offFont.body);
 
   console.log('=== 24: Farmer\'s Carry logs by time (seconds), not reps, and shows no plate math ===');
   await page.click('.tab:has-text("Extra")');

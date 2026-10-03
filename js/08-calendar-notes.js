@@ -122,7 +122,7 @@ function renderCalendar(){
         const ex = data[n];
         const entry = ex.entries.slice().reverse().find(e => e.date === calendarSelectedDate);
         if(entry){
-          html += `<div style="font-size:0.78rem;color:var(--slate);font-family:var(--font-mono);">${n} - ${formatEntryValue(entry, ex)}</div>`;
+          html += `<div style="font-size:0.78rem;color:var(--slate);font-family:var(--font-body);font-variant-numeric:tabular-nums;">${n} - ${formatEntryValue(entry, ex)}</div>`;
         }
       });
       html += `</div>`;
@@ -140,7 +140,7 @@ function renderCalendar(){
   if(recovery){
     const readinessColor = recovery.readiness >= 7 ? "var(--emerald)" : recovery.readiness >= 4 ? "var(--amber)" : "var(--danger)";
     html += `<p style="font-size:0.76rem;color:var(--slate);margin:0.6rem 0 0;padding-top:0.5rem;border-top:1px dashed var(--line);">
-      Recovery readiness: <b style="color:${readinessColor};font-family:var(--font-mono);">${recovery.readiness}/10</b>
+      Recovery readiness: <b style="color:${readinessColor};font-family:var(--font-body);font-variant-numeric:tabular-nums;">${recovery.readiness}/10</b>
       - ${recovery.daysSince} day${recovery.daysSince===1?'':'s'} rested${recovery.neededRestDays > 0 ? `, ~${recovery.neededRestDays} more suggested` : ', should be ready'}
     </p>`;
   }

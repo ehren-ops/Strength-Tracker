@@ -304,6 +304,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v60";
+const APP_VERSION = "v61";
 const APP_UPDATED = "Oct 2, 2026";
 
