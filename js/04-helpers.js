@@ -153,6 +153,13 @@ function sidesText(name){
   return `weight ${words[s.weight]}, reps ${words[s.reps]}`;
 }
 
+// The last full working session: a Deload Week session is planned and light, so where a lift
+// stands (current weight, since first, Est. 1RM, the trend) comes from the session before it.
+function lastWorking(ex){
+  for(let i = ex.entries.length - 1; i >= 0; i--) if(!ex.entries[i].deload) return ex.entries[i];
+  return ex.entries[ex.entries.length - 1] || null;
+}
+
 function repLabel(sets, reps, unit){
   return unit === "sec" ? `${sets}x${reps}sec` : `${sets}x${reps}`;
 }

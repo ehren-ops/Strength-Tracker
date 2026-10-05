@@ -235,10 +235,10 @@ function guidanceHtml(msg, pool){
   pool.forEach(t => { if(t && parts.join(" ").length + t.length + 1 <= 105) parts.push(t); });
   return `<span data-gpool="${id}">${escapeHtml(parts.join(" "))}</span>`;
 }
-function composeGuidance(msg, name, ex, last){
+function composeGuidance(msg, name, ex, last, work){
   return guidanceHtml(msg, [
-    ...noteInsights(ex.entries), lastSessionLine(ex, last), hrLine(name, last), ...trendLine(name, ex),
-    bestLine(ex, last), progressionRule(name, ex), effortLine(ex), daysSinceLine(last), LOG_TIMING_TIP, NOTE_TIP,
+    ...noteInsights(ex.entries), lastSessionLine(ex, work), deloadSessionLine(ex, last), hrLine(name, last), ...trendLine(name, ex),
+    bestLine(ex, work), progressionRule(name, ex), effortLine(ex), daysSinceLine(last), LOG_TIMING_TIP, NOTE_TIP,
   ]);
 }
 function firstSessionGuidance(name, ex){
@@ -335,12 +335,19 @@ function hrLine(name, last){
   const h = last && hrFor(name, last.date);
   return h ? `Heart rate last time: ${h.approx ? "about " : ""}${h.avg} avg, ${h.peak} peak.` : "";
 }
-// Last session's numbers and RPE, the fallback detail when notes give nothing to act on.
-function lastSessionLine(ex, last){
-  if(!last) return "";
-  const what = ex.trackBy !== "weight" ? formatEntryValue(last, ex)
-    : `${last.weight > 0 ? `${last.weight} lb` : "bodyweight"}, ${repLabel(last.sets, last.reps, ex.unit)}`;
-  return `Last: ${what}${last.difficulty ? ` at RPE ${last.difficulty}` : ""}.`;
+function sessionWhat(ex, e){
+  return ex.trackBy !== "weight" ? formatEntryValue(e, ex)
+    : `${e.weight > 0 ? `${e.weight} lb` : "bodyweight"}, ${repLabel(e.sets, e.reps, ex.unit)}`;
+}
+// The last full session's numbers and RPE (a deload session is described on its own line).
+function lastSessionLine(ex, work){
+  if(!work) return "";
+  const afterDeload = !work.deload && ex.entries[ex.entries.length - 1].deload;
+  return `${afterDeload ? "Last full session" : "Last"}: ${sessionWhat(ex, work)}${work.difficulty ? ` at RPE ${work.difficulty}` : ""}.`;
+}
+// When the latest session was a Deload Week session, say so, so it never reads as a drop.
+function deloadSessionLine(ex, last){
+  return last && last.deload ? `Deload last time: ${sessionWhat(ex, last)}.` : "";
 }
 // Row 4: what to load. Plates for a barbell, per hand, the bell, bodyweight, or the cardio setting.
 function loadText(name, ex, sug){
@@ -370,6 +377,7 @@ function renderExerciseCard(name, ex){
   if(ex.trackBy === "checklist") return renderChecklistCard(name, ex);
   const hasEntries = ex.entries.length > 0;
   const last = hasEntries ? ex.entries[ex.entries.length-1] : null;
+  const work = hasEntries ? lastWorking(ex) : null; // last non-deload session: where the lift stands
   const first = hasEntries ? ex.entries[0] : null;
   const suggestion = computeSuggestion(ex, name);
   const skiActive = modes.ski && !!ex.targetRepsSki;
@@ -382,7 +390,7 @@ function renderExerciseCard(name, ex){
   // "+20 since first" rides at the right end of the title row, so the Next tile sits right under
   // the weight and 1RM instead of below a line of its own.
   const delta = ex.entries.length > 1
-    ? (ex.trackBy==="weight" ? last.weight-first.weight : ex.trackBy==="duration" ? last.minutes-first.minutes : last.reps-first.reps)
+    ? (ex.trackBy==="weight" ? work.weight-first.weight : ex.trackBy==="duration" ? work.minutes-first.minutes : work.reps-first.reps)
     : 0;
   const deltaColor = delta>0 ? "color:var(--emerald)" : delta<0 ? "color:var(--amber)" : "color:var(--slate)";
   const deltaHtml = ex.entries.length > 1 ? `<span class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</span>` : "";
@@ -430,14 +438,14 @@ function renderExerciseCard(name, ex){
     html += renderTips(name);
   } else {
     const sideTag = s => s ? `<span class="side-tag">${s}</span>` : "";
-    const bigVal = ex.trackBy==="weight" ? last.weight+" lbs" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
-      : ex.trackBy==="duration" ? last.minutes+" min" : last.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
+    const bigVal = ex.trackBy==="weight" ? work.weight+" lbs" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
+      : ex.trackBy==="duration" ? work.minutes+" min" : work.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
 
     html += `<div class="weight-row">
       <div class="weight-main">
         <span class="big-val">${bigVal}</span>
       </div>
-      ${ex.trackBy === "weight" ? render1RMInline(name, ex, last) : ''}
+      ${ex.trackBy === "weight" ? render1RMInline(name, ex, work) : ''}
     </div>`;
     html += modHtml;
 
@@ -451,8 +459,8 @@ function renderExerciseCard(name, ex){
         // When the prior session's actual reps beat the target, call that out by
         // name with the real number instead of flattening it to a plain "hit
         // target" - going over is a stronger, more specific signal than a bare hit.
-        const wentOverTarget = suggestion.hitTarget && !suggestion.deload && !suggestion.deloadWeek && last.reps > suggestion.reps;
-        const actualAmt = ex.unit === "sec" ? `${last.reps} sec` : `${last.reps} reps`;
+        const wentOverTarget = suggestion.hitTarget && !suggestion.deload && !suggestion.deloadWeek && work.reps > suggestion.reps;
+        const actualAmt = ex.unit === "sec" ? `${work.reps} sec` : `${work.reps} reps`;
         const targetAmt = ex.unit === "sec" ? `${suggestion.reps} sec` : `${suggestion.reps} reps`;
         const hitLeadIn = wentOverTarget
           ? `Went over target ${unitWord} (did ${actualAmt}, target is ${targetAmt})`
@@ -513,7 +521,7 @@ function renderExerciseCard(name, ex){
           : suggestion.powerHold ? `Power: hold reps; go higher or farther only while every rep stays fast.`
           : `Add 2 reps.`;
       }
-      recHtml = renderNextTile(`Next: ${nextLabel}`, ex, composeGuidance(msg, name, ex, last), loadText(name, ex, suggestion));
+      recHtml = renderNextTile(`Next: ${nextLabel}`, ex, composeGuidance(msg, name, ex, last, work), loadText(name, ex, suggestion));
     }
 
     html += recHtml;

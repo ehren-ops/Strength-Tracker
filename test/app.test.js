@@ -1771,6 +1771,30 @@ async function main(){
   });
   if(deloadNotes.typed !== 'Deload, felt fine' || deloadNotes.cleared !== 'Deload' || deloadNotes.kept !== 'Deload, sore' || deloadNotes.fixed !== 1 || deloadNotes.note !== 'Deload' || deloadNotes.queued < 1 || deloadNotes.again !== 0) throw new Error('expected every deload session note to carry "Deload", got: ' + JSON.stringify(deloadNotes));
   console.log('OK: deload notes always start with "Deload" (typed text kept after it); old deload entries missing it are fixed and synced once');
+  // After a deload, where the lift stands (current weight, since first, Est. 1RM, trend) and the
+  // next weight come from the last full session, and the deload is named as such, never a drop.
+  const afterDeload = await page.evaluate(() => {
+    const saved = { ...modes };
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const ex = Object.assign(newExerciseShell('Squat'), { entries: [
+      { clientId: 'ad1', date: shiftISO(todayISO(), -10), weight: 165, sets: 3, reps: 8, difficulty: 7, label: 'a' },
+      { clientId: 'ad2', date: shiftISO(todayISO(), -5), weight: 175, sets: 3, reps: 8, difficulty: 7, label: 'b' },
+      { clientId: 'ad3', date: todayISO(), weight: 157.5, sets: 2, reps: 8, difficulty: 5, deload: true, note: 'Deload', label: 'c' },
+    ] });
+    const div = document.createElement('div');
+    guidancePools = [];
+    div.innerHTML = renderExerciseCard('Squat', ex);
+    const sug = computeSuggestion(ex, 'Squat');
+    const trend = liftTrend('Squat', ex, todayISO());
+    Object.assign(modes, saved);
+    return { big: div.querySelector('.big-val').textContent, since: (div.querySelector('.delta-line') || {}).textContent, onerm: div.querySelector('.onerm-val').textContent,
+      pool: guidancePools.flat(), next: sug.weight, e1rm: trend.e1rmChange4WeeksPct, sessions: trend.sessionsLast4Weeks };
+  });
+  const wantE1 = Math.round((175 * (1 + 8 / 30) - 165 * (1 + 8 / 30)) / (165 * (1 + 8 / 30)) * 1000) / 10;
+  if(!/^175 lbs/.test(afterDeload.big) || afterDeload.since !== '+10 since first' || !/^222 lbs/.test(afterDeload.onerm) || afterDeload.next !== 180
+    || !afterDeload.pool.includes('Last full session: 175 lb, 3x8 at RPE 7.') || !afterDeload.pool.includes('Deload last time: 157.5 lb, 2x8.')
+    || afterDeload.e1rm !== wantE1 || afterDeload.sessions !== 3) throw new Error('expected the card to stand on the last full session after a deload, got: ' + JSON.stringify(afterDeload));
+  console.log('OK: after a deload the card shows 175 lbs, +10 since first, Est. 1RM 222 and next 180, with the deload named, not a drop');
   await page.click('.tab:has-text("Overview")');
   await page.click('button:has-text("Deload Week: ON")');
   await sleep(150);

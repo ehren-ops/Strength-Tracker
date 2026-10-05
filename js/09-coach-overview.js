@@ -62,14 +62,18 @@ const LIFT_PATTERNS = {
 // change is reported in seconds instead.
 function liftTrend(name, ex, asOf){
   if(ex.trackBy === "checklist" || ex.trackBy === "duration") return null;
-  const es = ex.entries.filter(e => e.date <= asOf);
-  if(!es.length) return null;
+  const all = ex.entries.filter(e => e.date <= asOf);
+  if(!all.length) return null;
+  // Deload Week sessions are planned and light: the trend reads from working sessions only, so a
+  // deload never shows up as a drop in estimated 1RM or resets "sessions at this load".
+  const es = all.some(e => !e.deload) ? all.filter(e => !e.deload) : all;
   const last = es[es.length - 1];
   const timed = ex.unit === "sec";
   const e1 = e => (!timed && e.weight > 0 && e.reps) ? e.weight * (1 + e.reps / 30) : null;
   const since = shiftISO(asOf, -28);
   const recent = es.filter(e => e.date >= since);
   const base = recent.length > 1 ? recent[0] : null;
+  const sessionsRecent = all.filter(e => e.date >= since).length;
   let atLoad = 0;
   const rpeAtLoad = [];
   for(let i = es.length - 1; i >= 0 && es[i].weight === last.weight; i--){
@@ -79,7 +83,7 @@ function liftTrend(name, ex, asOf){
   const a = base && e1(base), b = e1(last);
   return {
     pattern: LIFT_PATTERNS[name] || "other",
-    sessionsLast4Weeks: recent.length,
+    sessionsLast4Weeks: sessionsRecent,
     e1rmChange4WeeksPct: a && b ? Math.round((b - a) / a * 1000) / 10 : null,
     [timed ? "secondsChange4Weeks" : "repsChange4Weeks"]: base && (timed || !(last.weight > 0)) && base.reps != null && last.reps != null ? last.reps - base.reps : null,
     sessionsAtCurrentLoad: atLoad,
