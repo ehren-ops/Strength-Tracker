@@ -1716,6 +1716,19 @@ async function main(){
   // Modifier badges sit under the current weight, not in the title.
   const badgePlace = await page.evaluate(() => { const m = document.querySelector('.mod-badges'); return { prev: m.previousElementSibling && m.previousElementSibling.className, inTitle: !!document.querySelector('.ex-name .deload-badge') }; });
   if(badgePlace.prev !== 'weight-row' || badgePlace.inTitle) throw new Error('expected modifier badges right under the weight row, got: ' + JSON.stringify(badgePlace));
+  // A Deload Week session charts as a planned deload (diamond, Deload color), not a short-set flag.
+  const deloadMark = await page.evaluate(() => {
+    const ex = Object.assign(newExerciseShell('Squat'), { entries: [
+      { date: todayISO(), weight: 170, sets: 3, reps: 8, difficulty: 7, label: 'a' },
+      { date: todayISO(), weight: 150, sets: 2, reps: 8, difficulty: 6, deload: true, label: 'b' },
+    ] });
+    const div = document.createElement('div');
+    div.innerHTML = renderChart(ex, null, true, 'deload-check');
+    return { marks: div.querySelectorAll('.deload-mark').length, under: div.querySelectorAll('circle[fill="var(--chart-under)"]').length,
+      title: [...div.querySelectorAll('title')].map(t => t.textContent).find(t => /Deload Week/.test(t)) || null };
+  });
+  if(deloadMark.marks !== 1 || deloadMark.under !== 0 || !deloadMark.title) throw new Error('expected a planned-deload diamond and no short-set flag on the Deload Week session, got: ' + JSON.stringify(deloadMark));
+  console.log('OK: a Deload Week session charts as a planned deload diamond, not a short-set flag');
   await page.fill('#f-weight', String(expectedW));
   await page.fill('#f-sets', '2');
   await page.fill('#f-reps', '8');

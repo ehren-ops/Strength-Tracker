@@ -97,22 +97,31 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
   // under 3 sets gets dark red, missed target reps gets red, extra reps/sets
   // (that actually hit target) gets green - each with a small sets×reps label
   points.forEach((p,i) => {
-    const isDeload = deloadFlags[i];
+    // A Deload Week session (tagged when logged with the modifier on) is planned, so it gets its own
+    // diamond in the Deload badge color instead of the short-set or missed-rep flag its lighter load
+    // and fewer sets would otherwise earn.
+    const isPlanned = isRealExercise && !!p.entry.deload;
+    const isDeload = !isPlanned && deloadFlags[i];
     const targetReps = ex.targetReps || 8;
-    const isUnder = isRealExercise && !isDeload && ex.trackBy !== "duration" && p.entry.sets < 3;
-    const isMissed = isRealExercise && !isDeload && !isUnder && ex.trackBy !== "duration" && p.entry.reps < targetReps;
-    const isExtra = isRealExercise && !isDeload && !isUnder && !isMissed && ex.trackBy !== "duration" &&
+    const isUnder = isRealExercise && !isPlanned && !isDeload && ex.trackBy !== "duration" && p.entry.sets < 3;
+    const isMissed = isRealExercise && !isPlanned && !isDeload && !isUnder && ex.trackBy !== "duration" && p.entry.reps < targetReps;
+    const isExtra = isRealExercise && !isPlanned && !isDeload && !isUnder && !isMissed && ex.trackBy !== "duration" &&
       (p.entry.reps > targetReps || p.entry.sets > 3);
-    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" - "+p.entry.note:""}${isDeload?" - deload":""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
+    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" - "+p.entry.note:""}${isPlanned?" - Deload Week (planned)":""}${isDeload?" - dropped after missed sessions":""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
 
     function labelWithHalo(text, color){
-      const labelY = Math.max(padT + 7, yAt(p.y) - 8);
+      // Above the point when there's room, otherwise just below it so it never covers the dot.
+      const labelY = yAt(p.y) - 8 >= padT + 7 ? yAt(p.y) - 8 : yAt(p.y) + 14;
       const w = text.length * 4.6 + 3;
       svg += `<rect x="${(xAt(i)-w/2).toFixed(1)}" y="${(labelY-6.5).toFixed(1)}" width="${w.toFixed(1)}" height="9" rx="2" fill="var(--chart-label-halo)" opacity="0.85"/>`;
       svg += `<text x="${xAt(i).toFixed(1)}" y="${labelY.toFixed(1)}" font-size="7.5" fill="${color}" font-weight="700" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${text}</text>`;
     }
 
-    if(isDeload){
+    if(isPlanned){
+      const cx = xAt(i), cy = yAt(p.y), r = 5.5;
+      svg += `<path d="M${cx.toFixed(1)},${(cy-r).toFixed(1)} L${(cx+r).toFixed(1)},${cy.toFixed(1)} L${cx.toFixed(1)},${(cy+r).toFixed(1)} L${(cx-r).toFixed(1)},${cy.toFixed(1)} Z" fill="var(--deload)" stroke="var(--chart-white)" stroke-width="1.2" class="deload-mark"><title>${titleText}</title></path>`;
+      labelWithHalo("Deload", "var(--deload)");
+    } else if(isDeload){
       svg += `<line x1="${xAt(i).toFixed(1)}" y1="${padT}" x2="${xAt(i).toFixed(1)}" y2="${H-padB}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>`;
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="5" fill="var(--chart-white)" stroke="var(--danger)" stroke-width="2"><title>${titleText}</title></circle>`;
     } else if(isUnder){
@@ -127,7 +136,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     } else {
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="var(--chart-line)"><title>${titleText}</title></circle>`;
     }
-    svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'var(--danger)':'var(--chart-axis)'}" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${isDeload?'D':p.entry.label}</text>`;
+    svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'var(--danger)':isPlanned?'var(--deload)':'var(--chart-axis)'}" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${isDeload?'D':p.entry.label}</text>`;
   });
 
   // dashed projection segment
