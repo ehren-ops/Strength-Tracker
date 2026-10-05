@@ -168,11 +168,14 @@ async function outliveContext(email: string, mode: "session" | "weekly", end: st
 }
 
 // ---------- heart rate per lift ----------
-// The app logs each lift right after its last set, so the wearable's heart-rate stream (Whoop via
-// Strava, fetched by Outlive's strava-hr function) splits at those log times into one window per
-// lift: its sets plus the rests before them. Peak is the hardest set; average reflects density.
-type Log = { name: string; at: string };
-const FIRST_LIFT_LEAD_MIN = 20; // the first lift's window starts at most this long before its log
+// The wearable's heart-rate stream (Whoop via Strava, fetched by Outlive's strava-hr function) is
+// split into one window per lift using anchors the app sends: when each lift was logged, plus each
+// rest-timer start (a set of that lift just ended). The log alone is ambiguous, since a lift may be
+// logged after its first set or its last, so a lift anchored only by its log is marked approximate.
+// Between two lifts the split falls at the lowest heart rate in the gap between their anchors: the
+// switch (rest, setup, walking over) runs longer than rest between sets, so HR bottoms out there.
+type Log = { name: string; at: string; kind?: string; sets?: number };
+const FIRST_LIFT_LEAD_MIN = 20; // the first lift's window starts at most this long before its first anchor
 const HR_MAX_SESSIONS = 4; // per hr-only request: each session is two Strava calls
 
 function clock(ms: number, tz: string) {
@@ -192,6 +195,23 @@ async function hrStream(start: number, end: number) {
   return await resp.json() as { activity: Row | null; samples: [number, number][] };
 }
 
+type Lift = { name: string; log: number | null; anchors: number[]; sets: number };
+// Group anchors by lift, in the order the lifts were logged (a lift with only rest taps goes by its
+// first tap). Anchors within 30 s of each other are one set end (a tap and a log for the same set).
+function liftsFromAnchors(ls: Log[]): Lift[] {
+  const by = new Map<string, Lift>();
+  for (const l of ls) {
+    const t = Date.parse(l.at);
+    const cur = by.get(l.name) ?? { name: l.name, log: null, anchors: [], sets: 0 };
+    if (l.kind !== "rest") { cur.log = cur.log == null ? t : Math.max(cur.log, t); cur.sets = Math.max(cur.sets, Number(l.sets) || 0); }
+    if (!cur.anchors.some((x) => Math.abs(x - t) < 30_000)) cur.anchors.push(t);
+    by.set(l.name, cur);
+  }
+  const lifts = [...by.values()];
+  lifts.forEach((x) => x.anchors.sort((p, q) => p - q));
+  return lifts.sort((x, y) => (x.log ?? x.anchors[0]) - (y.log ?? y.anchors[0]));
+}
+
 async function sessionHeartRate(logs: unknown, tz: string) {
   if (!Array.isArray(logs) || logs.length < 2) return null;
   const valid = (logs as Log[]).filter((l) => l && typeof l.name === "string" && Number.isFinite(Date.parse(l.at)))
@@ -204,23 +224,51 @@ async function sessionHeartRate(logs: unknown, tz: string) {
     if (cur && Date.parse(l.at) - Date.parse(cur[cur.length - 1].at) <= 90 * 60_000) cur.push(l);
     else clusters.push([l]);
   }
-  const ls = clusters.sort((x, y) => y.length - x.length)[0] ?? [];
-  const times = ls.map((l) => Date.parse(l.at));
-  if (ls.length < 2) return null;
+  const block = clusters.sort((x, y) => y.length - x.length)[0] ?? [];
+  const lifts = liftsFromAnchors(block);
+  if (lifts.length < 2) return null;
+  const all = block.map((l) => Date.parse(l.at));
+  const first = Math.min(...all), last = Math.max(...all);
   // Sets imported in bulk share one timestamp: not a real timeline, so no per-lift split.
-  if (ls.length >= 3 && times[times.length - 1] - times[0] < 5 * 60_000) return { status: "no_log_timeline" };
-  const res = await hrStream(times[0] - 75 * 60_000, times[times.length - 1] + 2 * 60_000).catch((e) => { console.error("strava-hr", e); return null; });
+  if (lifts.length >= 3 && last - first < 5 * 60_000) return { status: "no_log_timeline" };
+  const res = await hrStream(first - 75 * 60_000, last + 20 * 60_000).catch((e) => { console.error("strava-hr", e); return null; });
   if (!res) return { status: "hr_unavailable" };
   if (!res.activity || !res.samples?.length) return { status: "not_uploaded_yet" };
   const actStart = Date.parse(String(res.activity.startTime));
-  const per = ls.map((l, i) => {
-    const to = times[i];
-    const from = i ? times[i - 1] : Math.max(actStart, to - FIRST_LIFT_LEAD_MIN * 60_000);
-    const w = res.samples.filter(([t]) => t * 1000 > from && t * 1000 <= to).map(([, h]) => h);
+  const actEnd = actStart + (num(res.activity.elapsedSec) ?? 0) * 1000;
+  const samples = res.samples.map(([t, h]) => [t * 1000, h] as [number, number]);
+  // 20-second average, so one noisy reading doesn't pick the split.
+  const smoothAt = (i: number) => {
+    const t = samples[i][0];
+    let sum = 0, n = 0;
+    for (let j = i; j >= 0 && t - samples[j][0] <= 10_000; j--) { sum += samples[j][1]; n++; }
+    for (let j = i + 1; j < samples.length && samples[j][0] - t <= 10_000; j++) { sum += samples[j][1]; n++; }
+    return sum / n;
+  };
+  const lowestBetween = (a: number, b: number) => {
+    let best: [number, number] | null = null;
+    samples.forEach(([t], i) => { if (t > a && t < b) { const h = smoothAt(i); if (!best || h < best[1]) best = [t, h]; } });
+    return best ? best[0] : (a + b) / 2;
+  };
+  const bounds: number[] = [];
+  for (let i = 0; i < lifts.length - 1; i++) {
+    const A = lifts[i], B = lifts[i + 1];
+    const lastA = A.anchors[A.anchors.length - 1], firstB = B.anchors[0];
+    // With rest taps, sets not yet anchored (normally the final one) come after the last anchor.
+    const pending = A.anchors.length >= 2 ? Math.max(0, A.sets - A.anchors.length) : 0;
+    const a = lastA + 40_000 + pending * 60_000, b = firstB - 20_000;
+    bounds.push(b > a ? lowestBetween(a, b) : b > lastA + 40_000 ? lowestBetween(lastA + 40_000, b) : (lastA + firstB) / 2);
+  }
+  const per = lifts.map((l, i) => {
+    const from = i ? bounds[i - 1] : Math.max(actStart, l.anchors[0] - FIRST_LIFT_LEAD_MIN * 60_000);
+    const to = i < lifts.length - 1 ? bounds[i] : Math.min(actEnd || Infinity, l.anchors[l.anchors.length - 1] + 15 * 60_000);
+    const w = samples.filter(([t]) => t > from && t <= to).map(([, h]) => h);
     const min = Math.round((to - from) / 60_000);
+    const approx = l.anchors.length < 2;
+    const at = new Date(l.log ?? l.anchors[l.anchors.length - 1]).toISOString();
     return w.length < 3
-      ? { name: l.name, at: l.at, min, avg: null, peak: null }
-      : { name: l.name, at: l.at, min, avg: Math.round(w.reduce((a, b) => a + b, 0) / w.length), peak: Math.max(...w) };
+      ? { name: l.name, at, min, avg: null, peak: null, approx }
+      : { name: l.name, at, min, avg: Math.round(w.reduce((x, y) => x + y, 0) / w.length), peak: Math.max(...w), approx };
   });
   const a = res.activity;
   const elapsedMin = round(num(a.elapsedSec) != null ? num(a.elapsedSec)! / 60 : null);
@@ -229,7 +277,7 @@ async function sessionHeartRate(logs: unknown, tz: string) {
     session: `${elapsedMin} min, avg ${round(num(a.avgHr))}, max ${round(num(a.maxHr))}`,
     lifts: per.map((x) => x.avg == null
       ? `${x.name}: no heart rate in its window`
-      : `${x.name} ${clock(Date.parse(x.at), tz)} (${x.min} min): peak ${x.peak}, avg ${x.avg}`),
+      : `${x.name} ${clock(Date.parse(x.at), tz)} (${x.min} min): peak ${x.peak}, avg ${x.avg}${x.approx ? " (approx)" : ""}`),
     // Numbers for the app's own display (history rows, the post-workout breakdown); the prompt
     // only sees the text lines above.
     numbers: { elapsedMin, avgHr: round(num(a.avgHr)), maxHr: round(num(a.maxHr)), lifts: per },
@@ -250,7 +298,7 @@ Look for:
 - Exercise order: lifts are normally done in their numbered order (#1 first). A lift done out of its planned place usually means its equipment was busy, not a choice, so never criticize the swap itself. Do use it to explain a result: a lift done later than planned was done more fatigued, one done earlier, fresher. Recommend changing the program order only when a pattern across sessions shows the order is holding back a priority lift, and then say the numbered order should change.
 - Notes that cluster by body region or keep repeating across weeks.
 - Progressions that jumped too far, and lifts that matter most for the current training phase and goal.
-- Heart rate, when "heartRate" has status "ok": each lift's peak and average come from the wearable stream split at the app's log times, so the window holds that lift's sets plus the rests before them. Treat it as effort evidence and compare like for like: the same lift at a similar load against the comparison session (lower HR at the same or heavier load means better conditioning; higher means fatigue, heat or shorter rests). Accessories pushing HR as high as the main lifts suggest rests too short or circuit pacing. High RPE with modest HR points to a local muscular limit, not cardio. Cite HR only when it changes a conclusion. If heartRate is missing or its status is not "ok", ignore it and never mention heart rate.
+- Heart rate, when "heartRate" has status "ok": each lift's peak and average come from the wearable stream split between lifts using when each lift was logged and when its rest timer was started, so the window holds that lift's sets and rests. A lift marked "(approx)" had only its log time, and it may have been logged after its first set rather than its last, so its window can include sets of a neighboring lift: use approx numbers only for broad session-level points, never for a lift-specific conclusion. Treat it as effort evidence and compare like for like: the same lift at a similar load against the comparison session (lower HR at the same or heavier load means better conditioning; higher means fatigue, heat or shorter rests). Accessories pushing HR as high as the main lifts suggest rests too short or circuit pacing. High RPE with modest HR points to a local muscular limit, not cardio. Cite HR only when it changes a conclusion. If heartRate is missing or its status is not "ok", ignore it and never mention heart rate.
 - Recovery data, when present, is only an explainer: use it only when it explains a specific lift result (for example a hard set the day after a long ride or a short night). Never summarize recovery, sleep or HRV trends on their own; another app covers that.
 
 Rules:

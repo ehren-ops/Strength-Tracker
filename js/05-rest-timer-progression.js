@@ -40,12 +40,24 @@ function restTimerChoicesFor(name){
 // press past the end removes the timer entirely. That covers "I tapped
 // it by accident" without needing a separate cancel control: just keep
 // pressing the button you already pressed.
+// Each rest-timer start marks the end of a set of that lift. Kept per day so the heart-rate split
+// can pin each lift's sets no matter whether it was logged after its first set or its last.
+const REST_TAPS_KEY = "strength-tracker-rest-taps";
+let restTaps = (function(){ try{ return JSON.parse(localStorage.getItem(REST_TAPS_KEY) || "{}") || {}; }catch(e){ return {}; } })();
+function recordRestTap(name){
+  const d = todayISO();
+  (restTaps[d] = restTaps[d] || []).push({ name, at: new Date().toISOString() });
+  const keep = shiftISO(d, -30);
+  Object.keys(restTaps).forEach(k => { if(k < keep) delete restTaps[k]; });
+  try{ localStorage.setItem(REST_TAPS_KEY, JSON.stringify(restTaps)); }catch(e){}
+}
 function startRestTimer(name){
   if(restTimer && restTimer.exerciseName === name && restTimer.phase === "running"){
     advanceRestTimer();
     return;
   }
   clearRestTimer();
+  recordRestTap(name);
   const bucket = restBucketFor(data[name]);
   restTimer = {
     exerciseName: name,

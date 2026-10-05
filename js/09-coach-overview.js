@@ -135,13 +135,24 @@ function sessionLogTimes(date){
   });
   return logs.sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
 }
+// Everything that marks when a lift's sets ended on one date: each log (with its set count) and
+// each rest-timer start. Sent to the coach function to split the heart-rate stream per lift.
+function sessionAnchors(date){
+  const logs = [];
+  Object.entries(data).forEach(([name, ex]) => {
+    if(ex.trackBy === "checklist") return;
+    ex.entries.forEach(e => { if(e.date === date && e.loggedAt) logs.push({ name, at: e.loggedAt, kind: "log", sets: e.sets || null }); });
+  });
+  (restTaps[date] || []).forEach(t => { if(data[t.name]) logs.push({ name: t.name, at: t.at, kind: "rest" }); });
+  return logs.sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
+}
 // The latest earlier session of the same day type, for a like-for-like heart-rate comparison.
 function previousComparableSession(date){
   const day = guessDayForNames(sessionLogTimes(date).map(l => l.name));
   const dates = new Set();
   Object.values(data).forEach(ex => ex.entries.forEach(e => { if(e.date < date) dates.add(e.date); }));
   const prev = [...dates].sort().reverse().find(d => guessDayForNames(sessionLogTimes(d).map(l => l.name)) === day && sessionLogTimes(d).length >= 2);
-  return prev ? { date: prev, logs: sessionLogTimes(prev) } : null;
+  return prev ? { date: prev, logs: sessionAnchors(prev) } : null;
 }
 
 // ---------- heart rate per lift, after the fact ----------
@@ -163,8 +174,8 @@ function hrCandidateDates(){
   Object.values(data).forEach(ex => ex.entries.forEach(e => { if(e.date >= since && e.loggedAt) dates.add(e.date); }));
   const now = Date.now();
   return [...dates].sort().reverse().filter(d => {
-    const logs = sessionLogTimes(d);
-    if(logs.length < 2) return false;
+    if(sessionLogTimes(d).length < 2) return false;
+    const logs = sessionAnchors(d);
     const h = hrStore[d];
     if(!h) return true;
     if(h.logCount !== logs.length) return true; // lifts added since the last check
@@ -179,7 +190,7 @@ async function refreshHeartRate(){
   hrBusy = true;
   let gotNew = false;
   try{
-    const sessions = Object.fromEntries(dates.map(d => [d, sessionLogTimes(d)]));
+    const sessions = Object.fromEntries(dates.map(d => [d, sessionAnchors(d)]));
     const res = await fetch(`${SUPABASE_URL}/functions/v1/coach`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentSession.access_token },
@@ -208,7 +219,10 @@ function hrFor(name, date){
   const l = h.lifts.find(x => x.name === name && x.avg != null);
   return l || null;
 }
-function hrText(h){ return `HR ${h.avg} avg · ${h.peak} peak`; }
+// "~" marks a lift pinned only by its log time: it may have been logged after its first set, so
+// its window can hold a neighbor's sets. Rest-timer taps make it exact.
+function hrText(h){ return `HR ${h.approx ? "~" : ""}${h.avg} avg · ${h.peak} peak`; }
+function hrShort(h){ return `HR ${h.approx ? "~" : ""}${h.avg}/${h.peak}`; }
 
 function coachTz(){
   try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }catch(e){ return "UTC"; }
@@ -237,7 +251,7 @@ function buildSessionCoachPayload(date){
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
   const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
-  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionLogTimes(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date) };
+  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date) };
 }
 
 // The past week plus 6 weeks of history per lift, enough to judge loading blocks and deloads.
@@ -257,7 +271,7 @@ function buildWeeklyCoachPayload(){
   const sessionOrders = Object.fromEntries([...sessionDates].filter(d => d >= orderSince).sort()
     .map(d => [d, sessionOrder(d)]).filter(([, o]) => o));
   const weekLogTimes = Object.fromEntries([...sessionDates].filter(d => d >= shiftISO(weekEnd, -6)).sort()
-    .map(d => [d, sessionLogTimes(d)]).filter(([, l]) => l.length >= 2));
+    .map(d => [d, sessionAnchors(d)]).filter(([, l]) => l.length >= 2));
   return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd) };
 }
 
@@ -409,6 +423,9 @@ function renderLastSessionBreakdown(){
       ? "Heart rate: waiting for Whoop to sync to Strava"
       : "";
     if(hrLine) html += `<div class="session-hr-summary">${hrLine}</div>`;
+    if(h && h.status === "ok" && (h.lifts || []).some(l => l.approx && l.avg != null)){
+      html += `<div class="session-hr-summary">~ approximate: start the rest timer after each set to pin a lift's heart rate exactly.</div>`;
+    }
     names.forEach(n => {
       const ex = data[n];
       const entry = ex.entries.slice().reverse().find(e => e.date === lastDate);

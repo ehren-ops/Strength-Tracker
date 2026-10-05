@@ -333,7 +333,7 @@ function trendLine(name, ex){
 // Last session's heart rate on this lift, once Whoop has synced it.
 function hrLine(name, last){
   const h = last && hrFor(name, last.date);
-  return h ? `Heart rate last time: ${h.avg} avg, ${h.peak} peak.` : "";
+  return h ? `Heart rate last time: ${h.approx ? "about " : ""}${h.avg} avg, ${h.peak} peak.` : "";
 }
 // Last session's numbers and RPE, the fallback detail when notes give nothing to act on.
 function lastSessionLine(ex, last){
@@ -598,7 +598,7 @@ function renderHistRow(e, idx, isLatest, ex, name){
   const tag = isLatest ? (e.date === todayISO() ? "Today" : "Latest") : "";
   html += `<span>${fmtDate(e.date)}${e.confirmed===false?'<span class="est">*</span>':''}${tag ? `<br><span class="latest-tag">${tag}</span>` : ''}</span>`;
   const hr = hrFor(name, e.date);
-  html += `<span class="exact">${formatEntryValue(e, ex)}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">HR ${hr.avg}/${hr.peak}</span>` : ""}</span>`;
+  html += `<span class="exact">${formatEntryValue(e, ex)}${hr ? `<span class="hist-hr" title="Heart rate: average / peak${hr.approx ? ", approximate" : ""}">${hrShort(hr)}</span>` : ""}</span>`;
   html += `<span class="exact">${e.difficulty ?? "-"}</span>`;
   html += `<span class="hist-note-cell">`;
   html += `<span class="note">${e.note ? escapeHtml(e.note) : ""}</span>`;
