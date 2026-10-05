@@ -10,7 +10,7 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
   renderSyncStatus();
   if(view === "overview") render();
   // Heart rate is checked once the first pull has brought in every lift's log time.
-  if(session && !wasSignedIn) syncOnSignIn().then(refreshHeartRate, refreshHeartRate);
+  if(session && !wasSignedIn) syncOnSignIn().then(afterSignInSync, afterSignInSync);
 });
 window.addEventListener("online", () => { renderSyncStatus(); flushQueue(); });
 window.addEventListener("offline", () => { renderSyncStatus(); });
@@ -24,5 +24,8 @@ if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitGuidance
 // Typing in the log form holds off the background heart-rate refresh's re-render.
 document.addEventListener("input", e => { if(e.target && /^f-/.test(e.target.id || "")) logFormDirty = true; });
 
+function afterSignInSync(){ ensureDeloadNotes(); refreshHeartRate(); }
+
 render();
+ensureDeloadNotes();
 checkDeloadAutoEnd();

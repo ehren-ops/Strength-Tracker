@@ -1754,6 +1754,23 @@ async function main(){
   const loggedDeload = await page.evaluate(() => { const es = data['Bench Press'].entries; const e = es[es.length - 1]; return { note: e.note, deload: !!e.deload, read: noteInsights(es) }; });
   if(loggedDeload.note !== 'Deload' || !loggedDeload.deload || loggedDeload.read.some(t => /grind/.test(t))) throw new Error('expected the session saved with note "Deload", tagged deload, and its note kept out of the Next tile read, got: ' + JSON.stringify(loggedDeload));
   console.log('OK: the note pre-fills "Deload", saves with the session, and stays out of the next session\'s note read');
+  // Cleared or typed over, the note still says Deload; an old deload entry missing it gets fixed and synced.
+  const deloadNotes = await page.evaluate(() => {
+    const out = { typed: withDeloadNote('felt fine'), cleared: withDeloadNote(''), kept: withDeloadNote('Deload, sore') };
+    const ex = data['Bench Press'];
+    ex.entries.push({ clientId: 'old-deload', date: todayISO(), weight: 150, sets: 2, reps: 8, difficulty: 6, deload: true, note: '' });
+    const realEnqueue = enqueueOp;
+    out.queued = 0;
+    enqueueOp = op => { if(op.type === 'upsert_entry' && op.payload.clientId === 'old-deload') out.queued++; return realEnqueue(op); };
+    out.fixed = ensureDeloadNotes();
+    out.note = ex.entries.find(e => e.clientId === 'old-deload').note;
+    out.again = ensureDeloadNotes();
+    enqueueOp = realEnqueue;
+    ex.entries = ex.entries.filter(e => e.clientId !== 'old-deload');
+    return out;
+  });
+  if(deloadNotes.typed !== 'Deload, felt fine' || deloadNotes.cleared !== 'Deload' || deloadNotes.kept !== 'Deload, sore' || deloadNotes.fixed !== 1 || deloadNotes.note !== 'Deload' || deloadNotes.queued < 1 || deloadNotes.again !== 0) throw new Error('expected every deload session note to carry "Deload", got: ' + JSON.stringify(deloadNotes));
+  console.log('OK: deload notes always start with "Deload" (typed text kept after it); old deload entries missing it are fixed and synced once');
   await page.click('.tab:has-text("Overview")');
   await page.click('button:has-text("Deload Week: ON")');
   await sleep(150);

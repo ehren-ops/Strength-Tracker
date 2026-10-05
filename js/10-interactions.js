@@ -37,6 +37,28 @@ function flashFieldError(el){
   });
 }
 
+// Deload Week sessions always say so in their note, so history and the coach read them as planned.
+// Whatever was typed is kept after it: "Deload, still tender shoulders".
+function withDeloadNote(note){
+  const n = (note || "").trim();
+  return /deload/i.test(n) ? n : n ? `${DELOAD_NOTE}, ${n}` : DELOAD_NOTE;
+}
+// Catches any deload-tagged entry whose note lacks it (logged before the note pre-fill, or cleared),
+// saves the fix and syncs it. Runs at startup and after each sign-in pull.
+function ensureDeloadNotes(){
+  let changed = 0;
+  Object.entries(data).forEach(([name, ex]) => ex.entries.forEach(e => {
+    if(!e.deload) return;
+    const fixed = withDeloadNote(e.note);
+    if(fixed === (e.note || "")) return;
+    e.note = fixed;
+    changed++;
+    enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: name, clientId: e.clientId } });
+  }));
+  if(changed){ persist(); render(); }
+  return changed;
+}
+
 function logEntry(){
   const ex = data[selected];
   const dateEl = document.getElementById("f-date");
@@ -91,7 +113,7 @@ function logEntry(){
       note: (noteEl.value || "").trim(),
     };
   }
-  if(modes.deload && ex.trackBy !== "duration") entry.deload = true;
+  if(modes.deload && ex.trackBy !== "duration"){ entry.deload = true; entry.note = withDeloadNote(entry.note); }
   // When it was logged, so a session's actual exercise order can be compared with the planned one.
   entry.loggedAt = new Date().toISOString();
   ex.entries.push(entry);
