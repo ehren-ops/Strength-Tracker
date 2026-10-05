@@ -675,6 +675,8 @@ function confirmDeleteEntry(name, idx){
 
 // A thin line stopwatch in the button's own color, in place of the emoji.
 const STOPWATCH_ICON = `<svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9.2" r="5.3"/><path d="M8 9.2V6.4M6.4 1.8h3.2M8 1.8v2.1M12.4 4.6l1-1"/></svg>`;
+// Deload Week starts the note with this, so the history and the coach read the session as planned.
+const DELOAD_NOTE = "Deload";
 function renderForm(name, ex){
   let html = "";
   if(ex.entries.length){
@@ -725,7 +727,7 @@ function renderForm(name, ex){
   html += `</div>`;
   if(plan) html += `<p class="prefill-note">${mods.length ? `Pre-filled: ${mods.join(", ")} plan` : "Pre-filled: next progression"}</p>`;
   html += `<div class="form-row">
-    ${ex.trackBy === "duration" ? rpeField : ""}<div class="field field-note"><input type="text" id="f-note" aria-label="Note" placeholder="${ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
+    ${ex.trackBy === "duration" ? rpeField : ""}<div class="field field-note"><input type="text" id="f-note" aria-label="Note" value="${modes.deload && ex.trackBy !== "duration" ? DELOAD_NOTE : ""}" placeholder="${ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
   </div>`;
   html += `<div class="date-log-row">
     <div class="field"><input type="date" id="f-date" aria-label="Date" value="${todayISO()}"></div>

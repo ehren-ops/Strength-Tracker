@@ -282,7 +282,9 @@ const NOTE_THEMES = [
 ];
 // budget: characters left for it in the tile's two guidance lines after the call itself.
 function noteInsights(entries){
-  const notes = entries.slice(-3).reverse().map(e => e.note).filter(Boolean).slice(0, 2);
+  // Deload Week sessions are planned and lighter (and their notes start with "Deload"), so the read
+  // comes from regular sessions, the same ones the next suggestion is built from.
+  const notes = entries.filter(e => !e.deload).slice(-3).reverse().map(e => e.note).filter(Boolean).slice(0, 2);
   const out = [], seen = new Set();
   notes.forEach(n => NOTE_THEMES.forEach(t => {
     if(seen.has(t.key) || !t.re.test(n)) return;

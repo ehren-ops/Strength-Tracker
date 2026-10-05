@@ -1732,8 +1732,13 @@ async function main(){
   await page.fill('#f-weight', String(expectedW));
   await page.fill('#f-sets', '2');
   await page.fill('#f-reps', '8');
+  const prefillNote = await page.inputValue('#f-note');
+  if(prefillNote !== 'Deload') throw new Error('expected the note to start as "Deload" with Deload Week on, got: ' + JSON.stringify(prefillNote));
   await page.click('button.log:has-text("Log set")');
   await sleep(150);
+  const loggedDeload = await page.evaluate(() => { const es = data['Bench Press'].entries; const e = es[es.length - 1]; return { note: e.note, deload: !!e.deload, read: noteInsights(es) }; });
+  if(loggedDeload.note !== 'Deload' || !loggedDeload.deload || loggedDeload.read.some(t => /grind/.test(t))) throw new Error('expected the session saved with note "Deload", tagged deload, and its note kept out of the Next tile read, got: ' + JSON.stringify(loggedDeload));
+  console.log('OK: the note pre-fills "Deload", saves with the session, and stays out of the next session\'s note read');
   await page.click('.tab:has-text("Overview")');
   await page.click('button:has-text("Deload Week: ON")');
   await sleep(150);
