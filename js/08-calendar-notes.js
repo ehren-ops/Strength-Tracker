@@ -29,16 +29,30 @@ function guessDayForNames(names){
   return best;
 }
 
+// Each date's lifts in the order they were done: by when each was first logged that day. Lifts with
+// no log time (older entries) follow, in their planned program order.
 function getSessionsByDate(){
-  const map = {};
+  const map = {}, firstAt = {};
   Object.entries(data).forEach(([name, ex]) => {
     if(ex.trackBy === "checklist") return;
     ex.entries.forEach(e => {
       if(!e.date) return;
       if(!map[e.date]) map[e.date] = [];
       if(!map[e.date].includes(name)) map[e.date].push(name);
+      const k = e.date + "|" + name;
+      if(e.loggedAt && (!firstAt[k] || e.loggedAt < firstAt[k])) firstAt[k] = e.loggedAt;
     });
   });
+  const planned = name => {
+    const i = Object.values(DAY_ORDER).map(list => list.indexOf(name)).filter(x => x >= 0);
+    return i.length ? Math.min(...i) : 999;
+  };
+  Object.entries(map).forEach(([date, names]) => names.sort((a, b) => {
+    const ta = firstAt[date + "|" + a], tb = firstAt[date + "|" + b];
+    if(ta && tb) return ta < tb ? -1 : ta > tb ? 1 : 0;
+    if(ta || tb) return ta ? -1 : 1;
+    return planned(a) - planned(b);
+  }));
   return map;
 }
 

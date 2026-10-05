@@ -2168,6 +2168,19 @@ async function main(){
   await page.evaluate(() => { delete restTaps[todayISO()]; lastSessionExpanded = false; data['Squat'].entries = data['Squat'].entries.filter(e => e.clientId !== 'hr-sq'); data['RDL'].entries = data['RDL'].entries.filter(e => e.clientId !== 'hr-rdl'); render(); });
   console.log('OK: pending until Whoop syncs, then HR in history ("HR ~120/140" when only the log pins it), the breakdown and the Next tile; rest-timer starts pin a lift exactly; no AI call, no wiped form');
 
+  // The post-workout breakdown lists lifts in the order they were logged, not storage order.
+  const loggedOrder = await page.evaluate(() => {
+    const d = '2026-09-01', base = Date.parse('2026-09-01T16:00:00Z');
+    const add = (name, min) => data[name].entries.push({ clientId: 'ord-' + name, date: d, weight: 50, sets: 3, reps: 8, difficulty: 7, loggedAt: new Date(base + min * 60000).toISOString() });
+    add('Lateral Raise', 0); add('Squat', 10); add('Bench Press', 20); add('Barbell Row', 30);
+    data['Back Extension'].entries.push({ clientId: 'ord-Back Extension', date: d, weight: 0, sets: 3, reps: 12 }); // no log time: goes last
+    const order = getSessionsByDate()[d];
+    ['Lateral Raise', 'Squat', 'Bench Press', 'Barbell Row', 'Back Extension'].forEach(n => { data[n].entries = data[n].entries.filter(e => e.clientId !== 'ord-' + n); });
+    return order;
+  });
+  if(JSON.stringify(loggedOrder) !== JSON.stringify(['Lateral Raise', 'Squat', 'Bench Press', 'Barbell Row', 'Back Extension'])) throw new Error('expected the session list in logged order, got: ' + JSON.stringify(loggedOrder));
+  console.log('OK: the post-workout breakdown lists lifts in the order they were logged');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
