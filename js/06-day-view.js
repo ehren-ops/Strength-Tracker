@@ -3,8 +3,10 @@
 
 // ---------- rendering ----------
 let lastRenderedView = null;
+let logFormDirty = false; // typed into the log form since the last render: don't re-render under it
 function render(){
   guidancePools = [];
+  logFormDirty = false;
   const oldPillScroll = document.getElementById("pill-scroll");
   const sameView = lastRenderedView === view;
   const savedPillScrollLeft = (sameView && oldPillScroll) ? oldPillScroll.scrollLeft : null;
@@ -235,7 +237,7 @@ function guidanceHtml(msg, pool){
 }
 function composeGuidance(msg, name, ex, last){
   return guidanceHtml(msg, [
-    ...noteInsights(ex.entries), lastSessionLine(ex, last), ...trendLine(name, ex),
+    ...noteInsights(ex.entries), lastSessionLine(ex, last), hrLine(name, last), ...trendLine(name, ex),
     bestLine(ex, last), progressionRule(name, ex), effortLine(ex), daysSinceLine(last), LOG_TIMING_TIP, NOTE_TIP,
   ]);
 }
@@ -327,6 +329,11 @@ function trendLine(name, ex){
     if(n) bits.push(`${n} session${n > 1 ? "s" : ""} in the last 4 weeks`);
   }
   return bits.map(b => b + ".");
+}
+// Last session's heart rate on this lift, once Whoop has synced it.
+function hrLine(name, last){
+  const h = last && hrFor(name, last.date);
+  return h ? `Heart rate last time: ${h.avg} avg, ${h.peak} peak.` : "";
 }
 // Last session's numbers and RPE, the fallback detail when notes give nothing to act on.
 function lastSessionLine(ex, last){
@@ -590,7 +597,8 @@ function renderHistRow(e, idx, isLatest, ex, name){
   let html = `<div class="hist-row${isLatest?' latest':''}${ex.trackBy==="duration"?' cardio':''}">`;
   const tag = isLatest ? (e.date === todayISO() ? "Today" : "Latest") : "";
   html += `<span>${fmtDate(e.date)}${e.confirmed===false?'<span class="est">*</span>':''}${tag ? `<br><span class="latest-tag">${tag}</span>` : ''}</span>`;
-  html += `<span class="exact">${formatEntryValue(e, ex)}</span>`;
+  const hr = hrFor(name, e.date);
+  html += `<span class="exact">${formatEntryValue(e, ex)}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">HR ${hr.avg}/${hr.peak}</span>` : ""}</span>`;
   html += `<span class="exact">${e.difficulty ?? "-"}</span>`;
   html += `<span class="hist-note-cell">`;
   html += `<span class="note">${e.note ? escapeHtml(e.note) : ""}</span>`;

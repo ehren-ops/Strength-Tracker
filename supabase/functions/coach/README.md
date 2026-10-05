@@ -31,6 +31,11 @@ table (`kind` = `session` or `weekly`) when signed in. Model: Claude Sonnet 5.5.
   session of the same day type, for a like-for-like comparison; weekly mode does it for each
   session that week. Right after a workout the wearable may not have uploaded yet, in which case
   the analysis runs without heart rate.
+- **Heart rate on its own (`mode: "hr"`):** the same split, returned as numbers with no model
+  call, so it never counts toward the daily limit. The app asks on open and when it returns to
+  the foreground, for recent sessions still missing heart rate (at most every 15 minutes each),
+  and shows each lift's average and peak in its history row, the post-workout breakdown and the
+  Next tile. Sessions before 2026-10-02 are skipped: their log times are sync times.
 
 ## Setup after cloning this repo
 

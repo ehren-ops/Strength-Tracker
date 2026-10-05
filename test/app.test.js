@@ -58,13 +58,27 @@ async function main(){
   // called exactly once per explicit click, never automatically.
   let aiBreakdownCallCount = 0;
   const coachRequests = [];
+  // Background heart-rate requests and what the mock answers: "not uploaded yet" until a test
+  // flips hrMockReady, then avg 120 + 5 per lift and peak avg + 20, in log order.
+  const hrRequests = [];
+  let hrMockReady = false;
+  const hrMockReply = (d, logs) => !hrMockReady ? { status: 'not_uploaded_yet' } : {
+    status: 'ok', elapsedMin: 60, avgHr: 118, maxHr: 165,
+    lifts: logs.map((l, i) => ({ name: l.name, at: l.at, min: 6, avg: 120 + 5 * i, peak: 140 + 5 * i })),
+  };
   await context.route('**/functions/v1/coach', route => {
     // Mirrors the real function: no signed-in session, no call.
     if(!/^Bearer \S+/.test(route.request().headers()['authorization'] || '')){
       return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'not_signed_in' }) });
     }
-    aiBreakdownCallCount++;
     const req = route.request().postDataJSON();
+    // Heart-rate-only requests run in the background with no AI call; they never count as one.
+    if(req.mode === 'hr'){
+      hrRequests.push(req);
+      const sessions = Object.fromEntries(Object.entries(req.payload.sessions || {}).map(([d, logs]) => [d, hrMockReply(d, logs)]));
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sessions }) });
+    }
+    aiBreakdownCallCount++;
     coachRequests.push(req);
     const breakdown = req.mode === 'weekly'
       ? { verdict: 'Mock weekly verdict.', sections: [
@@ -2083,6 +2097,47 @@ async function main(){
   });
   if(!head.inTitle || head.text !== '+10 since first' || head.next !== 'rec-box') throw new Error('expected "+10 since first" in the title row and the Next tile right under the weight row, got: ' + JSON.stringify(head));
   console.log('OK: "+10 since first" sits top right in the title row; the Next tile follows the weight row');
+
+  console.log('=== 76: heart rate per lift arrives after the fact and shows in history, the breakdown and the Next tile ===');
+  const aiCallsBeforeHr = aiBreakdownCallCount;
+  await page.evaluate(() => {
+    const t = Date.now();
+    data['Squat'].entries.push({ clientId: 'hr-sq', date: todayISO(), weight: 185, sets: 3, reps: 8, difficulty: 7, loggedAt: new Date(t - 20 * 60000).toISOString(), label: 'hr1' });
+    data['RDL'].entries.push({ clientId: 'hr-rdl', date: todayISO(), weight: 235, sets: 3, reps: 8, difficulty: 7, loggedAt: new Date(t - 10 * 60000).toISOString(), label: 'hr2' });
+    hrStore = {};
+  });
+  hrMockReady = false;
+  await page.evaluate(() => refreshHeartRate());
+  await sleep(200);
+  const pending = await page.evaluate(() => (hrStore[todayISO()] || {}).status);
+  if(pending !== 'not_uploaded_yet') throw new Error('expected a session Whoop has not synced yet to be marked pending, got: ' + pending);
+  // Whoop syncs; 15 minutes later the app checks again on its own.
+  hrMockReady = true;
+  await page.evaluate(() => { hrStore[todayISO()].checkedAt = 0; view = 'lower'; selected = 'Squat'; render(); });
+  await page.fill('#f-note', 'half typed');
+  await page.evaluate(() => refreshHeartRate());
+  await sleep(200);
+  const heldNote = await page.inputValue('#f-note');
+  if(heldNote !== 'half typed') throw new Error('expected the background heart-rate refresh not to wipe a half-typed log form, got: ' + JSON.stringify(heldNote));
+  await page.evaluate(() => { view = 'lower'; selected = 'Squat'; render(); });
+  const hrShown = await page.evaluate(() => ({
+    hist: document.querySelector('.hist-row.latest .hist-hr') && document.querySelector('.hist-row.latest .hist-hr').textContent,
+    pool: guidancePools.flat().find(t => /^Heart rate last time/.test(t)) || null,
+  }));
+  if(hrShown.hist !== 'HR 120/140' || hrShown.pool !== 'Heart rate last time: 120 avg, 140 peak.') throw new Error('expected Squat\'s heart rate in its history row and Next tile, got: ' + JSON.stringify(hrShown));
+  await page.evaluate(() => { lastSessionExpanded = true; view = 'overview'; render(); });
+  const breakdownHr = await page.evaluate(() => ({
+    summary: (document.querySelector('.session-hr-summary') || {}).textContent || null,
+    rdl: [...document.querySelectorAll('.session-row')].map(r => r.textContent).find(t => /^RDL/.test(t.trim())) || null,
+  }));
+  if(!/Whoop: 60 min · 118 avg · 165 max/.test(breakdownHr.summary || '') || !/HR 125 avg · 145 peak/.test(breakdownHr.rdl || '')) throw new Error('expected the post-workout breakdown to show session and per-lift heart rate, got: ' + JSON.stringify(breakdownHr));
+  const hrCallsAfter = hrRequests.length;
+  await page.evaluate(() => refreshHeartRate());
+  await sleep(150);
+  if(hrRequests.length !== hrCallsAfter) throw new Error('expected no further heart-rate requests once a session has its numbers');
+  if(aiBreakdownCallCount !== aiCallsBeforeHr) throw new Error('expected heart-rate checks never to count as AI calls');
+  await page.evaluate(() => { lastSessionExpanded = false; data['Squat'].entries = data['Squat'].entries.filter(e => e.clientId !== 'hr-sq'); data['RDL'].entries = data['RDL'].entries.filter(e => e.clientId !== 'hr-rdl'); render(); });
+  console.log('OK: pending until Whoop syncs, then HR in history ("HR 120/140"), the breakdown and the Next tile; no AI call, no wiped form, no repeat request');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

@@ -3,6 +3,9 @@
 //   mode "weekly":  weekly check-in. What's moving, what's lagging, imbalances, block and deload,
 //                   next week's focus, and at most one bodyweight line.
 // POST {mode, payload} -> {breakdown: {verdict, sections: [{title, items}]}, generatedAt, context}
+//   mode "hr":      no model call and no daily cap. payload {tz, sessions: {date: [{name, at}]}} ->
+//                   {sessions: {date: {status, elapsedMin, avgHr, maxHr, lifts: [{name, at, min, avg, peak}]}}}
+//                   for the app to show per-lift heart rate once Whoop has synced to Strava.
 //
 // payload is built client-side from the app's own log (buildSessionCoachPayload and
 // buildWeeklyCoachPayload in js/09-coach-overview.js). When the caller is signed in and this project has
@@ -170,6 +173,7 @@ async function outliveContext(email: string, mode: "session" | "weekly", end: st
 // lift: its sets plus the rests before them. Peak is the hardest set; average reflects density.
 type Log = { name: string; at: string };
 const FIRST_LIFT_LEAD_MIN = 20; // the first lift's window starts at most this long before its log
+const HR_MAX_SESSIONS = 4; // per hr-only request: each session is two Strava calls
 
 function clock(ms: number, tz: string) {
   try { return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(ms)); }
@@ -209,21 +213,31 @@ async function sessionHeartRate(logs: unknown, tz: string) {
   if (!res) return { status: "hr_unavailable" };
   if (!res.activity || !res.samples?.length) return { status: "not_uploaded_yet" };
   const actStart = Date.parse(String(res.activity.startTime));
-  const lifts = ls.map((l, i) => {
+  const per = ls.map((l, i) => {
     const to = times[i];
     const from = i ? times[i - 1] : Math.max(actStart, to - FIRST_LIFT_LEAD_MIN * 60_000);
     const w = res.samples.filter(([t]) => t * 1000 > from && t * 1000 <= to).map(([, h]) => h);
-    if (w.length < 3) return `${l.name}: no heart rate in its window`;
-    const avgHr = Math.round(w.reduce((a, b) => a + b, 0) / w.length);
-    return `${l.name} ${clock(to, tz)} (${Math.round((to - from) / 60_000)} min): peak ${Math.max(...w)}, avg ${avgHr}`;
+    const min = Math.round((to - from) / 60_000);
+    return w.length < 3
+      ? { name: l.name, at: l.at, min, avg: null, peak: null }
+      : { name: l.name, at: l.at, min, avg: Math.round(w.reduce((a, b) => a + b, 0) / w.length), peak: Math.max(...w) };
   });
   const a = res.activity;
+  const elapsedMin = round(num(a.elapsedSec) != null ? num(a.elapsedSec)! / 60 : null);
   return {
     status: "ok",
-    session: `${round(num(a.elapsedSec) != null ? num(a.elapsedSec)! / 60 : null)} min, avg ${round(num(a.avgHr))}, max ${round(num(a.maxHr))}`,
-    lifts,
+    session: `${elapsedMin} min, avg ${round(num(a.avgHr))}, max ${round(num(a.maxHr))}`,
+    lifts: per.map((x) => x.avg == null
+      ? `${x.name}: no heart rate in its window`
+      : `${x.name} ${clock(Date.parse(x.at), tz)} (${x.min} min): peak ${x.peak}, avg ${x.avg}`),
+    // Numbers for the app's own display (history rows, the post-workout breakdown); the prompt
+    // only sees the text lines above.
+    numbers: { elapsedMin, avgHr: round(num(a.avgHr)), maxHr: round(num(a.maxHr)), lifts: per },
   };
 }
+
+// The model reads the text lines; the numbers block is for the app.
+function textOnly(h: Row) { const { numbers: _n, ...rest } = h; return rest; }
 
 // ---------- prompts and output shapes ----------
 const PRINCIPLES = `Your value is synthesis the athlete cannot see on the log screen. They already see every weight, set, rep and RPE they logged, so never hand those back. Every bullet must be an insight: a pattern across sessions, a comparison between lifts or movement patterns, a likely cause, or a decision. Numbers appear only as brief evidence for the insight, never as the point.
@@ -314,6 +328,23 @@ Deno.serve(async (req) => {
     if (!payload || typeof payload !== "object") return json({ error: "missing_payload" }, 400);
     if (JSON.stringify(payload).length > MAX_PAYLOAD_CHARS) return json({ error: "payload_too_large" }, 413);
 
+    // Heart rate only: per-lift numbers for sessions the app hasn't filled in yet. No model call,
+    // so it doesn't count toward the daily AI cap; it still needs a signed-in account.
+    if (body.mode === "hr") {
+      const who = await caller(req).catch(() => null);
+      if (!who) return json({ error: "not_signed_in" }, 401);
+      const tz = validTz(payload.tz);
+      const sessions = (payload.sessions && typeof payload.sessions === "object") ? payload.sessions as Record<string, unknown> : {};
+      const dates = Object.keys(sessions).filter(isDate).sort().slice(-HR_MAX_SESSIONS);
+      const results = await Promise.all(dates.map((d) => sessionHeartRate(sessions[d], tz)));
+      const out = Object.fromEntries(dates.map((d, i) => {
+        const r = results[i] as Row | null;
+        return [d, !r ? { status: "too_few_logs" } : r.status === "ok" ? { status: "ok", ...(r.numbers as Row) } : { status: r.status }];
+      }));
+      console.log("coach hr", JSON.stringify(Object.fromEntries(Object.entries(out).map(([d, v]) => [d, (v as Row).status]))));
+      return json({ sessions: out });
+    }
+
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) return json({ error: "anthropic_key_not_configured" }, 500);
 
@@ -346,11 +377,11 @@ Deno.serve(async (req) => {
         sessionHeartRate(logTimes, tz),
         compareSession?.logs ? sessionHeartRate(compareSession.logs, tz) : Promise.resolve(null),
       ]);
-      if (today) heartRate = { ...today, compare: compare && compareSession?.date ? { date: compareSession.date, ...compare } : null };
+      if (today) heartRate = { ...textOnly(today), compare: compare && compareSession?.date ? { date: compareSession.date, ...textOnly(compare) } : null };
     } else if (weekLogTimes && typeof weekLogTimes === "object") {
       const dates = Object.keys(weekLogTimes).filter(isDate).sort().slice(-5);
       const byDate = await Promise.all(dates.map((d) => sessionHeartRate(weekLogTimes[d], tz)));
-      heartRate = Object.fromEntries(dates.map((d, i) => [d, byDate[i]]).filter(([, h]) => h));
+      heartRate = Object.fromEntries(dates.map((d, i) => [d, byDate[i] && textOnly(byDate[i])]).filter(([, h]) => h));
     }
 
     const client = new Anthropic({ apiKey });

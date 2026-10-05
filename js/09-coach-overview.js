@@ -144,6 +144,72 @@ function previousComparableSession(date){
   return prev ? { date: prev, logs: sessionLogTimes(prev) } : null;
 }
 
+// ---------- heart rate per lift, after the fact ----------
+// Whoop reaches Strava some time after a session, so the app checks back on its own: on open and
+// when it comes back to the foreground, any recent session without heart rate is asked for again
+// (at most every 15 minutes). The coach function splits the stream at the log times and returns
+// each lift's average and peak; no AI call, so it doesn't count toward the daily limit.
+const HR_KEY = "strength-tracker-hr";
+const HR_LOG_TIMES_SINCE = "2026-10-02"; // log times before this are sync times, not when a lift ended
+const HR_LOOKBACK_DAYS = 10;
+const HR_RETRY_MS = 15 * 60 * 1000;
+const HR_FINAL = new Set(["ok", "no_log_timeline", "too_few_logs"]);
+let hrStore = loadCoachCache(HR_KEY);
+let hrBusy = false;
+function saveHrStore(){ try{ localStorage.setItem(HR_KEY, JSON.stringify(hrStore)); }catch(e){} }
+function hrCandidateDates(){
+  const since = [HR_LOG_TIMES_SINCE, shiftISO(todayISO(), -HR_LOOKBACK_DAYS)].sort().pop();
+  const dates = new Set();
+  Object.values(data).forEach(ex => ex.entries.forEach(e => { if(e.date >= since && e.loggedAt) dates.add(e.date); }));
+  const now = Date.now();
+  return [...dates].sort().reverse().filter(d => {
+    const logs = sessionLogTimes(d);
+    if(logs.length < 2) return false;
+    const h = hrStore[d];
+    if(!h) return true;
+    if(h.logCount !== logs.length) return true; // lifts added since the last check
+    if(HR_FINAL.has(h.status)) return false;
+    return now - (h.checkedAt || 0) > HR_RETRY_MS;
+  }).slice(0, 4);
+}
+async function refreshHeartRate(){
+  if(hrBusy || !currentSession || !currentSession.access_token) return;
+  const dates = hrCandidateDates();
+  if(!dates.length) return;
+  hrBusy = true;
+  let gotNew = false;
+  try{
+    const sessions = Object.fromEntries(dates.map(d => [d, sessionLogTimes(d)]));
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/coach`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentSession.access_token },
+      body: JSON.stringify({ mode: "hr", payload: { tz: coachTz(), sessions } }),
+    });
+    const body = await res.json().catch(() => null);
+    if(!res.ok || !body || !body.sessions) return;
+    dates.forEach(d => {
+      const r = body.sessions[d];
+      if(!r) return;
+      if(r.status === "ok" && !(hrStore[d] && hrStore[d].status === "ok" && hrStore[d].logCount === sessions[d].length)) gotNew = true;
+      hrStore[d] = { ...r, logCount: sessions[d].length, checkedAt: Date.now() };
+    });
+    saveHrStore();
+  }catch(e){
+    // Offline or the function is down: try again on the next open.
+  }finally{
+    hrBusy = false;
+  }
+  if(gotNew && !logFormDirty) render();
+}
+// One lift's heart rate on one date, or null.
+function hrFor(name, date){
+  const h = hrStore[date];
+  if(!h || h.status !== "ok" || !Array.isArray(h.lifts)) return null;
+  const l = h.lifts.find(x => x.name === name && x.avg != null);
+  return l || null;
+}
+function hrText(h){ return `HR ${h.avg} avg · ${h.peak} peak`; }
+
 function coachTz(){
   try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }catch(e){ return "UTC"; }
 }
@@ -336,12 +402,20 @@ function renderLastSessionBreakdown(){
 
   if(lastSessionExpanded){
     html += `<div style="margin-top:0.5rem;">`;
+    const h = hrStore[lastDate];
+    const hrLine = h && h.status === "ok"
+      ? `Whoop: ${h.elapsedMin} min · ${h.avgHr} avg · ${h.maxHr} max heart rate`
+      : lastDate >= HR_LOG_TIMES_SINCE && sessionLogTimes(lastDate).length >= 2 && currentSession
+      ? "Heart rate: waiting for Whoop to sync to Strava"
+      : "";
+    if(hrLine) html += `<div class="session-hr-summary">${hrLine}</div>`;
     names.forEach(n => {
       const ex = data[n];
       const entry = ex.entries.slice().reverse().find(e => e.date === lastDate);
       if(entry){
+        const hr = hrFor(n, lastDate);
         html += `<div class="session-row">
-          <span>${n}</span>
+          <span>${n}${hr ? `<span class="session-hr">${hrText(hr)}</span>` : ""}</span>
           <span class="exact">${formatEntryValue(entry, ex)}</span>
           <span class="exact">${entry.difficulty ?? "-"}</span>
         </div>`;

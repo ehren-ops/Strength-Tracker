@@ -245,6 +245,9 @@
   .cal-badge{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;border-radius:4px;color:#fff;font-size:0.58rem;font-weight:700;text-align:center;margin-top:1px;padding:0 2px;}
   .cal-detail{margin-top:0.7rem;padding-top:0.55rem;border-top:1px dashed var(--line);}
   .session-row{display:grid;grid-template-columns:1fr 110px 34px;column-gap:0.5rem;align-items:baseline;font-size:0.78rem;padding:0.18rem 0;font-family:var(--font-body);font-variant-numeric:tabular-nums;color:var(--slate);}
+  .hist-hr, .session-hr{display:block;font-size:0.64rem;font-weight:500;color:var(--slate);margin-top:0.1rem;}
+  .session-hr-summary{font-size:0.72rem;color:var(--slate);margin:0 0 0.35rem;}
+  .session-row span.session-hr{color:var(--slate);font-weight:400;}
   .session-row span:first-child{color:var(--ink);font-family:var(--font-body);font-weight:500;}
   .session-row .exact{color:var(--ink);}
   .cal-legend{display:flex;gap:0.7rem;margin-top:0.7rem;font-size:0.68rem;color:var(--slate);flex-wrap:wrap;align-items:center;}
