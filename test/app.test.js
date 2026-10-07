@@ -1795,6 +1795,37 @@ async function main(){
     || !afterDeload.pool.includes('Last full session: 175 lb, 3x8 at RPE 7.') || !afterDeload.pool.includes('Deload last time: 157.5 lb, 2x8.')
     || afterDeload.e1rm !== wantE1 || afterDeload.sessions !== 3) throw new Error('expected the card to stand on the last full session after a deload, got: ' + JSON.stringify(afterDeload));
   console.log('OK: after a deload the card shows 175 lbs, +10 since first, Est. 1RM 222 and next 180, with the deload named, not a drop');
+  // Coming back: the first session after a deload holds pressing lifts at the pre-deload weight;
+  // after 14+ days with no training at all, lifts restart near 90% and ramp 95% then 100%.
+  const comeback = await page.evaluate(() => {
+    const savedData = data, savedModes = { ...modes };
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const day = n => shiftISO(todayISO(), n);
+    const mk = (name, rows) => Object.assign(newExerciseShell(name), { entries: rows.map((r, i) => ({ clientId: name + i, date: day(r[0]), weight: r[1], sets: r[2] || 3, reps: r[3] || 8, difficulty: 7, deload: r[4] || undefined, label: 'x' })) });
+    const out = {};
+    // after a deload: press holds, a non-press adds
+    data = { 'Cable Chest Fly': mk('Cable Chest Fly', [[-9, 60, 3, 12], [-2, 40, 2, 12, true]]), 'Seated Calf Raise': mk('Seated Calf Raise', [[-9, 95, 3, 15], [-2, 90, 2, 15, true]]) };
+    data['Cable Chest Fly'].targetReps = 12; data['Seated Calf Raise'].targetReps = 15;
+    const fly = computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly'), calf = computeSuggestion(data['Seated Calf Raise'], 'Seated Calf Raise');
+    out.fly = [fly.weight, !!fly.postDeloadHold]; out.calf = calf.weight;
+    // 20 days with no training: 90%, then 95%, then the full weight
+    data = { 'Squat': mk('Squat', [[-27, 170], [-20, 180]]) };
+    const s1 = computeSuggestion(data['Squat'], 'Squat');
+    data['Squat'].entries.push({ clientId: 'sq-b1', date: todayISO(), weight: s1.weight, sets: 3, reps: 8, difficulty: 7, label: 'x' });
+    const s2 = computeSuggestion(data['Squat'], 'Squat');
+    data['Squat'].entries.push({ clientId: 'sq-b2', date: todayISO(), weight: s2.weight, sets: 3, reps: 8, difficulty: 7, label: 'x' });
+    const s3 = computeSuggestion(data['Squat'], 'Squat');
+    out.ramp = [s1.weight, s1.reentry && s1.reentry.step, s2.weight, s3.weight];
+    // one lift skipped for 3 weeks while others were trained: not a break
+    data = { 'Kettlebell Swings': mk('Kettlebell Swings', [[-22, 35, 3, 12]]), 'Squat': mk('Squat', [[-15, 170], [-8, 175], [-1, 180]]) };
+    data['Kettlebell Swings'].targetReps = 12;
+    const kb = computeSuggestion(data['Kettlebell Swings'], 'Kettlebell Swings');
+    out.skipped = !!kb.reentry;
+    data = savedData; Object.assign(modes, savedModes);
+    return out;
+  });
+  if(JSON.stringify(comeback) !== JSON.stringify({ fly: [60, true], calf: 100, ramp: [162.5, 1, 170, 180], skipped: false })) throw new Error('expected press hold after deload and a 90/95/100% ramp after time off, got: ' + JSON.stringify(comeback));
+  console.log('OK: after a deload pressing lifts hold (fly 60) while others add (calf 100); after 20 days off squat ramps 162.5, 170, 180; a skipped lift is not a break');
   await page.click('.tab:has-text("Overview")');
   await page.click('button:has-text("Deload Week: ON")');
   await sleep(150);

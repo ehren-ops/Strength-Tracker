@@ -329,12 +329,68 @@ function applyNoteTarget(core, ex, last){
   return { ...core, weight: w, deload: false, readyToProgress: w > last.weight, noteTarget: w, noteText: last.note };
 }
 
+// Coming back, two rules on top of the normal progression (Deload Week, when on, overrides both):
+// - Time off: a gap of BREAK_DAYS or more since the last session restarts at ~90% of the last
+//   working weight, then 95%, then the full weight, one session each, while targets are hit.
+// - After a deload: the first session back on a pressing (push) lift holds the pre-deload weight
+//   instead of adding, so tender shoulders get one session at a known load before progressing.
+const BREAK_DAYS = 14;
+const REENTRY_STEPS = [0.9, 0.95, 1];
+const roundLoad = w => Math.round(w / 2.5) * 2.5;
+function daysBetween(a, b){ return Math.round((Date.parse(b) - Date.parse(a)) / 86400000); }
+// Time off means no training at all, not one lift skipped: any logged session of any lift in
+// between breaks it. A lift done every couple of weeks never counts as coming back from a break.
+function trainedBetween(a, b){
+  return Object.values(data).some(x => x.entries.some(e => e.date > a && e.date < b));
+}
+function lastTrainingDate(){
+  let d = "";
+  Object.values(data).forEach(x => x.entries.forEach(e => { if(e.date > d) d = e.date; }));
+  return d;
+}
+function applyReturn(core, ex, name, baseline){
+  if(!core || ex.trackBy !== "weight" || !baseline.length) return core;
+  const all = ex.entries;
+  const last = all[all.length - 1];
+  const careHeld = core.careFlags && core.careFlags.length;
+  // Time off now: the next session is the first back.
+  const lastAny = lastTrainingDate();
+  const off = lastAny ? daysBetween(lastAny, todayISO()) : 0;
+  if(off >= BREAK_DAYS){
+    const pre = baseline[baseline.length - 1];
+    if(!(pre.weight > 0)) return core;
+    const weight = Math.min(core.weight, roundLoad(pre.weight * REENTRY_STEPS[0]));
+    return { ...core, weight, reps: effectiveTargetReps(ex), readyToProgress: false, reentry: { step: 1, daysOff: off, fullWeight: pre.weight } };
+  }
+  // Back from time off already: keep climbing the ramp while each session hits its target.
+  let gapAt = -1;
+  for(let i = all.length - 1; i > 0 && i >= all.length - REENTRY_STEPS.length + 1; i--){
+    if(daysBetween(all[i - 1].date, all[i].date) >= BREAK_DAYS && !trainedBetween(all[i - 1].date, all[i].date)){ gapAt = i; break; }
+  }
+  if(gapAt > 0 && !careHeld && core.noteTarget == null){
+    const before = all.slice(0, gapAt).filter(e => !e.deload), since = all.slice(gapAt);
+    const pre = before[before.length - 1];
+    const step = since.length + 1; // the session being planned
+    const allHit = since.every(e => e.reps >= effectiveTargetReps(ex));
+    if(pre && pre.weight > 0 && step <= REENTRY_STEPS.length && allHit){
+      const ramp = roundLoad(pre.weight * REENTRY_STEPS[step - 1]);
+      if(ramp > core.weight) return { ...core, weight: ramp, readyToProgress: true, reentry: { step, fullWeight: pre.weight } };
+    }
+  }
+  // First session back from a deload on a pressing lift: hold the pre-deload weight.
+  if(last.deload && !modes.deload && LIFT_PATTERNS[name] === "push" && core.noteTarget == null){
+    const pre = baseline[baseline.length - 1];
+    if(core.weight > pre.weight) return { ...core, weight: pre.weight, readyToProgress: false, postDeloadHold: true };
+  }
+  return core;
+}
+
 function computeSuggestion(ex, name){
   if(!ex.entries.length) return null;
   const baseline = ex.entries.filter(e => !e.deload);
   const baseEntries = baseline.length ? baseline : ex.entries;
   const lastBaseEntry = baseEntries[baseEntries.length - 1];
-  const core = capAtMaxWeight(applyNoteTarget(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, lastBaseEntry), ex, name, lastBaseEntry);
+  const core = applyReturn(capAtMaxWeight(applyNoteTarget(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, lastBaseEntry), ex, name, lastBaseEntry), ex, name, baseline);
   if(!modes.deload || !core || ex.trackBy === "duration") return core;
   const lastBase = (baseline.length ? baseline : ex.entries)[ (baseline.length ? baseline : ex.entries).length - 1 ];
   const sets = Math.max(2, Math.round((lastBase.sets || core.sets || 3) * 2 / 3));

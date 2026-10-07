@@ -465,7 +465,15 @@ function renderExerciseCard(name, ex){
         const hitLeadIn = wentOverTarget
           ? `Went over target ${unitWord} (did ${actualAmt}, target is ${targetAmt})`
           : `Hit target ${unitWord}`;
-        if(suggestion.deloadWeek){
+        if(suggestion.reentry && !suggestion.deloadWeek){
+          const r = suggestion.reentry, left = REENTRY_STEPS.length - r.step;
+          msg = r.step === 1
+            ? `Back after ${r.daysOff} days off: start near 90% and rebuild to ${r.fullWeight} lb over ${left} more session${left === 1 ? "" : "s"}.`
+            : left ? `Rebuilding after time off: ${Math.round(REENTRY_STEPS[r.step - 1] * 100)}% today, full ${r.fullWeight} lb next.`
+            : `Back to your full ${r.fullWeight} lb after the time off.`;
+        } else if(suggestion.postDeloadHold){
+          msg = `First session back from the deload: hold ${suggestion.weight} lb before adding.`;
+        } else if(suggestion.deloadWeek){
           msg = suggestion.deloadKeptReduction
             ? `Deload: already reduced, so same weight, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`
             : `Deload: ~10% lighter, a third fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`;
