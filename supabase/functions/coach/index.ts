@@ -170,12 +170,12 @@ async function outliveContext(email: string, mode: "session" | "weekly", end: st
 // ---------- heart rate per lift ----------
 // The wearable's heart-rate stream (Whoop via Strava, fetched by Outlive's strava-hr function) is
 // split into one window per lift using anchors the app sends: when each lift was logged, plus each
-// rest-timer start (a set of that lift just ended). The log alone is ambiguous, since a lift may be
-// logged after its first set or its last, so a lift anchored only by its log is marked approximate.
-// Between two lifts the split falls at the lowest heart rate in the gap between their anchors: the
-// switch (rest, setup, walking over) runs longer than rest between sets, so HR bottoms out there.
+// rest-timer start (a set of that lift just ended). The athlete logs a lift right after its first
+// set, so a lift's earliest anchor marks the end of its first set and its other sets follow. Each
+// split between lifts therefore falls just before the next lift's first set: at the lowest heart
+// rate in the few minutes before its earliest anchor, where the switch (rest, setup, walking over)
+// lets HR bottom out. A lift with only its log is marked logOnly for the model.
 type Log = { name: string; at: string; kind?: string; sets?: number };
-const FIRST_LIFT_LEAD_MIN = 20; // the first lift's window starts at most this long before its first anchor
 const HR_MAX_SESSIONS = 4; // per hr-only request: each session is two Strava calls
 
 function clock(ms: number, tz: string) {
@@ -250,25 +250,30 @@ async function sessionHeartRate(logs: unknown, tz: string) {
     samples.forEach(([t], i) => { if (t > a && t < b) { const h = smoothAt(i); if (!best || h < best[1]) best = [t, h]; } });
     return best ? best[0] : (a + b) / 2;
   };
+  // Lift B's first set ends at its earliest anchor; it started a set's length before that, and the
+  // switch from the lift before sits in the few minutes ahead of it.
+  const SWITCH_LOOKBACK = 4 * 60_000, SET_LEAD = 30_000;
+  const splitBefore = (firstB: number, notBefore: number) => {
+    const a = Math.max(notBefore, firstB - SWITCH_LOOKBACK), b = firstB - SET_LEAD;
+    return b > a ? lowestBetween(a, b) : Math.max(notBefore, (notBefore + firstB) / 2);
+  };
   const bounds: number[] = [];
   for (let i = 0; i < lifts.length - 1; i++) {
     const A = lifts[i], B = lifts[i + 1];
-    const lastA = A.anchors[A.anchors.length - 1], firstB = B.anchors[0];
-    // With rest taps, sets not yet anchored (normally the final one) come after the last anchor.
-    const pending = A.anchors.length >= 2 ? Math.max(0, A.sets - A.anchors.length) : 0;
-    const a = lastA + 40_000 + pending * 60_000, b = firstB - 20_000;
-    bounds.push(b > a ? lowestBetween(a, b) : b > lastA + 40_000 ? lowestBetween(lastA + 40_000, b) : (lastA + firstB) / 2);
+    // A's own set ends (its anchors) stay on A's side, plus a moment for its heart rate to peak.
+    bounds.push(splitBefore(B.anchors[0], A.anchors[A.anchors.length - 1] + 40_000));
   }
   const per = lifts.map((l, i) => {
-    const from = i ? bounds[i - 1] : Math.max(actStart, l.anchors[0] - FIRST_LIFT_LEAD_MIN * 60_000);
+    // The first lift starts just before its first set, so warm-up and arrival stay out.
+    const from = i ? bounds[i - 1] : splitBefore(l.anchors[0], actStart);
     const to = i < lifts.length - 1 ? bounds[i] : Math.min(actEnd || Infinity, l.anchors[l.anchors.length - 1] + 15 * 60_000);
     const w = samples.filter(([t]) => t > from && t <= to).map(([, h]) => h);
     const min = Math.round((to - from) / 60_000);
-    const approx = l.anchors.length < 2;
+    const logOnly = l.anchors.length < 2;
     const at = new Date(l.log ?? l.anchors[l.anchors.length - 1]).toISOString();
     return w.length < 3
-      ? { name: l.name, at, min, avg: null, peak: null, approx }
-      : { name: l.name, at, min, avg: Math.round(w.reduce((x, y) => x + y, 0) / w.length), peak: Math.max(...w), approx };
+      ? { name: l.name, at, min, avg: null, peak: null, logOnly }
+      : { name: l.name, at, min, avg: Math.round(w.reduce((x, y) => x + y, 0) / w.length), peak: Math.max(...w), logOnly };
   });
   const a = res.activity;
   const elapsedMin = round(num(a.elapsedSec) != null ? num(a.elapsedSec)! / 60 : null);
@@ -277,7 +282,7 @@ async function sessionHeartRate(logs: unknown, tz: string) {
     session: `${elapsedMin} min, avg ${round(num(a.avgHr))}, max ${round(num(a.maxHr))}`,
     lifts: per.map((x) => x.avg == null
       ? `${x.name}: no heart rate in its window`
-      : `${x.name} ${clock(Date.parse(x.at), tz)} (${x.min} min): peak ${x.peak}, avg ${x.avg}${x.approx ? " (approx)" : ""}`),
+      : `${x.name} ${clock(Date.parse(x.at), tz)} (${x.min} min): peak ${x.peak}, avg ${x.avg}${x.logOnly ? " (log time only)" : ""}`),
     // Numbers for the app's own display (history rows, the post-workout breakdown); the prompt
     // only sees the text lines above.
     numbers: { elapsedMin, avgHr: round(num(a.avgHr)), maxHr: round(num(a.maxHr)), lifts: per },
@@ -298,7 +303,7 @@ Look for:
 - Exercise order: lifts are normally done in their numbered order (#1 first). A lift done out of its planned place usually means its equipment was busy, not a choice, so never criticize the swap itself. Do use it to explain a result: a lift done later than planned was done more fatigued, one done earlier, fresher. Recommend changing the program order only when a pattern across sessions shows the order is holding back a priority lift, and then say the numbered order should change.
 - Notes that cluster by body region or keep repeating across weeks.
 - Progressions that jumped too far, and lifts that matter most for the current training phase and goal.
-- Heart rate, when "heartRate" has status "ok": each lift's peak and average come from the wearable stream split between lifts using when each lift was logged and when its rest timer was started, so the window holds that lift's sets and rests. A lift marked "(approx)" had only its log time, and it may have been logged after its first set rather than its last, so its window can include sets of a neighboring lift: use approx numbers only for broad session-level points, never for a lift-specific conclusion. Treat it as effort evidence and compare like for like: the same lift at a similar load against the comparison session (lower HR at the same or heavier load means better conditioning; higher means fatigue, heat or shorter rests). Accessories pushing HR as high as the main lifts suggest rests too short or circuit pacing. High RPE with modest HR points to a local muscular limit, not cardio. Cite HR only when it changes a conclusion. If heartRate is missing or its status is not "ok", ignore it and never mention heart rate.
+- Heart rate, when "heartRate" has status "ok": each lift's peak and average come from the wearable stream split between lifts using when each lift was logged and when its rest timer was started, so the window holds that lift's sets and rests. The athlete logs each lift right after its first set, so each window runs from just before that lift's first set to just before the next lift's. A lift marked "(log time only)" relies on that habit alone (no rest-timer starts); the split is consistent session to session, so compare the same lift across sessions, but treat one odd reading as possible mislogging before building a conclusion on it. Treat it as effort evidence and compare like for like: the same lift at a similar load against the comparison session (lower HR at the same or heavier load means better conditioning; higher means fatigue, heat or shorter rests). Accessories pushing HR as high as the main lifts suggest rests too short or circuit pacing. High RPE with modest HR points to a local muscular limit, not cardio. Cite HR only when it changes a conclusion. If heartRate is missing or its status is not "ok", ignore it and never mention heart rate.
 - Recovery data, when present, is only an explainer: use it only when it explains a specific lift result (for example a hard set the day after a long ride or a short night). Never summarize recovery, sleep or HRV trends on their own; another app covers that.
 
 Rules:

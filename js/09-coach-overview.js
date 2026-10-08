@@ -223,10 +223,10 @@ function hrFor(name, date){
   const l = h.lifts.find(x => x.name === name && x.avg != null);
   return l || null;
 }
-// "~" marks a lift pinned only by its log time: it may have been logged after its first set, so
-// its window can hold a neighbor's sets. Rest-timer taps make it exact.
-function hrText(h){ return `HR ${h.approx ? "~" : ""}${h.avg} avg · ${h.peak} peak`; }
-function hrShort(h){ return `HR ${h.approx ? "~" : ""}${h.avg}/${h.peak}`; }
+// Lifts are logged right after their first set; the split relies on that habit, with rest-timer
+// starts sharpening it when used, so the numbers show without a qualifier.
+function hrText(h){ return `HR ${h.avg} avg · ${h.peak} peak`; }
+function hrShort(h){ return `HR ${h.avg}/${h.peak}`; }
 
 function coachTz(){
   try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }catch(e){ return "UTC"; }
@@ -427,9 +427,6 @@ function renderLastSessionBreakdown(){
       ? "Heart rate: waiting for Whoop to sync to Strava"
       : "";
     if(hrLine) html += `<div class="session-hr-summary">${hrLine}</div>`;
-    if(h && h.status === "ok" && (h.lifts || []).some(l => l.approx && l.avg != null)){
-      html += `<div class="session-hr-summary">~ approximate: start the rest timer after each set to pin a lift's heart rate exactly.</div>`;
-    }
     names.forEach(n => {
       const ex = data[n];
       const entry = ex.entries.slice().reverse().find(e => e.date === lastDate);

@@ -25,14 +25,14 @@ table (`kind` = `session` or `weekly`) when signed in. Model: Claude Sonnet 5.5.
   sleep and rides (used only to explain a specific lift result), and the bodyweight trend (weekly
   only). Recovery and nutrition analysis itself lives in Outlive.
 - **Per-lift heart rate, through Outlive:** the app sends anchors for each lift: when it was
-  logged (with its set count) and every rest-timer start (a set of that lift just ended). The
-  function asks Outlive's `strava-hr` function for the wearable's heart-rate stream (Whoop via
-  Strava) over the session and splits it between lifts at the lowest heart rate in the gap
-  between their anchors, since switching lifts takes longer than resting between sets. A lift
-  anchored only by its log is marked approximate: it may have been logged after its first set
-  rather than its last. Session mode also does this for the latest earlier session of the same
-  day type; weekly mode for each session that week. Right after a workout the wearable may not
-  have uploaded yet, in which case the analysis runs without heart rate.
+  logged and every rest-timer start (a set of that lift just ended). The athlete logs right after
+  the first set, so a lift's earliest anchor marks the end of its first set. The function asks
+  Outlive's `strava-hr` function for the wearable's heart-rate stream (Whoop via Strava) and
+  splits between lifts at the lowest heart rate in the few minutes before the next lift's first
+  set. Lifts with only a log time are labeled "(log time only)" for the model. Session mode also
+  does this for the latest earlier session of the same day type; weekly mode for each session that
+  week. Right after a workout the wearable may not have uploaded yet, in which case the analysis
+  runs without heart rate.
 - **Heart rate on its own (`mode: "hr"`):** the same split, returned as numbers with no model
   call, so it never counts toward the daily limit. The app asks on open and when it returns to
   the foreground, for recent sessions still missing heart rate (at most every 15 minutes each),

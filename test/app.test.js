@@ -65,7 +65,7 @@ async function main(){
   const hrMockReply = (d, logs) => !hrMockReady ? { status: 'not_uploaded_yet' } : {
     status: 'ok', elapsedMin: 60, avgHr: 118, maxHr: 165,
     lifts: logs.filter(l => l.kind !== 'rest').map((l, i) => ({ name: l.name, at: l.at, min: 6, avg: 120 + 5 * i, peak: 140 + 5 * i,
-      approx: !logs.some(x => x.kind === 'rest' && x.name === l.name) })),
+      logOnly: !logs.some(x => x.kind === 'rest' && x.name === l.name) })),
   };
   await context.route('**/functions/v1/coach', route => {
     // Mirrors the real function: no signed-in session, no call.
@@ -2197,21 +2197,21 @@ async function main(){
     hist: document.querySelector('.hist-row.latest .hist-hr') && document.querySelector('.hist-row.latest .hist-hr').textContent,
     pool: guidancePools.flat().find(t => /^Heart rate last time/.test(t)) || null,
   }));
-  if(hrShown.hist !== 'HR ~120/140' || hrShown.pool !== 'Heart rate last time: about 120 avg, 140 peak.') throw new Error('expected Squat\'s heart rate in its history row and Next tile, got: ' + JSON.stringify(hrShown));
+  if(hrShown.hist !== 'HR 120/140' || hrShown.pool !== 'Heart rate last time: 120 avg, 140 peak.') throw new Error('expected Squat\'s heart rate in its history row and Next tile, got: ' + JSON.stringify(hrShown));
   await page.evaluate(() => { lastSessionExpanded = true; view = 'overview'; render(); });
   const breakdownHr = await page.evaluate(() => ({
     summary: (document.querySelector('.session-hr-summary') || {}).textContent || null,
     rdl: [...document.querySelectorAll('.session-row')].map(r => r.textContent).find(t => /^RDL/.test(t.trim())) || null,
   }));
-  if(!/Whoop: 60 min · 118 avg · 165 max/.test(breakdownHr.summary || '') || !/HR ~125 avg · 145 peak/.test(breakdownHr.rdl || '')) throw new Error('expected the post-workout breakdown to show session and per-lift heart rate, got: ' + JSON.stringify(breakdownHr));
-  // Squat had no rest-timer taps, so its numbers are approximate; RDL gets taps below.
+  if(!/Whoop: 60 min · 118 avg · 165 max/.test(breakdownHr.summary || '') || !/HR 125 avg · 145 peak/.test(breakdownHr.rdl || '')) throw new Error('expected the post-workout breakdown to show session and per-lift heart rate, got: ' + JSON.stringify(breakdownHr));
+  // Squat has only its log time (split by the log-after-first-set habit); RDL gets taps below.
   const hrCallsAfter = hrRequests.length;
   await page.evaluate(() => refreshHeartRate());
   await sleep(150);
   if(hrRequests.length !== hrCallsAfter) throw new Error('expected no further heart-rate requests once a session has its numbers');
   if(aiBreakdownCallCount !== aiCallsBeforeHr) throw new Error('expected heart-rate checks never to count as AI calls');
   // A rest-timer start marks a set end: it goes out as an anchor, triggers a fresh split, and the
-  // lift it pins is no longer approximate.
+  // lift it pins is no longer log-only.
   await page.evaluate(() => { view = 'lower'; selected = 'RDL'; render(); startRestTimer('RDL'); clearRestTimer(); });
   const tapSent = await page.evaluate(() => sessionAnchors(todayISO()).filter(a => a.kind === 'rest' && a.name === 'RDL').length);
   await page.evaluate(() => refreshHeartRate());
@@ -2219,9 +2219,9 @@ async function main(){
   const lastHrReq = hrRequests[hrRequests.length - 1];
   const sentTap = lastHrReq && (lastHrReq.payload.sessions[await page.evaluate(() => todayISO())] || []).some(a => a.kind === 'rest' && a.name === 'RDL');
   const rdlHr = await page.evaluate(() => hrFor('RDL', todayISO()));
-  if(tapSent !== 1 || !sentTap || !rdlHr || rdlHr.approx) throw new Error('expected the RDL rest-timer start to be sent as an anchor and pin RDL exactly, got: ' + JSON.stringify({ tapSent, sentTap, rdlHr }));
+  if(tapSent !== 1 || !sentTap || !rdlHr || rdlHr.logOnly) throw new Error('expected the RDL rest-timer start to be sent as an anchor and pin RDL exactly, got: ' + JSON.stringify({ tapSent, sentTap, rdlHr }));
   await page.evaluate(() => { delete restTaps[todayISO()]; lastSessionExpanded = false; data['Squat'].entries = data['Squat'].entries.filter(e => e.clientId !== 'hr-sq'); data['RDL'].entries = data['RDL'].entries.filter(e => e.clientId !== 'hr-rdl'); render(); });
-  console.log('OK: pending until Whoop syncs, then HR in history ("HR ~120/140" when only the log pins it), the breakdown and the Next tile; rest-timer starts pin a lift exactly; no AI call, no wiped form');
+  console.log('OK: pending until Whoop syncs, then HR in history ("HR 120/140"), the breakdown and the Next tile; rest-timer starts pin a lift exactly; no AI call, no wiped form');
 
   // The post-workout breakdown lists lifts in the order they were logged, not storage order.
   const loggedOrder = await page.evaluate(() => {
