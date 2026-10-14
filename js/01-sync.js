@@ -263,6 +263,9 @@ async function runOp(op){
       deload_started_on: deloadDates.startedOn || null,
       deload_ended_on: deloadDates.endedOn || null,
       deload_planned_end_on: deloadDates.plannedEndOn || null,
+      shoulder_rehab_started_on: shoulderRehab.startedOn || null,
+      shoulder_rehab_ended_on: shoulderRehab.endedOn || null,
+      shoulder_rehab_phase3: !!shoulderRehab.phase3,
     }, { onConflict: "user_id" });
     if(error) throw error;
     return true;
@@ -409,6 +412,10 @@ async function pullRemoteAndMerge(){
   if(settingsRow && !deloadDates.startedOn && settingsRow.deload_started_on){
     deloadDates = { startedOn: settingsRow.deload_started_on, endedOn: settingsRow.deload_ended_on || null, plannedEndOn: settingsRow.deload_planned_end_on || null };
     saveDeloadDates();
+  }
+  if(settingsRow && !shoulderRehab.startedOn && settingsRow.shoulder_rehab_started_on){
+    shoulderRehab = { startedOn: settingsRow.shoulder_rehab_started_on, endedOn: settingsRow.shoulder_rehab_ended_on || null, phase3: !!settingsRow.shoulder_rehab_phase3 };
+    saveShoulderRehab();
   }
 
   // Skips from other devices: added where this one has none for that lift and day.

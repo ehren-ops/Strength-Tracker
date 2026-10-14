@@ -37,7 +37,9 @@ function describeSuggestion(ex, name){
   const s = computeSuggestion(ex, name);
   if(!s) return null;
   if(ex.trackBy === "weight"){
-    const why = s.deloadWeek ? "deload week" : s.reentry ? `rebuilding after time off, step ${s.reentry.step} of 3 back to ${s.reentry.fullWeight} lb` : s.postDeloadHold ? "first session back from deload, holding pre-deload weight" : s.noteTarget != null ? "set by last note" : s.noteCue === "up" ? "add weight, note said so" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
+    const why = s.shoulderPaused ? "paused for shoulder rehab" : s.shoulderHold ? (name === "Bicep Curl" ? "shoulder rehab: hammer curls only, held" : "shoulder rehab: held, close grip, short range")
+      : s.shoulderReturn ? `back from shoulder rehab, step ${s.shoulderReturn.step} of 3 back to ${s.shoulderReturn.fullWeight} lb`
+      : s.deloadWeek ? "deload week" : s.reentry ? `rebuilding after time off, step ${s.reentry.step} of 3 back to ${s.reentry.fullWeight} lb` : s.postDeloadHold ? "first session back from deload, holding pre-deload weight" : s.noteTarget != null ? "set by last note" : s.noteCue === "up" ? "add weight, note said so" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
       : s.noteConcern ? "hold, note flagged" : s.noteCue === "hold" ? "hold, note said so" : s.difficultyNote === "hard" ? "hold, last RPE high" : "hold";
     return `${s.weight} lb ${s.sets}x${s.reps} (${why})`;
   }
@@ -260,7 +262,7 @@ function buildSessionCoachPayload(date){
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
   const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
-  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date), skipped: skippedOn(date) };
+  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date), skipped: skippedOn(date), rehab: rehabCoachBlock() };
 }
 
 // The past week plus 6 weeks of history per lift, enough to judge loading blocks and deloads.
@@ -282,7 +284,7 @@ function buildWeeklyCoachPayload(){
   const weekLogTimes = Object.fromEntries([...sessionDates].filter(d => d >= shiftISO(weekEnd, -6)).sort()
     .map(d => [d, sessionAnchors(d)]).filter(([, l]) => l.length >= 2));
   const weekSkips = Object.fromEntries(Object.keys(skips).filter(d => d >= shiftISO(weekEnd, -6) && d <= weekEnd).sort().map(d => [d, skippedOn(d)]));
-  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), skipped: weekSkips, modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd) };
+  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), skipped: weekSkips, modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd), rehab: rehabCoachBlock() };
 }
 
 async function generateCoach(kind){
@@ -525,6 +527,18 @@ function renderModifierRow(key, emoji, name, desc, extraHtml){
     </div>`;
 }
 
+// Shoulder Rehab: the daily rehab card on every day, flies, incline, lateral raises and slams
+// paused, bench and curls held. One status line on or off.
+function renderShoulderModifier(){
+  let status;
+  if(modes.shoulder) status = `On since ${fmtShortDate(shoulderRehab.startedOn)} · week ${rehabWeek()}, phase ${rehabPhase()}`;
+  else if(shoulderRehab.startedOn) status = `Last run: ${fmtShortDate(shoulderRehab.startedOn)} to ${fmtShortDate(shoulderRehab.endedOn || shoulderRehab.startedOn)}. Paused lifts ramp back 85, 92.5, 100%.`;
+  else status = `Not started`;
+  return renderModifierRow("shoulder", "🩹", "Shoulder Rehab",
+    "Adds a daily rehab card to every day. Pauses flies, incline press, lateral raises and slams; holds bench at a close grip; curls come back as hammer curls in week 3. Rows, pushdowns, legs and riding carry on.",
+    `<div class="shoulder-status">${status}</div>`);
+}
+
 // Deload status is always exactly two short lines, so the row stays the same size on or off.
 function renderDeloadModifier(){
   const st = deloadStatus();
@@ -558,7 +572,7 @@ function renderOverview(){
   }).filter(Boolean).sort((a,b) => b.pct - a.pct);
 
   const avgPct = overviewData.length ? overviewData.reduce((s,o)=>s+o.pct,0)/overviewData.length : 0;
-  const totalSessions = Object.values(data).reduce((s,ex)=>s+ex.entries.length,0);
+  const totalSessions = Object.entries(data).reduce((s,[n,ex])=>n === REHAB_NAME ? s : s+ex.entries.length,0);
   const progressing = overviewData.filter(o=>o.pct>0).length;
   const holding = overviewData.filter(o=>o.pct===0).length;
   const declining = overviewData.filter(o=>o.pct<0).length;
@@ -673,6 +687,7 @@ function renderOverview(){
     ${renderModifierRow("preseason", "🏔️", "Preseason Prep", "Adds power, lateral, lowering-phase and calf work to your lift days for the 7 to 10 week ramp into ski season. Power work goes first; stop a set when speed drops.")}
     ${renderModifierRow("knee", "🦵", "Knee Care", "Squat, Bulgarian Split Squat and Walking Lunge hold and drop about 10% while your knee settles. Everything else trains as normal.")}
     ${renderModifierRow("back", "🩺", "Low Back Care", "Squat, RDL, Barbell Row, Kettlebell Swings and Hip Thrust (swap to a glute bridge) hold and drop about 10% while your lower back settles. Everything else trains as normal.")}
+    ${renderShoulderModifier()}
   </div>`;
 
   html += renderBackupSyncCard();

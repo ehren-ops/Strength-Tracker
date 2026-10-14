@@ -223,7 +223,8 @@ function computeRecoveryReadiness(){
 
   // Average difficulty across the most recent few logged sets, across all exercises
   const allEntries = [];
-  Object.values(data).forEach(ex => ex.entries.forEach(e => { if(e.difficulty) allEntries.push({ date: e.date, difficulty: e.difficulty }); }));
+  // Shoulder Rehab stores its 0-10 pain score in difficulty; that is not effort, so it stays out.
+  Object.entries(data).forEach(([n, ex]) => n !== REHAB_NAME && ex.entries.forEach(e => { if(e.difficulty) allEntries.push({ date: e.date, difficulty: e.difficulty }); }));
   allEntries.sort((a,b) => (a.date < b.date ? 1 : -1));
   const recentDiff = allEntries.slice(0, 5);
   const avgDifficulty = recentDiff.length ? recentDiff.reduce((s,e)=>s+e.difficulty,0)/recentDiff.length : null;
@@ -340,11 +341,11 @@ const roundLoad = w => Math.round(w / 2.5) * 2.5;
 // Time off means no training at all, not one lift skipped: any logged session of any lift in
 // between breaks it. A lift done every couple of weeks never counts as coming back from a break.
 function trainedBetween(a, b){
-  return Object.values(data).some(x => x.entries.some(e => e.date > a && e.date < b));
+  return Object.entries(data).some(([n, x]) => n !== REHAB_NAME && x.entries.some(e => e.date > a && e.date < b));
 }
 function lastTrainingDate(){
   let d = "";
-  Object.values(data).forEach(x => x.entries.forEach(e => { if(e.date > d) d = e.date; }));
+  Object.entries(data).forEach(([n, x]) => { if(n !== REHAB_NAME) x.entries.forEach(e => { if(e.date > d) d = e.date; }); });
   return d;
 }
 function applyReturn(core, ex, name, baseline){
@@ -389,7 +390,7 @@ function computeSuggestion(ex, name){
   const baseline = ex.entries.filter(e => !e.deload);
   const baseEntries = baseline.length ? baseline : ex.entries;
   const lastBaseEntry = baseEntries[baseEntries.length - 1];
-  const core = applyReturn(capAtMaxWeight(applyNoteTarget(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, lastBaseEntry), ex, name, lastBaseEntry), ex, name, baseline);
+  const core = applyShoulder(applyReturn(capAtMaxWeight(applyNoteTarget(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, lastBaseEntry), ex, name, lastBaseEntry), ex, name, baseline), ex, name, baseline);
   if(!modes.deload || !core || ex.trackBy === "duration") return core;
   const lastBase = (baseline.length ? baseline : ex.entries)[ (baseline.length ? baseline : ex.entries).length - 1 ];
   const sets = Math.max(2, Math.round((lastBase.sets || core.sets || 3) * 2 / 3));

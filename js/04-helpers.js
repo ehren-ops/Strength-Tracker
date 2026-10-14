@@ -20,6 +20,7 @@ function isLoggedToday(name){
   if(!ex) return false;
   const entry = ex.entries.find(e => e.date === todayISO());
   if(!entry) return false;
+  if(name === REHAB_NAME) return rehabDoneToday();
   if(ex.trackBy === "checklist"){
     const routine = CHECKLIST_ROUTINES[name];
     const total = routine ? routine.items.length : 0;
@@ -103,7 +104,7 @@ function checkCoreWorkoutComplete(day){
   // optional, so skipping one never blocks the popup, with Preseason Prep on or
   // off. Ski, care and deload modes change prescriptions, never this list.
   const coreList = DAY_ORDER[day].filter(name => !PRESEASON_ONLY.has(name));
-  if(!coreList.every(name => isLoggedToday(name) || skipReason(name))) return;
+  if(!coreList.every(name => isLoggedToday(name) || skipReason(name) || isShoulderPaused(name))) return;
   const today = todayISO();
   if(celebratedToday[day] === today) return;
   celebratedToday[day] = today;

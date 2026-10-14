@@ -43,6 +43,7 @@ const MODE_DEFS = [
   { key: "knee", storageKey: "strength-tracker-knee-mode", column: "knee_care_mode" },
   { key: "back", storageKey: "strength-tracker-back-mode", column: "low_back_care_mode" },
   { key: "preseason", storageKey: "strength-tracker-preseason-mode", column: "preseason_mode" },
+  { key: "shoulder", storageKey: "strength-tracker-shoulder-mode", column: "shoulder_rehab_mode" },
 ];
 const modes = {};
 MODE_DEFS.forEach(m => {
@@ -81,6 +82,16 @@ function saveDeloadDates(){
   try{ window.localStorage.setItem(DELOAD_DATES_KEY, JSON.stringify(deloadDates)); }catch(e){}
 }
 
+// Shoulder rehab bookkeeping: the day it was switched on sets the week and
+// phase, and stays after it is switched off so returning lifts can ramp back.
+const SHOULDER_REHAB_KEY = "strength-tracker-shoulder-rehab";
+let shoulderRehab = (function(){
+  try{ return JSON.parse(window.localStorage.getItem(SHOULDER_REHAB_KEY)) || {}; }catch(e){ return {}; }
+})();
+function saveShoulderRehab(){
+  try{ window.localStorage.setItem(SHOULDER_REHAB_KEY, JSON.stringify(shoulderRehab)); }catch(e){}
+}
+
 function toggleMode(key){
   const def = MODE_DEFS.find(m => m.key === key);
   modes[key] = !modes[key];
@@ -89,6 +100,13 @@ function toggleMode(key){
     if(modes.deload) deloadDates = { startedOn: todayISO(), endedOn: null, plannedEndOn: shiftISO(todayISO(), DELOAD_LENGTH_DAYS) };
     else if(deloadDates.startedOn) deloadDates.endedOn = todayISO();
     saveDeloadDates();
+  }
+  if(key === "shoulder"){
+    // Switched back on within a week (or by accident): pick up where it left off.
+    if(modes.shoulder && shoulderRehab.startedOn && shoulderRehab.endedOn && daysBetween(shoulderRehab.endedOn, todayISO()) <= 7) shoulderRehab.endedOn = null;
+    else if(modes.shoulder) shoulderRehab = { startedOn: todayISO(), endedOn: null, phase3: false };
+    else shoulderRehab.endedOn = todayISO();
+    saveShoulderRehab();
   }
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
   render();

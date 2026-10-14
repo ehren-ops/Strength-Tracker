@@ -193,6 +193,7 @@ const EXERCISE_DEFAULTS = {
   "Leg Stretch": { trackBy: "checklist" },
   "Full Body Stretch": { trackBy: "checklist" },
   "5-Minute Core Routine": { trackBy: "checklist" },
+  "Shoulder Rehab": { trackBy: "checklist" }, // items and phases live in js/05b-shoulder-rehab.js
 };
 
 // Content for the checklist-type "exercises" above: not logged sets, just a
@@ -304,6 +305,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v76";
-const APP_UPDATED = "Oct 2, 2026";
+const APP_VERSION = "v77";
+const APP_UPDATED = "Oct 14, 2026";
 

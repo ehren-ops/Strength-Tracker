@@ -2294,6 +2294,84 @@ async function main(){
   if(chartsBefore !== 1 || collapsed.charts !== 0 || collapsed.saved !== '1' || otherCard !== 0 || restored !== 1) throw new Error('expected the date range to hide the graph on every card and bring it back, got: ' + JSON.stringify({ chartsBefore, collapsed, otherCard, restored }));
   console.log('OK: the date range hides the graph (and keeps it hidden on other cards), and a second tap brings it back');
 
+  console.log('=== 79: Shoulder Rehab adds a daily card to every day, pauses or holds the shoulder lifts, and ramps them back ===');
+  const r79 = await page.evaluate(() => {
+    const out = {};
+    const keep = ['Bench Press', 'Cable Chest Fly', 'Bicep Curl', REHAB_NAME];
+    const savedEx = JSON.stringify(Object.fromEntries(keep.map(n => [n, data[n] || null])));
+    const savedModes = JSON.stringify(modes);
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    shoulderRehab = {};
+    const today = todayISO(), pre = shiftISO(today, -20);
+    const shell = (n, w, r) => Object.assign(newExerciseShell(n), { entries: [{ clientId: 'r79-' + n, date: pre, confirmed: true, weight: w, sets: 3, reps: r }] });
+    data['Bench Press'] = shell('Bench Press', 185, 8);
+    data['Cable Chest Fly'] = shell('Cable Chest Fly', 30, 8);
+    data['Bicep Curl'] = shell('Bicep Curl', 30, 10);
+    delete data[REHAB_NAME];
+    const pills = () => [...document.querySelectorAll('#pill-scroll .pill:not(.pill-add)')].map(p => p.textContent.trim());
+    view = 'upper'; selected = 'Bench Press'; render();
+    out.off = { first: pills()[0], rehabPill: !!document.querySelector('.pill.rehab-pill'), bench: computeSuggestion(data['Bench Press'], 'Bench Press').weight };
+
+    toggleMode('shoulder');
+    out.firstPills = ['full', 'upper', 'lower', 'extra'].map(d => { view = d; selected = DAY_ORDER[d][0]; render(); return pills().slice(0, 2); });
+    view = 'upper'; selected = 'Bench Press'; render();
+    out.flyPill = document.querySelector('.pill.skipped-today') && document.querySelector('.pill.skipped-today').textContent;
+    const b = computeSuggestion(data['Bench Press'], 'Bench Press');
+    out.bench = { weight: b.weight, hold: !!b.shoulderHold, badge: !!document.querySelector('.shoulder-badge'), tip: (document.querySelector('.shoulder-care-line') || {}).textContent };
+    out.fly = !!computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly').shoulderPaused;
+    out.curlWeek1 = !!computeSuggestion(data['Bicep Curl'], 'Bicep Curl').shoulderPaused;
+    selected = 'Cable Chest Fly'; render();
+    out.flyCard = { next: document.querySelector('.rec-plan').textContent, skip: !!document.querySelector('.skip-ctl') };
+
+    selected = REHAB_NAME; render();
+    out.p1 = { items: document.querySelectorAll('.rehab-card .stretch-item').length, week: document.querySelector('.rehab-week').textContent };
+    const lt0 = lastTrainingDate();
+    [0, 1, 2].forEach(i => toggleChecklistItem(REHAB_NAME, i));
+    setRehabPain(2);
+    const entry = data[REHAB_NAME].entries.find(e => e.date === today);
+    out.p1.done = isLoggedToday(REHAB_NAME);
+    out.p1.pain = entry.difficulty;
+    out.p1.painOn = (document.querySelector('.pain-btn.on') || {}).textContent;
+    out.p1.notTraining = lastTrainingDate() === lt0; // rehab alone never counts as a lift session
+
+    shoulderRehab.startedOn = shiftISO(today, -15); render();
+    out.p2 = { items: document.querySelectorAll('.rehab-card .stretch-item').length, week: document.querySelector('.rehab-week').textContent, done: isLoggedToday(REHAB_NAME) };
+    const c = computeSuggestion(data['Bicep Curl'], 'Bicep Curl');
+    out.p2.curl = { weight: c.weight, hold: !!c.shoulderHold };
+    setRehabPhase3(true);
+    out.p3 = { items: document.querySelectorAll('.rehab-card .stretch-item').length, week: document.querySelector('.rehab-week').textContent, synced: shoulderRehab.phase3 };
+    out.coach = rehabCoachBlock();
+
+    toggleMode('shoulder');
+    const f1 = computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly');
+    data['Cable Chest Fly'].entries.push({ clientId: 'r79-fly2', date: today, confirmed: true, weight: f1.weight, sets: 3, reps: 8 });
+    const f2 = computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly');
+    out.ret = { w1: f1.weight, s1: f1.shoulderReturn && f1.shoulderReturn.step, w2: f2.weight, s2: f2.shoulderReturn && f2.shoulderReturn.step, bench: computeSuggestion(data['Bench Press'], 'Bench Press').weight, endedOn: shoulderRehab.endedOn === today };
+    view = 'upper'; selected = 'Bench Press'; render();
+    out.afterOff = { first: pills()[0], rehabPill: !!document.querySelector('.pill.rehab-pill') };
+
+    const restore = JSON.parse(savedEx);
+    keep.forEach(n => { if(restore[n]) data[n] = restore[n]; else delete data[n]; });
+    Object.assign(modes, JSON.parse(savedModes));
+    shoulderRehab = {}; saveShoulderRehab();
+    persist(); render();
+    return out;
+  });
+  const ok79 =
+    r79.off.first.startsWith('1. Bench Press') && !r79.off.rehabPill && r79.off.bench === 190 &&
+    r79.firstPills.every((p, i) => p[0] === 'Shoulder Rehab' && (i === 3 ? !/^\d/.test(p[1]) : /^1\. /.test(p[1]))) &&
+    /Cable Chest Fly/.test(r79.flyPill || '') &&
+    r79.bench.weight === 185 && r79.bench.hold && r79.bench.badge && /Close grip/.test(r79.bench.tip || '') &&
+    r79.fly && r79.curlWeek1 && /paused/.test(r79.flyCard.next) && !r79.flyCard.skip &&
+    r79.p1.items === 3 && r79.p1.week === 'Week 1 · Phase 1' && r79.p1.done && r79.p1.pain === 2 && r79.p1.painOn === '2' && r79.p1.notTraining &&
+    r79.p2.items === 9 && r79.p2.week === 'Week 3 · Phase 2' && r79.p2.curl.weight === 20 && r79.p2.curl.hold &&
+    r79.p3.items === 11 && r79.p3.week === 'Week 3 · Phase 3' && r79.p3.synced &&
+    r79.coach && r79.coach.on && r79.coach.phase === 3 && r79.coach.pausedLifts.includes('Cable Chest Fly') && r79.coach.heldLifts.includes('Bench Press') &&
+    r79.ret.w1 === 25 && r79.ret.s1 === 1 && r79.ret.w2 === 27.5 && r79.ret.s2 === 2 && r79.ret.bench === 190 && r79.ret.endedOn &&
+    !r79.afterOff.rehabPill && r79.afterOff.first.startsWith('1. Bench Press');
+  if(!ok79) throw new Error('expected Shoulder Rehab to work as designed, got: ' + JSON.stringify(r79));
+  console.log('OK: off changes nothing; on, the rehab card leads every day (lifts keep their numbers), flies paused, bench held at 185, curls paused then hammer at 20; phases 1/2/3 show 3/9/11 items; pain saves; off ramps the fly 25 then 27.5');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

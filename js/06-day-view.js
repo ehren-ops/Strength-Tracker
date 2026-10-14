@@ -53,8 +53,11 @@ function getDisplayOrder(day){
 
 function renderDay(day){
   const app = document.getElementById("app");
-  const customExercises = Object.keys(data).filter(k => !allDayNames().includes(k) && (data[k].day || "full") === day);
-  const list = getDisplayOrder(day).concat(customExercises);
+  const customExercises = Object.keys(data).filter(k => k !== REHAB_NAME && !allDayNames().includes(k) && (data[k].day || "full") === day);
+  // Shoulder Rehab leads every day's row while it is on, unnumbered so the lifts keep their numbers.
+  const lead = modes.shoulder ? [REHAB_NAME] : [];
+  const list = lead.concat(getDisplayOrder(day), customExercises);
+  if(selected === REHAB_NAME && !modes.shoulder) selected = activeDayOrder(day)[0];
 
   let html = `<div class="pill-row" id="pill-scroll">`;
   list.forEach((name, i) => {
@@ -65,12 +68,16 @@ function renderDay(day){
     const isPreseasonPill = modes.preseason && !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseason);
     const pillClasses = ['pill'];
     if(isPreseasonPill) pillClasses.push('preseason-pill');
+    if(name === REHAB_NAME) pillClasses.push('rehab-pill');
     if(day === "extra" && EXTRA_CATEGORY[name]) pillClasses.push('cat-' + EXTRA_CATEGORY[name]);
     if(selected===name) pillClasses.push('active');
     const skipped = !loggedToday && skipReason(name);
+    const paused = !loggedToday && !skipped && isShoulderPaused(name);
     if(loggedToday) pillClasses.push('logged-today');
-    if(skipped) pillClasses.push('skipped-today');
-    html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')"${skipped ? ` title="Skipped today: ${SKIP_REASONS[skipped]}"` : ''}>${(day !== "extra" && i < activeDayOrder(day).length) ? (i+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
+    if(skipped || paused) pillClasses.push('skipped-today');
+    const n = i - lead.length;
+    const title = skipped ? ` title="Skipped today: ${SKIP_REASONS[skipped]}"` : paused ? ` title="Paused: Shoulder Rehab"` : '';
+    html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')"${title}>${(day !== "extra" && n >= 0 && n < activeDayOrder(day).length) ? (n+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
   });
   html += `<div class="pill pill-add" onclick="toggleAddExercise()">+</div></div>`;
   html += `<div id="add-ex-row" style="display:none" class="add-ex-row">
@@ -79,7 +86,7 @@ function renderDay(day){
   </div>`;
 
   if(DAY_ORDER[day].includes(selected) && !activeDayOrder(day).includes(selected)) selected = activeDayOrder(day)[0];
-  let ex = data[selected];
+  let ex = selected === REHAB_NAME && modes.shoulder ? ensureRehabExercise() : data[selected];
   if(!ex && DAY_ORDER[day].includes(selected)){
     ex = data[selected] = newExerciseShell(selected);
     persist();
@@ -213,6 +220,7 @@ function planModifiers(name, ex){
   if(modes.preseason && ex.preseason && ex.targetRepsPreseason) on.push("Preseason Prep");
   if(modes.knee && KNEE_SENSITIVE_EXERCISES.has(name)) on.push("Knee Care");
   if(modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name)) on.push("Low Back Care");
+  if(isShoulderPaused(name) || isShoulderHeld(name)) on.push("Shoulder Rehab");
   return on;
 }
 
@@ -376,6 +384,7 @@ function renderTips(name){
 }
 
 function renderExerciseCard(name, ex){
+  if(name === REHAB_NAME) return renderRehabCard();
   if(ex.trackBy === "checklist") return renderChecklistCard(name, ex);
   const hasEntries = ex.entries.length > 0;
   const last = hasEntries ? ex.entries[ex.entries.length-1] : null;
@@ -387,6 +396,7 @@ function renderExerciseCard(name, ex){
   const backActive = modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name);
   const preseasonActive = modes.preseason && !!ex.preseason;
   const deloadActive = modes.deload && ex.trackBy !== "duration";
+  const shoulderPaused = isShoulderPaused(name), shoulderActive = shoulderPaused || isShoulderHeld(name);
 
   const isCustom = !allDayNames().includes(name);
   // "+20 since first" rides at the right end of the title row, so the Next tile sits right under
@@ -400,13 +410,16 @@ function renderExerciseCard(name, ex){
   // Active modifiers: badges, then their notes, under the current weight rather than above it.
   const badges = [skiActive && '<span class="ski-badge">🎿 Ski</span>', kneeActive && '<span class="knee-badge">🦵 Knee Care</span>',
     backActive && '<span class="back-badge">🩺 Back Care</span>', preseasonActive && '<span class="preseason-badge">🏔️ Preseason</span>',
-    deloadActive && '<span class="deload-badge">🔋 Deload</span>'].filter(Boolean).join("");
+    deloadActive && '<span class="deload-badge">🔋 Deload</span>', shoulderActive && `<span class="shoulder-badge">🩹 ${shoulderPaused ? "Paused" : "Shoulder Rehab"}</span>`].filter(Boolean).join("");
   let modHtml = badges ? `<div class="mod-badges">${badges}</div>` : "";
   if(kneeActive && KNEE_CARE_TIP[name]){
     modHtml += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
   }
   if(backActive && LOW_BACK_CARE_TIP[name]){
     modHtml += `<div class="care-line back-care-line">${LOW_BACK_CARE_TIP[name]}</div>`;
+  }
+  if(shoulderActive){
+    modHtml += `<div class="care-line shoulder-care-line">${shoulderPaused ? SHOULDER_PAUSED_TIP : SHOULDER_CARE_TIP[name]}</div>`;
   }
   if(kneeActive || backActive){
     modHtml += `<p class="care-disclaimer">Load adjustment only, not a substitute for a PT or doctor.</p>`;
@@ -421,7 +434,7 @@ function renderExerciseCard(name, ex){
     modHtml += `<div class="preseason-line">${ex.preseasonNote}${ex.preseasonWeek3 ? ' <b>Add from week 3.</b>' : ''}</div>`;
   }
 
-  let html = `<div class="card${skiActive ? ' ski-mode' : ''}${kneeActive ? ' knee-mode' : ''}${backActive ? ' back-mode' : ''}${preseasonActive ? ' preseason-mode' : ''}">`;
+  let html = `<div class="card${skiActive ? ' ski-mode' : ''}${kneeActive ? ' knee-mode' : ''}${backActive ? ' back-mode' : ''}${preseasonActive ? ' preseason-mode' : ''}${shoulderActive ? ' shoulder-mode' : ''}">`;
   if(isCustom && deletingExercise === name){
     html += `<div class="ex-name-row">
       <span style="color:var(--slate);font-size:0.85rem;">Delete "${escapeHtml(name)}" and all its logged history?</span>
@@ -467,7 +480,19 @@ function renderExerciseCard(name, ex){
         const hitLeadIn = wentOverTarget
           ? `Went over target ${unitWord} (did ${actualAmt}, target is ${targetAmt})`
           : `Hit target ${unitWord}`;
-        if(suggestion.reentry && !suggestion.deloadWeek){
+        if(suggestion.shoulderPaused){
+          nextLabel = "paused";
+          msg = `Paused for Shoulder Rehab until the side-raise press is pain-free.`;
+        } else if(suggestion.shoulderHold){
+          msg = name === "Bicep Curl"
+            ? `Shoulder Rehab: hammer curls only at ${suggestion.weight} lb, lower over 3 sec. No adding weight yet.`
+            : `Shoulder Rehab: hold ${suggestion.weight} lb, close grip, stop short of the chest. Only at 3 of 10 pain or less.`;
+        } else if(suggestion.shoulderReturn && !suggestion.deloadWeek){
+          const r = suggestion.shoulderReturn, left = SHOULDER_RETURN_STEPS.length - r.step;
+          msg = left
+            ? `Back from shoulder rehab: ${Math.round(SHOULDER_RETURN_STEPS[r.step - 1] * 1000) / 10}% today, rebuilding to ${r.fullWeight} lb over ${left} more session${left === 1 ? "" : "s"}.`
+            : `Back from shoulder rehab: your full ${r.fullWeight} lb, if it stays at 3 of 10 or less.`;
+        } else if(suggestion.reentry && !suggestion.deloadWeek){
           const r = suggestion.reentry, left = REENTRY_STEPS.length - r.step;
           msg = r.step === 1
             ? `Back after ${r.daysOff} days off: start near 90% and rebuild to ${r.fullWeight} lb over ${left} more session${left === 1 ? "" : "s"}.`
@@ -531,7 +556,7 @@ function renderExerciseCard(name, ex){
           : suggestion.powerHold ? `Power: hold reps; go higher or farther only while every rep stays fast.`
           : `Add 2 reps.`;
       }
-      recHtml = renderNextTile(`Next: ${nextLabel}`, ex, composeGuidance(msg, name, ex, last, work), loadText(name, ex, suggestion));
+      recHtml = renderNextTile(`Next: ${nextLabel}`, ex, composeGuidance(msg, name, ex, last, work), suggestion.shoulderPaused ? "Load: none today" : loadText(name, ex, suggestion));
     }
 
     html += recHtml;
@@ -577,7 +602,7 @@ function renderExerciseCard(name, ex){
 // Right end of the history footer: skip this lift today, for injury or another reason. Hidden once
 // the lift is logged today; while skipped, shows the reason and an undo.
 function renderSkipControl(name){
-  if(isLoggedToday(name)) return "";
+  if(isLoggedToday(name) || isShoulderPaused(name)) return "";
   const q = name.replace(/'/g, "\\'");
   const reason = skipReason(name);
   if(reason){

@@ -15,6 +15,7 @@
     --ski:#1565C0; --ski-bg:#E3F0FC; --ski-border:#BBD9F5; --ski-text:#0D47A1;
     --knee:#B3660A; --knee-bg:#FFF3E0; --knee-border:#F0C889; --knee-text:#7A4A0A;
     --back:#8C2F39; --back-bg:#FBEAEA; --back-border:#E3B3B8; --back-text:#6B1F26;
+    --shoulder:#0F766E; --shoulder-bg:#E6F4F1; --shoulder-border:#A7D7CF; --shoulder-text:#0B4F4A;
     --preseason:#6A3FA0; --preseason-bg:#F1E8FB; --preseason-border:#D9C4EF; --preseason-text:#4A2570;
     --cat-strength:#4A5568; --cat-strength-bg:#EAEDF0; --cat-strength-border:#C7CFD9; --cat-strength-text:#333F4C;
     --cat-cardio:#C2447D; --cat-cardio-bg:#FBEAF2; --cat-cardio-border:#F0C4DC; --cat-cardio-text:#8C2F5C;
@@ -43,6 +44,7 @@
     --ski:#b967ff; --ski-bg:rgba(185,103,255,0.12); --ski-border:#b967ff; --ski-text:#e0c8ff;
     --knee:#fee440; --knee-bg:rgba(254,228,64,0.12); --knee-border:#fee440; --knee-text:#fee440;
     --back:#ff3860; --back-bg:rgba(255,56,96,0.12); --back-border:#ff3860; --back-text:#ff8fa3;
+    --shoulder:#ff9eea; --shoulder-bg:rgba(255,158,234,0.12); --shoulder-border:#ff9eea; --shoulder-text:#ffd1f5;
     --preseason:#00f0ff; --preseason-bg:rgba(0,240,255,0.12); --preseason-border:#00f0ff; --preseason-text:#9be8ff;
     --cat-strength:#3B9EFF; --cat-strength-bg:rgba(59,158,255,0.12); --cat-strength-border:#3B9EFF; --cat-strength-text:#9DCBFF;
     --cat-cardio:#FF6A00; --cat-cardio-bg:rgba(255,106,0,0.12); --cat-cardio-border:#FF6A00; --cat-cardio-text:#FFB37A;
@@ -269,6 +271,7 @@
   .card.knee-mode{border-color:var(--knee);box-shadow:0 0 0 1px rgba(179,102,10,0.18);}
   .card.back-mode{border-color:var(--back);box-shadow:0 0 0 1px rgba(140,47,57,0.18);}
   .card.preseason-mode{border-color:var(--preseason);box-shadow:0 0 0 1px rgba(106,63,160,0.18);}
+  .card.shoulder-mode{border-color:var(--shoulder);box-shadow:0 0 0 1px rgba(15,118,110,0.18);}
   /* Shared shape for all four mode badges - only the background differs
      per mode, so each class below is just a one-line color override. */
   .mod-badges{display:flex;flex-wrap:wrap;gap:0.3rem;margin:0.35rem 0 0.1rem;}
@@ -280,6 +283,9 @@
   .back-badge{background:var(--back);}
   .preseason-badge{background:var(--preseason);}
   .deload-badge{background:var(--deload);color:var(--deload-on-text);}
+  .shoulder-badge{display:inline-block;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;vertical-align:middle;letter-spacing:0.02em;background:var(--shoulder);}
+  :root[data-theme="dark"] .shoulder-badge{color:#050308;}
+  .shoulder-status{font-size:0.76rem;line-height:1.45;color:var(--ink);margin:0.35rem 0 0;}
   .deload-status{font-size:0.76rem;line-height:1.45;color:var(--ink);margin:0.35rem 0 0;}
   .deload-status div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .ski-tempo-line{font-size:0.72rem;color:var(--ski-text);background:var(--ski-bg);border:1px solid var(--ski-border);border-radius:8px;padding:0.3rem 0.55rem;margin:0.3rem 0 0.4rem;line-height:1.3;}
@@ -288,6 +294,31 @@
   .care-line{font-size:0.72rem;border-radius:8px;padding:0.3rem 0.55rem;margin:0.3rem 0 0.4rem;line-height:1.3;}
   .knee-care-line{color:var(--knee-text);background:var(--knee-bg);border:1px solid var(--knee-border);}
   .back-care-line{color:var(--back-text);background:var(--back-bg);border:1px solid var(--back-border);}
+  .shoulder-care-line{color:var(--shoulder-text);background:var(--shoulder-bg);border:1px solid var(--shoulder-border);}
+  /* Shoulder Rehab card and its pill */
+  .pill.rehab-pill{background:var(--shoulder-bg);border-color:var(--shoulder-border);color:var(--shoulder-text);}
+  .pill.rehab-pill.active{background:var(--shoulder);border-color:var(--shoulder);color:#fff;}
+  :root[data-theme="dark"] .pill.rehab-pill.active{color:#050308;}
+  .rehab-week{font-size:0.72rem;font-weight:600;color:var(--shoulder-text);white-space:nowrap;}
+  .rehab-phase{font-size:0.78rem;color:var(--slate);margin:0.2rem 0 0.5rem;line-height:1.4;}
+  .rehab-rules{display:flex;flex-direction:column;gap:0.1rem;font-size:0.72rem;line-height:1.35;color:var(--shoulder-text);background:var(--shoulder-bg);border:1px solid var(--shoulder-border);border-radius:8px;padding:0.4rem 0.55rem;margin-bottom:0.3rem;}
+  .rehab-group{display:flex;justify-content:space-between;align-items:baseline;gap:0.6rem;margin:0.8rem 0 0.1rem;}
+  .rehab-count{font-size:0.7rem;color:var(--slate);font-weight:500;flex-shrink:0;}
+  .rehab-pain{margin-top:0.8rem;}
+  .rehab-pain-label{display:block;font-size:0.72rem;font-weight:600;color:var(--ink);margin-bottom:0.3rem;}
+  .rehab-pain-scale{display:grid;grid-template-columns:repeat(11,1fr);gap:3px;}
+  .pain-btn{font:inherit;font-size:0.75rem;font-variant-numeric:tabular-nums;padding:0.35rem 0;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-width:0;}
+  .pain-btn.on.pain-ok{background:var(--emerald);border-color:var(--emerald);color:#fff;}
+  .pain-btn.on.pain-warn{background:var(--amber);border-color:var(--amber);color:#fff;}
+  .pain-btn.on.pain-bad{background:var(--back);border-color:var(--back);color:#fff;}
+  :root[data-theme="dark"] .pain-btn.on{color:#050308;}
+  .rehab-warn{font-size:0.72rem;color:var(--back-text);margin:0.4rem 0 0;line-height:1.35;}
+  .rehab-trend{font-size:0.72rem;color:var(--slate);margin:0.5rem 0 0;}
+  .rehab-hold{font-size:0.72rem;line-height:1.4;color:var(--ink);background:var(--panel-soft);border-radius:8px;padding:0.45rem 0.55rem;margin-top:0.6rem;}
+  .rehab-foot{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;margin-top:0.6rem;}
+  .rehab-check{font-size:0.72rem;color:var(--slate);line-height:1.35;}
+  .rehab-foot .skip-btn{flex-shrink:0;}
+  .rehab-card .care-disclaimer{margin:0.6rem 0 0;}
   .theme-toggle{position:relative;width:52px;height:28px;border-radius:999px;background:var(--line);flex-shrink:0;border:none;cursor:pointer;padding:0;transition:background 0.25s ease;}
   .theme-toggle .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.25s ease;box-shadow:0 1px 3px rgba(0,0,0,0.3);}
   .theme-toggle.on{background:linear-gradient(90deg,#ff2d95,#b967ff,#00f0ff);}
