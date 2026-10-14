@@ -2321,7 +2321,16 @@ async function main(){
     out.fly = !!computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly').shoulderPaused;
     out.curlWeek1 = !!computeSuggestion(data['Bicep Curl'], 'Bicep Curl').shoulderPaused;
     selected = 'Cable Chest Fly'; render();
-    out.flyCard = { next: document.querySelector('.rec-plan').textContent, skip: !!document.querySelector('.skip-ctl') };
+    out.flyCard = { next: document.querySelector('.rec-plan').textContent, skip: !!document.querySelector('.skip-ctl'), tip: document.querySelector('.shoulder-care-line').textContent };
+    selected = 'Bench Press'; render();
+    out.benchNote = document.getElementById('f-note').value;
+    document.getElementById('f-note').value = 'felt fine';
+    logEntry();
+    out.benchLogged = data['Bench Press'].entries[data['Bench Press'].entries.length - 1].note;
+    data['Bench Press'].entries.pop();
+    if(!data['Barbell Row']) data['Barbell Row'] = newExerciseShell('Barbell Row');
+    selected = 'Barbell Row'; render();
+    out.row = { tip: (document.querySelector('.shoulder-care-line') || {}).textContent, badge: !!document.querySelector('.shoulder-badge'), note: document.getElementById('f-note').value };
 
     selected = REHAB_NAME; render();
     out.p1 = { items: document.querySelectorAll('.rehab-card .stretch-item').length, week: document.querySelector('.rehab-week').textContent };
@@ -2334,6 +2343,8 @@ async function main(){
     out.p1.painOn = (document.querySelector('.pain-btn.on') || {}).textContent;
     out.p1.notTraining = lastTrainingDate() === lt0; // rehab alone never counts as a lift session
 
+    shoulderRehab.startedOn = shiftISO(today, -8); render();
+    out.week2Hammer = [...document.querySelectorAll('.rehab-card .stretch-item')].map(e => e.textContent.replace(/\s+/g, ' ')).find(t => /hammer/.test(t));
     shoulderRehab.startedOn = shiftISO(today, -15); render();
     out.p2 = { items: document.querySelectorAll('.rehab-card .stretch-item').length, week: document.querySelector('.rehab-week').textContent, done: isLoggedToday(REHAB_NAME) };
     const c = computeSuggestion(data['Bicep Curl'], 'Bicep Curl');
@@ -2362,7 +2373,9 @@ async function main(){
     r79.firstPills.every((p, i) => p[0] === 'Shoulder Rehab' && (i === 3 ? !/^\d/.test(p[1]) : /^1\. /.test(p[1]))) &&
     /Cable Chest Fly/.test(r79.flyPill || '') &&
     r79.bench.weight === 185 && r79.bench.hold && r79.bench.badge && /Close grip/.test(r79.bench.tip || '') &&
-    r79.fly && r79.curlWeek1 && /paused/.test(r79.flyCard.next) && !r79.flyCard.skip &&
+    r79.fly && r79.curlWeek1 && /paused/.test(r79.flyCard.next) && !r79.flyCard.skip && /Right arm/.test(r79.flyCard.tip) &&
+    r79.benchNote === 'Rehab' && r79.benchLogged === 'Rehab, felt fine' && /keep as is/.test(r79.row.tip || '') && !r79.row.badge && r79.row.note === '' &&
+    /right arm/.test(r79.week2Hammer || '') &&
     r79.p1.items === 3 && r79.p1.week === 'Week 1 · Phase 1' && r79.p1.done && r79.p1.pain === 2 && r79.p1.painOn === '2' && r79.p1.notTraining &&
     r79.p2.items === 9 && r79.p2.week === 'Week 3 · Phase 2' && r79.p2.curl.weight === 20 && r79.p2.curl.hold &&
     r79.p3.items === 11 && r79.p3.week === 'Week 3 · Phase 3' && r79.p3.synced &&

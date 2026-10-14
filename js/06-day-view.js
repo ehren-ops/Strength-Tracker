@@ -418,8 +418,9 @@ function renderExerciseCard(name, ex){
   if(backActive && LOW_BACK_CARE_TIP[name]){
     modHtml += `<div class="care-line back-care-line">${LOW_BACK_CARE_TIP[name]}</div>`;
   }
-  if(shoulderActive){
-    modHtml += `<div class="care-line shoulder-care-line">${shoulderPaused ? SHOULDER_PAUSED_TIP : SHOULDER_CARE_TIP[name]}</div>`;
+  const shoulderTip = shoulderCardTip(name);
+  if(shoulderTip){
+    modHtml += `<div class="care-line shoulder-care-line">${shoulderTip}</div>`;
   }
   if(kneeActive || backActive){
     modHtml += `<p class="care-disclaimer">Load adjustment only, not a substitute for a PT or doctor.</p>`;
@@ -482,7 +483,9 @@ function renderExerciseCard(name, ex){
           : `Hit target ${unitWord}`;
         if(suggestion.shoulderPaused){
           nextLabel = "paused";
-          msg = `Paused for Shoulder Rehab until the side-raise press is pain-free.`;
+          msg = name === "Bicep Curl"
+            ? `Left arm paused until week 3 of Shoulder Rehab. Right-arm hammer curls are fine now.`
+            : `Paused for Shoulder Rehab until the side-raise press is pain-free.`;
         } else if(suggestion.shoulderHold){
           msg = name === "Bicep Curl"
             ? `Shoulder Rehab: hammer curls only at ${suggestion.weight} lb, lower over 3 sec. No adding weight yet.`
@@ -823,7 +826,7 @@ function renderForm(name, ex){
   html += `</div>`;
   if(plan) html += `<p class="prefill-note">${mods.length ? `Pre-filled: ${mods.join(", ")} plan` : "Pre-filled: next progression"}</p>`;
   html += `<div class="form-row">
-    ${ex.trackBy === "duration" ? rpeField : ""}<div class="field field-note"><input type="text" id="f-note" aria-label="Note" value="${modes.deload && ex.trackBy !== "duration" ? DELOAD_NOTE : ""}" placeholder="${ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
+    ${ex.trackBy === "duration" ? rpeField : ""}<div class="field field-note"><input type="text" id="f-note" aria-label="Note" value="${[modes.deload && ex.trackBy !== "duration" && DELOAD_NOTE, isShoulderModified(name) && REHAB_NOTE].filter(Boolean).join(", ")}" placeholder="${ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
   </div>`;
   html += `<div class="date-log-row">
     <div class="field"><input type="date" id="f-date" aria-label="Date" value="${todayISO()}"></div>

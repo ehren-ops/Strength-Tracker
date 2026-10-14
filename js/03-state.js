@@ -107,6 +107,7 @@ function toggleMode(key){
     else if(modes.shoulder) shoulderRehab = { startedOn: todayISO(), endedOn: null, phase3: false };
     else shoulderRehab.endedOn = todayISO();
     saveShoulderRehab();
+    if(modes.shoulder) ensureRehabNotes(); // lifts already logged today get the note too
   }
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
   render();

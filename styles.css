@@ -314,6 +314,9 @@
   :root[data-theme="dark"] .pain-btn.on{color:#050308;}
   .rehab-warn{font-size:0.72rem;color:var(--back-text);margin:0.4rem 0 0;line-height:1.35;}
   .rehab-trend{font-size:0.72rem;color:var(--slate);margin:0.5rem 0 0;}
+  .rehab-right{font-size:0.72rem;line-height:1.4;color:var(--shoulder-text);background:var(--shoulder-bg);border:1px solid var(--shoulder-border);border-radius:8px;padding:0.45rem 0.55rem;margin-top:0.6rem;}
+  .rehab-right p{margin:0.2rem 0 0;}
+  .rehab-right-line{color:var(--shoulder-text);}
   .rehab-hold{font-size:0.72rem;line-height:1.4;color:var(--ink);background:var(--panel-soft);border-radius:8px;padding:0.45rem 0.55rem;margin-top:0.6rem;}
   .rehab-foot{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;margin-top:0.6rem;}
   .rehab-check{font-size:0.72rem;color:var(--slate);line-height:1.35;}

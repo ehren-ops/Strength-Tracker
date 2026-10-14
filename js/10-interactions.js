@@ -114,6 +114,7 @@ function logEntry(){
     };
   }
   if(modes.deload && ex.trackBy !== "duration"){ entry.deload = true; entry.note = withDeloadNote(entry.note); }
+  if(isShoulderModified(selected) && entry.date >= (shoulderRehab.startedOn || entry.date)) entry.note = withRehabNote(entry.note);
   // When it was logged, so a session's actual exercise order can be compared with the planned one.
   entry.loggedAt = new Date().toISOString();
   ex.entries.push(entry);

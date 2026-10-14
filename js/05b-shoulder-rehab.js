@@ -13,11 +13,30 @@ const SHOULDER_RETURN = new Set([...SHOULDER_PAUSED, "Bicep Curl"]);
 const SHOULDER_RETURN_STEPS = [0.85, 0.925, 1];
 const SHOULDER_RETURN_WINDOW_DAYS = 56; // after 8 weeks off rehab the ramp no longer applies
 const HAMMER_FROM_WEEK = 3;
+// The rehab is for the left shoulder; the right is trained alongside it (see REHAB_RIGHT_SIDE).
+const RIGHT_PRESS_TIP = "Right arm: single-arm DB floor press or landmine press keeps pressing trained.";
 const SHOULDER_CARE_TIP = {
-  "Bench Press": "Close grip, stop short of the chest. Only at 3 of 10 pain or less.",
-  "Bicep Curl": "Hammer curls only, light, lower over 3 seconds. Skip if the front of the shoulder aches.",
+  "Bench Press": "Close grip, stop short of the chest, only at 3 of 10 pain or less. No full-range barbell bench until the left is ready. " + RIGHT_PRESS_TIP,
+  "Bicep Curl": "Hammer curls only, both arms, light, lower over 3 seconds. Skip if the front of the left shoulder aches.",
 };
 const SHOULDER_PAUSED_TIP = "Paused for Shoulder Rehab. Back once the side-raise press is pain-free.";
+const SHOULDER_PAUSED_TIPS = {
+  "Cable Chest Fly": "Paused for Shoulder Rehab. " + RIGHT_PRESS_TIP,
+  "Incline DB Press": "Paused for Shoulder Rehab. " + RIGHT_PRESS_TIP,
+  "Bicep Curl": "Left arm paused until week 3. Right arm: slow hammer curls, 3 × 10 light, can start now.",
+};
+// Lifts the modifier leaves alone but has a word on, shown while it is on.
+const SHOULDER_KEEP_TIP = {
+  "Barbell Row": "Shoulder Rehab: keep as is. Single-arm DB rows let each side work at its own load.",
+  "Face Pulls": "Shoulder Rehab: keep as is. More pulling evens out the pressing, which protects both shoulders.",
+};
+// Logged sessions of a paused or held lift say so in their note, like Deload.
+const REHAB_NOTE = "Rehab";
+const REHAB_RIGHT_SIDE = [
+  "Train it too: pressing outrunning pulling loads both shoulders the same way, and training the right keeps a little strength in the left (cross-education).",
+  "Rotation work on both sides, the right about 50% heavier (5-8 lb). Holds on the right are optional: one round after the left at about 70% effort.",
+  "No 3 of 10 limit on the right, but if it aches the same way, sharpest on a resisted side raise, treat it like the left.",
+];
 
 const REHAB_RULES = [
   ["During", "3 of 10 pain or less"],
@@ -26,17 +45,17 @@ const REHAB_RULES = [
 ];
 // One master list so checked items keep their index as the phases change.
 const REHAB_ITEMS = [
-  { group: "holds", name: "Outward-rotation press", dose: "5 × 30-45 s", description: "Stand side-on to a wall, towel between elbow and ribs, elbow bent 90°. Press the back of the hand into the wall at 30-50% effort and hold. 30 s rest between holds.", variation: "Calms pain and wakes up the rotator cuff without moving the joint." },
-  { group: "holds", name: "Inward-rotation press", dose: "5 × 30-45 s", description: "Same setup in a door frame: elbow at your side, bent 90°, palm pressing toward your belly against the frame. 30-50% effort, 30 s rest.", variation: "Balances the outward press so both sides of the cuff work." },
-  { group: "holds", name: "Side-raise press", dose: "5 × 30-45 s", description: "Straight arm about 30° out from your side, outside of the wrist against a wall. Press out into the wall, starting at 30% effort.", variation: "Targets the supraspinatus. Pain-free at full effort means you're through." },
-  { group: "strength", name: "Side-lying external rotation", dose: "3 × 12-15, 3-5 lb", description: "Lie on your good side, towel under the working elbow, elbow bent 90°. Rotate the weight up toward the ceiling over 3 s, lower over 3 s.", variation: "The most important one. Drop to 2 lb if the last reps hurt." },
-  { group: "strength", name: "Band external and internal rotation", dose: "3 × 15 each way", description: "Band anchored at elbow height, elbow tucked at your side with a towel. Rotate out, then turn around and rotate in. Slow both ways.", variation: "Lighter band if you can't keep the elbow pinned." },
-  { group: "strength", name: "Scaption raise (full can)", dose: "3 × 10-12, 2-5 lb", description: "Thumbs up, arms about 30° forward of your sides. Raise to shoulder height, no higher, over 3 s and lower over 3 s.", variation: "No weight at first if 2 lb is above 3 of 10." },
-  { group: "strength", name: "Prone Y and T raises", dose: "2 × 10 each, 2 s hold", description: "Face down on a bench or the floor. Lift straight arms into a Y, hold 2 s, lower. Then out to the sides into a T.", variation: "No weight to start. Thumbs up on both." },
-  { group: "strength", name: "Push-up plus", dose: "3 × 12", description: "Plank on hands or a wall. Arms stay straight: push the floor away so the shoulder blades spread apart, then let them come back together.", variation: "Wall or counter version if the floor is too much." },
-  { group: "strength", name: "Slow hammer curl", dose: "3 × 10, light", description: "Neutral grip, elbows pinned. Curl up, then lower over 3 s.", variation: "Skip it if the front of the shoulder aches.", fromWeek: HAMMER_FROM_WEEK },
-  { group: "return", name: "External rotation at 90° with band", dose: "3 × 12", description: "Upper arm out to the side at shoulder height, elbow bent 90°. Rotate the forearm up against the band, slow both ways.", variation: "Drop the arm to 45° if 90° pinches." },
-  { group: "return", name: "Landmine press, half-kneeling", dose: "3 × 8-10, empty bar", description: "Half-kneeling or split stance, press the end of the bar up and forward. Ribs down, no arching.", variation: "Then bring back full-depth bench, then incline. Flies and lateral raises last." },
+  { group: "holds", name: "Outward-rotation press", dose: "5 × 30-45 s", description: "Stand side-on to a wall, towel between elbow and ribs, elbow bent 90°. Press the back of the hand into the wall at 30-50% effort and hold. 30 s rest between holds.", variation: "Calms pain and wakes up the rotator cuff without moving the joint.", right: "Optional: one hold after the left, about 70% effort." },
+  { group: "holds", name: "Inward-rotation press", dose: "5 × 30-45 s", description: "Same setup in a door frame: elbow at your side, bent 90°, palm pressing toward your belly against the frame. 30-50% effort, 30 s rest.", variation: "Balances the outward press so both sides of the cuff work.", right: "Optional: one hold after the left, about 70% effort." },
+  { group: "holds", name: "Side-raise press", dose: "5 × 30-45 s", description: "Straight arm about 30° out from your side, outside of the wrist against a wall. Press out into the wall, starting at 30% effort.", variation: "Targets the supraspinatus. Pain-free at full effort means you're through.", right: "Optional: one hold after the left, about 70% effort. An ache here on the right means treat it like the left." },
+  { group: "strength", name: "Side-lying external rotation", dose: "3 × 12-15, 3-5 lb", description: "Lie on your good side, towel under the working elbow, elbow bent 90°. Rotate the weight up toward the ceiling over 3 s, lower over 3 s.", variation: "The most important one. Drop to 2 lb if the last reps hurt.", right: "Yes, every session, about 50% heavier: 5-8 lb." },
+  { group: "strength", name: "Band external and internal rotation", dose: "3 × 15 each way", description: "Band anchored at elbow height, elbow tucked at your side with a towel. Rotate out, then turn around and rotate in. Slow both ways.", variation: "Lighter band if you can't keep the elbow pinned.", right: "Yes, every session, with a heavier band." },
+  { group: "strength", name: "Scaption raise (full can)", dose: "3 × 10-12, 2-5 lb", description: "Thumbs up, arms about 30° forward of your sides. Raise to shoulder height, no higher, over 3 s and lower over 3 s.", variation: "No weight at first if 2 lb is above 3 of 10.", right: "Already both arms together." },
+  { group: "strength", name: "Prone Y and T raises", dose: "2 × 10 each, 2 s hold", description: "Face down on a bench or the floor. Lift straight arms into a Y, hold 2 s, lower. Then out to the sides into a T.", variation: "No weight to start. Thumbs up on both.", right: "Already both arms together." },
+  { group: "strength", name: "Push-up plus", dose: "3 × 12", description: "Plank on hands or a wall. Arms stay straight: push the floor away so the shoulder blades spread apart, then let them come back together.", variation: "Wall or counter version if the floor is too much.", right: "Already both sides." },
+  { group: "strength", name: "Slow hammer curl", dose: "3 × 10, light", description: "Neutral grip, elbows pinned. Curl up, then lower over 3 s.", variation: "Skip it if the front of the left shoulder aches.", right: "Both arms. The right can start now; the left joins in week 3.", leftFromWeek: HAMMER_FROM_WEEK },
+  { group: "return", name: "External rotation at 90° with band", dose: "3 × 12", description: "Upper arm out to the side at shoulder height, elbow bent 90°. Rotate the forearm up against the band, slow both ways.", variation: "Drop the arm to 45° if 90° pinches.", right: "Both sides." },
+  { group: "return", name: "Landmine press, half-kneeling", dose: "3 × 8-10, empty bar", description: "Half-kneeling or split stance, press the end of the bar up and forward. Ribs down, no arching.", variation: "Then bring back full-depth bench, then incline. Flies and lateral raises last.", right: "Fine on the right any time to keep pressing trained." },
 ];
 const REHAB_GROUPS = {
   holds: "Holds",
@@ -64,11 +83,45 @@ function isShoulderPaused(name){
 function isShoulderHeld(name){
   return !!modes.shoulder && !isShoulderPaused(name) && !!SHOULDER_CARE_TIP[name];
 }
+function isShoulderModified(name){ return isShoulderPaused(name) || isShoulderHeld(name); }
+// The line on a lift's card while rehab is on: paused, held, or kept with a word. Null otherwise.
+function shoulderCardTip(name){
+  if(!modes.shoulder) return null;
+  if(isShoulderPaused(name)) return SHOULDER_PAUSED_TIPS[name] || SHOULDER_PAUSED_TIP;
+  if(isShoulderHeld(name)) return SHOULDER_CARE_TIP[name];
+  return SHOULDER_KEEP_TIP[name] || null;
+}
+function withRehabNote(note){
+  const n = (note || "").trim();
+  return /rehab/i.test(n) ? n : n ? `${REHAB_NOTE}, ${n}` : REHAB_NOTE;
+}
+// Sessions of a paused or held lift logged while rehab was on carry "Rehab" in the note, including
+// ones logged earlier today before it was switched on. Runs at startup, after sign-in and on toggle.
+function ensureRehabNotes(){
+  const from = shoulderRehab.startedOn;
+  if(!from) return 0;
+  const to = modes.shoulder ? todayISO() : (shoulderRehab.endedOn || from);
+  let changed = 0;
+  [...SHOULDER_RETURN, ...Object.keys(SHOULDER_CARE_TIP)].forEach(name => {
+    const ex = data[name];
+    if(!ex) return;
+    ex.entries.forEach(e => {
+      if(e.date < from || e.date > to) return;
+      const fixed = withRehabNote(e.note);
+      if(fixed === (e.note || "")) return;
+      e.note = fixed;
+      changed++;
+      enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: name, clientId: e.clientId } });
+    });
+  });
+  if(changed) persist();
+  return changed;
+}
 
 // The groups shown today, each with the master indices it covers.
 function rehabGroupsToday(){
   const phase = rehabPhase(), week = rehabWeek();
-  const idx = g => REHAB_ITEMS.map((it, i) => (it.group === g && (!it.fromWeek || week >= it.fromWeek)) ? i : -1).filter(i => i >= 0);
+  const idx = g => REHAB_ITEMS.map((it, i) => it.group === g ? i : -1).filter(i => i >= 0);
   if(phase === 1) return [{ key: "holds", title: `${REHAB_GROUPS.holds} · daily`, idx: idx("holds") }];
   const groups = [];
   if(phase === 3) groups.push({ key: "return", title: `${REHAB_GROUPS.return} · after a lift`, idx: idx("return") });
@@ -150,12 +203,13 @@ function renderRehabCard(){
             <input type="checkbox" ${isDone ? 'checked' : ''} onchange="toggleChecklistItem(${q}, ${idx})">
             <span class="stretch-name">${item.name}</span>
           </label>
-          <span class="stretch-dose">${item.dose}</span>
+          <span class="stretch-dose">${item.leftFromWeek && week < item.leftFromWeek ? item.dose + ", right arm" : item.dose}</span>
           <button class="stretch-toggle" onclick="toggleStretchDetail('${key}')" aria-label="Details">${isOpen ? '▲' : '▼'}</button>
         </div>
         ${isOpen ? `<div class="stretch-detail">
           <p>${item.description}</p>
           ${item.variation ? `<p class="stretch-variation">${item.variation}</p>` : ''}
+          ${item.right ? `<p class="rehab-right-line"><b>Right side:</b> ${item.right}</p>` : ''}
         </div>` : ''}
       </div>`;
     });
@@ -173,8 +227,10 @@ function renderRehabCard(){
   const painList = recent.pain.slice(-5).map(p => p.pain).join(", ");
   html += `<p class="rehab-trend">Last ${recent.daysOn} day${recent.daysOn === 1 ? "" : "s"}: ${recent.daysDone} with rehab done${painList ? ` · pain ${painList}` : ""}</p>`;
 
+  html += `<div class="rehab-right"><b>Right shoulder</b>${REHAB_RIGHT_SIDE.map(t => `<p>${t}</p>`).join("")}${phase === 1 ? `<p>Right-arm slow hammer curls (3 × 10, light) can start now.</p>` : ""}</div>`;
+
   const paused = [...SHOULDER_PAUSED].filter(n => data[n] || allDayNames().includes(n));
-  if(week < HAMMER_FROM_WEEK) paused.push("Bicep Curl (hammer curls from week 3)");
+  if(week < HAMMER_FROM_WEEK) paused.push("Bicep Curl for the left arm (hammer curls from week 3)");
   html += `<div class="rehab-hold"><b>Paused in the app:</b> ${paused.join(", ")}. <b>Bench:</b> held, close grip, stop short of the chest.${week >= HAMMER_FROM_WEEK ? " <b>Curls:</b> hammer only, light." : ""} <b>Also hold off:</b> dips, upright rows, behind-neck pressing, straight-bar curls, racquet and throwing.</div>`;
 
   html += `<div class="rehab-foot"><span class="rehab-check">Through it when a full-effort side-raise press is pain-free.</span>`;
@@ -229,6 +285,8 @@ function rehabCoachBlock(){
     block.phase = rehabPhase();
     block.pausedLifts = [...SHOULDER_PAUSED, "Bicep Curl"].filter(n => isShoulderPaused(n) && (data[n] || allDayNames().includes(n)));
     block.heldLifts = Object.keys(SHOULDER_CARE_TIP).filter(isShoulderHeld);
+    block.rightSide = "Rehab is for the left shoulder. The right is trained too: rotation work both sides with the right about 50% heavier, right-arm hammer curls from week 1, single-arm right pressing (DB floor press, landmine) allowed. No pain cap on the right, but the same ache there means treat it like the left.";
+    block.notes = "Sessions of paused or held lifts logged during rehab carry \"Rehab\" in the note.";
     block.last14Days = { daysOn: recent.daysOn, daysWithRehabDone: recent.daysDone, painScores0to10: recent.pain };
   }
   return block;
