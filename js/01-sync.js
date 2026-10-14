@@ -399,6 +399,10 @@ async function pullRemoteAndMerge(){
       // Entries logged before order tracking pick up the server's backfilled log time.
       const remoteAt = new Map(remoteEntries.map(e => [e.clientId, e.loggedAt]));
       data[row.name].entries.forEach(e => { if(!e.loggedAt && remoteAt.get(e.clientId)) e.loggedAt = remoteAt.get(e.clientId); });
+      // A set tagged preseason on the server (logged on another device, or marked after the fact) is
+      // tagged here too, so its chart point turns Preseason purple. Never untagged from here.
+      const remotePre = new Set(remoteEntries.filter(e => e.preseason).map(e => e.clientId));
+      data[row.name].entries.forEach(e => { if(!e.preseason && remotePre.has(e.clientId)) e.preseason = true; });
       data[row.name].entries.sort((a,b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       data[row.name].entries.forEach((e,i) => { e.label = "S" + (i+1); });
     }

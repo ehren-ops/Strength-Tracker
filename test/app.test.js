@@ -2574,6 +2574,22 @@ async function main(){
       back: rowToEntry({ client_id: 'x', entry_date: d(0), reps: 5, preseason: true }).preseason === true,
       target: entryTargetReps(ex, ex.entries[1]) + '/' + entryTargetReps(ex, ex.entries[3]) };
   });
+  // A set already on this phone picks up the preseason tag from the server on the next pull.
+  const r83b = await page.evaluate(async () => {
+    const saved = { data, from: supabaseClient.from, session: currentSession, render: window.render, persist: window.persist, auto: window.checkDeloadAutoEnd };
+    window.render = () => {}; window.persist = () => {}; window.checkDeloadAutoEnd = () => {};
+    data = { 'Squat': Object.assign(newExerciseShell('Squat'), { entries: [{ clientId: 'sq1', date: todayISO(), weight: 180, sets: 3, reps: 5, label: 'S1' }] }) };
+    const rows = { exercises: [{ id: 'ex-sq', name: 'Squat', user_id: 'u' }], entries: [{ client_id: 'sq1', exercise_id: 'ex-sq', entry_date: todayISO(), weight: 180, sets: 3, reps: 5, preseason: true }], user_settings: [], skips: [], ai_breakdowns: [] };
+    const q = (t) => { const b = { select(){ return b; }, eq(){ return b; }, maybeSingle(){ return Promise.resolve({ data: null, error: null }); }, then(res){ return Promise.resolve({ data: rows[t], error: null }).then(res); } }; return b; };
+    supabaseClient.from = q;
+    currentSession = { user: { id: 'u' } };
+    try { await pullRemoteAndMerge(); } catch (e) { return { err: String(e) }; }
+    const out = { pre: data['Squat'].entries[0].preseason === true };
+    data = saved.data; supabaseClient.from = saved.from; currentSession = saved.session;
+    window.render = saved.render; window.persist = saved.persist; window.checkDeloadAutoEnd = saved.auto; persist(); render();
+    return out;
+  });
+  if(!r83b.pre) throw new Error('expected a squat already on this phone to pick up the server preseason tag on pull, got: ' + JSON.stringify(r83b));
   if(r83.preseason !== 1 || r83.missed !== 2 || !r83.title || !r83.back || r83.target !== '5/8') throw new Error('expected one preseason point (5 reps at the 5-rep preseason target), the 4-rep preseason set and the untagged 5-rep set as misses, got: ' + JSON.stringify(r83));
   console.log('OK: a preseason 3x5 squat is drawn in the Preseason color; short of the preseason target or logged without the modifier it is still a miss');
 
