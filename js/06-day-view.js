@@ -121,6 +121,7 @@ function renderDay(day){
 
   // Mobility is one card, so its group needs no pill of its own (only Shoulder Rehab, when on).
   const hidePills = day === "extra" && extraGroup === "mobility" && !lead.length;
+  const due = day === "extra" ? {} : dueLifts();
   let html = groupRow + `<div class="pill-row" id="pill-scroll"${hidePills ? ' hidden' : ''}>`;
   list.forEach((name, i) => {
     if(name === MOBILITY_NAME) return; // the group button stands in for it
@@ -141,7 +142,9 @@ function renderDay(day){
     if(loggedToday) pillClasses.push('logged-today');
     if(skipped || paused) pillClasses.push('skipped-today');
     const n = i - lead.length;
-    const title = skipped ? ` title="Skipped today: ${SKIP_REASONS[skipped]}"` : paused ? ` title="Paused: Shoulder Rehab"` : '';
+    if(!loggedToday && !skipped && !paused && due[name]) pillClasses.push('due');
+    const title = skipped ? ` title="Skipped today: ${SKIP_REASONS[skipped]}"` : paused ? ` title="Paused: Shoulder Rehab"`
+      : due[name] && !loggedToday ? ` title="Due: missed its last ${due[name].missedSessions} sessions"` : '';
     html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')"${title}>${(day !== "extra" && n >= 0 && n < activeDayOrder(day).length) ? (n+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
   });
   html += `<div class="pill pill-add" onclick="toggleAddExercise()">+</div></div>`;
@@ -317,7 +320,7 @@ function guidanceHtml(msg, pool){
 }
 function composeGuidance(msg, name, ex, last, work){
   return guidanceHtml(msg, [
-    lastSessionLine(ex, work), ...noteInsights(ex.entries), deloadSessionLine(ex, last), hrLine(name, last), ...trendLine(name, ex),
+    dueLine(name), lastSessionLine(ex, work), ...noteInsights(ex.entries), deloadSessionLine(ex, last), hrLine(name, last), ...trendLine(name, ex),
     bestLine(ex, work), progressionRule(name, ex), effortLine(ex), daysSinceLine(last), LOG_TIMING_TIP, NOTE_TIP,
   ]);
 }

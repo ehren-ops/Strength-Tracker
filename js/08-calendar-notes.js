@@ -174,6 +174,57 @@ function getLastSessionDate(){
   return maxDate;
 }
 
+// ---------- lifts that are due ----------
+// A program lift is due once the days it belongs to were trained at least twice since it was last
+// done, counting only real misses. A session where it was skipped with a reason (injury, equipment,
+// time, other), one in a deload week, or one while Shoulder Rehab had it paused doesn't count. A lift
+// a modifier pauses or hides right now (rehab pause, preseason-only, knee-only), or one never logged,
+// is never due.
+const DUE_AFTER_MISSES = 2;
+function trainingDates(){
+  const byDate = {};
+  Object.entries(data).forEach(([n, ex]) => {
+    if(ex.trackBy === "checklist" || isRecovery(n)) return;
+    ex.entries.forEach(e => {
+      const d = (byDate[e.date] ||= { names: new Set(), deload: false });
+      d.names.add(n);
+      if(e.deload) d.deload = true;
+    });
+  });
+  const inDeloadWindow = d => !!(deloadDates.startedOn && d >= deloadDates.startedOn && d <= (deloadDates.endedOn || todayISO()));
+  Object.entries(byDate).forEach(([date, d]) => { d.day = guessDayForNames([...d.names]); if(inDeloadWindow(date)) d.deload = true; });
+  return byDate;
+}
+function pausedByRehabOn(name, date){
+  const r = shoulderRehab;
+  if(!r || !r.startedOn || date < r.startedOn || date > (r.endedOn || todayISO())) return false;
+  return SHOULDER_PAUSED.has(name) || (name === "Bicep Curl" && date < shiftISO(r.startedOn, (HAMMER_FROM_WEEK - 1) * 7));
+}
+function dueLifts(){
+  const dates = trainingDates(), today = todayISO();
+  const sorted = Object.keys(dates).filter(d => d < today).sort();
+  const due = {};
+  ["full", "upper", "lower"].forEach(day => activeDayOrder(day).forEach(name => {
+    if(name in due) return;
+    due[name] = null;
+    if(isShoulderPaused(name)) return;
+    const homes = ["full", "upper", "lower"].filter(d => activeDayOrder(d).includes(name));
+    const ex = data[name];
+    // Never logged: not part of the routine yet, so never due.
+    if(!ex || !ex.entries.length) return;
+    const last = ex.entries[ex.entries.length - 1].date;
+    const missed = sorted.filter(d => d > last && homes.includes(dates[d].day) && !dates[d].names.has(name)
+      && !skipReason(name, d) && !dates[d].deload && !pausedByRehabOn(name, d));
+    if(missed.length >= DUE_AFTER_MISSES) due[name] = { missedSessions: missed.length, lastDone: last };
+  }));
+  Object.keys(due).forEach(n => { if(!due[n]) delete due[n]; });
+  return due;
+}
+function dueLine(name, due){
+  const d = (due || dueLifts())[name];
+  return d ? `Due: missed its last ${d.missedSessions} sessions; do it early today.` : "";
+}
+
 function generateCoachNotes(){
   const lastDate = getLastSessionDate();
   if(!lastDate) return null;
@@ -226,6 +277,10 @@ function generateCoachNotes(){
   }
   if(!missed.length && !concerns.length && hitCount === total){
     sentences.push(increased.length ? `Clean session across the board - nothing to dial back here.` : `Solid and consistent - everything landed, nothing urgent to change.`);
+  }
+  const dueNow = Object.keys(dueLifts());
+  if(dueNow.length){
+    sentences.push(`Due: ${dueNow.slice(0, 3).join(", ")}${dueNow.length > 3 ? ` and ${dueNow.length - 3} more` : ""} missed ${dueNow.length > 1 ? "their" : "its"} last 2+ sessions - work ${dueNow.length > 1 ? "them" : "it"} in early next time.`);
   }
   if(modes.ski && (dayGuess === "lower" || dayGuess === "full")){
     sentences.push(`🎿 Ski season is on - keep leaning into single-leg work and a controlled lowering phase on squat/split squat/lunge.`);

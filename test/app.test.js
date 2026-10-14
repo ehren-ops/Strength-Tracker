@@ -2648,6 +2648,50 @@ async function main(){
   if(!ok85) throw new Error('expected each modifier on for a lift to pre-fill its tag, got: ' + JSON.stringify(r85));
   console.log('OK: Squat pre-fills "Knee Care, Back Care", RDL "Back Care", Squat "Deload, Preseason, Ski"; a typed note logs as "' + r85.logged + '"');
 
+  console.log('=== 86: a lift missed on its last 2 sessions is due, but intentional skips, deload weeks and rehab pauses never count ===');
+  const r86 = await page.evaluate(() => {
+    const saved = { data, skips: JSON.stringify(skips), modes: JSON.stringify(modes), deload: JSON.stringify(deloadDates), rehab: JSON.stringify(shoulderRehab) };
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    deloadDates = {}; shoulderRehab = {};
+    const d = n => shiftISO(todayISO(), n);
+    const e = (date, extra) => Object.assign({ clientId: Math.random().toString(36).slice(2), date, weight: 50, sets: 3, reps: 10, difficulty: 7 }, extra || {});
+    const S = [-10, -6, -2];
+    data = {
+      // Logged every Upper session, so each reads as an Upper day.
+      'Tricep Pushdown': Object.assign(newExerciseShell('Tricep Pushdown'), { entries: [e(d(-14)), ...S.map(n => e(d(n), n === -10 ? { deload: true } : {}))] }),
+      'Cable Lat Pulldown': Object.assign(newExerciseShell('Cable Lat Pulldown'), { entries: [e(d(-14))] }),
+      'Bicep Curl': Object.assign(newExerciseShell('Bicep Curl'), { entries: [e(d(-14))] }),
+      'Face Pulls': Object.assign(newExerciseShell('Face Pulls'), { entries: [e(d(-14))] }),
+      'Cable Chest Fly': Object.assign(newExerciseShell('Cable Chest Fly'), { entries: [e(d(-14))] }),
+    };
+    skips = { [d(-6)]: { 'Bicep Curl': 'injury' }, [d(-2)]: { 'Bicep Curl': 'equipment' } };
+    const out = {};
+    out.due = dueLifts();
+    // Face Pulls: one of its three misses was the deload session, so 2 real misses: due.
+    // Bicep Curl: 2 of 3 misses were skipped with a reason, so 1 real miss: not due.
+    // Lat Pulldown: missed all 3 Upper sessions after the deload one... the deload one doesn't count: 2.
+    modes.shoulder = true; shoulderRehab = { startedOn: d(-12), endedOn: null, phase3: false };
+    out.dueRehab = Object.keys(dueLifts());
+    modes.shoulder = false; shoulderRehab = {};
+    view = 'upper'; selected = 'Cable Lat Pulldown'; render();
+    const lat = [...document.querySelectorAll('.pill.due')].find(p => /Cable Lat Pulldown/.test(p.textContent));
+    out.pill = lat && lat.textContent;
+    out.pillTitle = lat && lat.getAttribute('title');
+    out.guide = guidancePools.flat().find(t => /^Due:/.test(t)) || null;
+    out.notes = generateCoachNotes() || '';
+    out.coach = buildWeeklyCoachPayload().liftsDue;
+    data = saved.data; skips = JSON.parse(saved.skips); Object.assign(modes, JSON.parse(saved.modes));
+    deloadDates = JSON.parse(saved.deload); shoulderRehab = JSON.parse(saved.rehab); render();
+    return out;
+  });
+  const due86 = Object.keys(r86.due).sort();
+  const ok86 = JSON.stringify(due86) === JSON.stringify(['Cable Chest Fly', 'Cable Lat Pulldown', 'Face Pulls']) &&
+    r86.due['Cable Lat Pulldown'].missedSessions === 2 && !r86.dueRehab.includes('Cable Chest Fly') &&
+    /Cable Lat Pulldown/.test(r86.pill || '') && /missed its last 2 sessions/.test(r86.pillTitle || '') && /^Due: missed its last 2 sessions/.test(r86.guide || '') &&
+    /Due: .*Cable Lat Pulldown/.test(r86.notes) && r86.coach && r86.coach.lifts.some(l => l.name === 'Cable Lat Pulldown') && /Intentional skips/.test(r86.coach.note);
+  if(!ok86) throw new Error('expected due lifts with intentional skips, deload weeks and rehab pauses excluded, got: ' + JSON.stringify(r86));
+  console.log('OK: Lat Pulldown, Face Pulls and Fly are due; Bicep Curl (skipped for injury and equipment) is not; Fly is not due while Shoulder Rehab pauses it; dot, Next line, Coach\'s Notes and the coach payload all agree');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
