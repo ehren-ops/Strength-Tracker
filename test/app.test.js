@@ -1827,7 +1827,7 @@ async function main(){
       pool: guidancePools.flat(), next: sug.weight, e1rm: trend.e1rmChange4WeeksPct, sessions: trend.sessionsLast4Weeks };
   });
   const wantE1 = Math.round((175 * (1 + 8 / 30) - 165 * (1 + 8 / 30)) / (165 * (1 + 8 / 30)) * 1000) / 10;
-  if(!/^157\.5 lbs/.test(afterDeload.big) || !/Logged today/.test(afterDeload.label) || !/^Last: 175 lb · /.test(afterDeload.corner || '') || afterDeload.since !== '+10 since first' || !/^222 lbs/.test(afterDeload.onerm) || afterDeload.next !== 180
+  if(!/^157\.5 lbs/.test(afterDeload.big) || !/Logged today/.test(afterDeload.label) || !/^Last: 175 lb$/.test(afterDeload.corner || '') || afterDeload.since !== '+10 since first' || !/^222 lbs/.test(afterDeload.onerm) || afterDeload.next !== 180
     || !afterDeload.pool.includes('Last full session: 175 lb, 3x8 at RPE 7.') || !afterDeload.pool.includes('Deload last time: 157.5 lb, 2x8.')
     || afterDeload.e1rm !== wantE1 || afterDeload.sessions !== 3) throw new Error('expected the card to stand on the last full session after a deload, got: ' + JSON.stringify(afterDeload));
   console.log('OK: with a deload logged today the card shows it as today\'s locked-in 157.5, "Last: 175" in the corner, +10 since first, Est. 1RM 222 and next 180, with the deload named, not a drop');
@@ -2212,7 +2212,7 @@ async function main(){
       big: div.querySelector('.big-val').textContent, label: div.querySelector('.big-label').textContent, plan: div.querySelector('.rec-plan').textContent, load: div.querySelector('.rec-load').textContent,
       next: w && w.nextElementSibling && w.nextElementSibling.className };
   });
-  if(!head.cornerInTitle || !/^Last: 175 lb · /.test(head.corner) || !head.deltaInHistory || head.text !== '+10 since first' || head.label !== 'Today' || !/^180 lbs/.test(head.big)
+  if(!head.cornerInTitle || !/^Last: 175 lb$/.test(head.corner) || !head.deltaInHistory || head.text !== '+10 since first' || head.label !== 'Today' || !/^180 lbs/.test(head.big)
     || head.plan !== '3x8 · +5 lbs' || !/^Load: 180 lb · /.test(head.load) || head.next !== 'rec-box') throw new Error('expected today\'s 180 big, "Last: 175" top right, "3x8 · +5 lbs", the load total before the plates and +10 since first in Recent History, got: ' + JSON.stringify(head));
   console.log('OK: TODAY 180 lbs, "' + head.corner + '" top right, "' + head.plan + '", "' + head.load + '", and +10 since first in the Recent History heading');
 

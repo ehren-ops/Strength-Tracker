@@ -446,6 +446,9 @@ function loadText(name, ex, sug){
   return sidesOf(name).weight === "hand" ? `Load: ${w} lb in each hand` : `Load: ${w} lb total`;
 }
 
+let lastDateShown = false;
+function toggleLastDate(){ lastDateShown = !lastDateShown; render(); }
+
 // A session in a few characters, for the "Last:" corner: 175 lb, 50 lb/hand, 3x10, 45 min.
 function shortValue(name, ex, e){
   if(ex.trackBy === "weight") return `${e.weight} lb${sidesOf(name).weight === "hand" ? "/hand" : ""}`;
@@ -509,13 +512,14 @@ function renderExerciseCard(name, ex){
     ? (ex.trackBy==="weight" ? work.weight-first.weight : ex.trackBy==="duration" ? work.minutes-first.minutes : work.reps-first.reps)
     : 0;
   const deltaColor = delta>0 ? "color:var(--emerald)" : delta<0 ? "color:var(--amber)" : "color:var(--slate)";
-  const deltaHtml = ex.entries.length > 1 && !recovery ? ` · <span class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</span>` : "";
+  const deltaHtml = ex.entries.length > 1 && !recovery ? `<span class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</span>` : "";
   // The big number is the weight to lift today, or what was logged today once it is. The top right
   // keeps the last day a full session was lifted, before today, so the two never get mixed up.
   const today = todayISO();
   const todayLog = recovery ? null : [...ex.entries].reverse().find(e => e.date === today) || null;
   const prior = [...ex.entries].reverse().find(e => e.date < today && !e.deload) || null;
-  const priorHtml = prior && !recovery ? `<span class="last-line">Last: ${shortValue(name, ex, prior)} · ${fmtShortDate(prior.date)}</span>` : "";
+  // Just the weight; a tap adds the date, on every card, until tapped again.
+  const priorHtml = prior && !recovery ? `<button type="button" class="last-line" onclick="toggleLastDate()" aria-pressed="${lastDateShown}" title="${fmtShortDate(prior.date)}">Last: ${shortValue(name, ex, prior)}${lastDateShown ? ` · ${fmtShortDate(prior.date)}` : ""}</button>` : "";
 
   // Active modifiers: badges, then their notes, under the current weight rather than above it.
   const badges = [skiActive && '<span class="ski-badge">🎿 Ski</span>', kneeActive && '<span class="knee-badge">🦵 Knee Care</span>',
@@ -575,8 +579,8 @@ function renderExerciseCard(name, ex){
 
     html += `<div class="weight-row">
       <div class="weight-main">
-        <span class="big-label${todayLog ? " locked" : ""}">${bigLabel}</span>
         <span class="big-val">${bigVal}</span>
+        <span class="big-label${todayLog ? " locked" : ""}">${bigLabel}</span>
       </div>
       ${ex.trackBy === "weight" ? render1RMInline(name, ex, work) : ''}
     </div>`;
@@ -703,7 +707,7 @@ function renderExerciseCard(name, ex){
     const older = reversed.slice(3);
 
     html += `<div style="margin-top:0.9rem;">`;
-    html += `<h3 class="section" style="margin-bottom:0.4rem;">Recent History${deltaHtml}</h3>`;
+    html += `<h3 class="section hist-head" style="margin-bottom:0.4rem;"><span>Recent History</span>${deltaHtml}</h3>`;
     const histColLabel = recovery ? "Session" : ex.trackBy==="duration" ? "Cardio" : ex.trackBy==="weight" ? "Load" + (sidesOf(name).weight === "total" ? "" : "/" + sidesOf(name).weight) : "Sets" + repsSuffix(name);
     const cardioCls = ex.trackBy==="duration" ? " cardio" : "";
     html += `<div class="hist-row header${cardioCls}"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;

@@ -130,17 +130,18 @@
   .ex-title-row{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:0.2rem 0.6rem;margin:0 0 0.6rem;}
   /* Name capitals match the current weight's digits (1.7rem body font): Fjalla One's capitals run
      about 15% taller than IBM Plex Sans digits, Orbitron's about the same as Rajdhani's. */
-  .ex-title-row .ex-name{margin:0;flex:1 1 auto;min-width:0;}
+  .ex-title-row .ex-name{margin:0;flex:1 1 0;}
   .delta-line{font-variant-numeric:tabular-nums;}
   .side-tag{font-size:0.5em;font-weight:600;color:var(--slate);margin-left:0.15rem;letter-spacing:0;}
   .plate-line{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.72rem;color:var(--slate);margin-top:0.15rem;}
-  .weight-row{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem 0.9rem;}
+  .weight-row{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:0.4rem 0.9rem;}
   .weight-main{display:flex;flex-direction:column;align-items:flex-start;}
-  .big-label{display:block;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);white-space:nowrap;}
+  .big-label{display:block;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);white-space:nowrap;line-height:1.2;}
   .big-label.locked{color:var(--emerald);font-weight:700;}
-  .last-line{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.78rem;font-weight:600;color:var(--slate);white-space:nowrap;flex:0 0 auto;margin-left:auto;}
+  .last-line{font:inherit;font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.78rem;font-weight:600;color:var(--slate);white-space:nowrap;flex:0 0 auto;margin-left:auto;background:none;border:none;padding:0;cursor:pointer;}
+  .hist-head{display:flex;justify-content:space-between;align-items:baseline;gap:0.6rem;}
   .onerm-box{text-align:right;flex-shrink:0;cursor:pointer;}
-  .onerm-label{display:block;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);white-space:nowrap;}
+  .onerm-label{display:inline;margin-right:0.35rem;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);white-space:nowrap;}
   .onerm-val{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.85rem;font-weight:700;color:var(--ink);white-space:nowrap;}
   .onerm-edit{display:flex;align-items:center;gap:0.25rem;}
   .onerm-edit input{width:58px;padding:0.2rem 0.35rem;border:1px solid var(--line);border-radius:5px;font-size:0.85rem;background:var(--input-bg);color:var(--ink);}
