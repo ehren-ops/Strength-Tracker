@@ -285,6 +285,7 @@ async function main(){
 
   console.log('=== 13: Extra day cardio exercises log time/distance/incline instead of weight/sets/reps ===');
   await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Cardio")');
   await page.click('.pill:has-text("Zone 2 Ride")');
   const rideFields = {
     weight: await page.locator('#f-weight').count(),
@@ -307,6 +308,7 @@ async function main(){
   if(rideEntry.minutes !== 45 || rideEntry.distance !== 12.5) throw new Error('Zone 2 Ride entry did not save minutes/distance correctly: ' + JSON.stringify(rideEntry));
   console.log('OK: Zone 2 Ride logs minutes + distance, no weight/sets/reps, no incline');
 
+  await page.click('.group-chip:has-text("Cardio")');
   await page.click('.pill:has-text("Incline Treadmill Walk")');
   const walkFields = {
     weight: await page.locator('#f-weight').count(),
@@ -536,6 +538,7 @@ async function main(){
 
   console.log('=== 24: Farmer\'s Carry logs by time (seconds), not reps, and shows no plate math ===');
   await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Strength")');
   await page.locator('.pill').filter({ hasText: /^Farmer's Carry$/ }).click();
   const carryUnitLabel = await page.locator('.field label').nth(2).textContent();
   if(carryUnitLabel.trim() !== 'Seconds') throw new Error('expected Farmer\'s Carry\'s third field to be labeled Seconds, got: ' + carryUnitLabel);
@@ -549,6 +552,7 @@ async function main(){
   console.log('OK: Farmer\'s Carry labels the field Seconds and shows no plate math:', carryHistText);
 
   console.log('=== 25: Incline Treadmill Walk has a Speed (mph) field alongside minutes/distance/incline ===');
+  await page.click('.group-chip:has-text("Cardio")');
   await page.locator('.pill').filter({ hasText: /^Incline Treadmill Walk/ }).click();
   if(await page.locator('#f-speed').count() !== 1) throw new Error('expected a Speed (mph) field on Incline Treadmill Walk');
   await page.fill('#f-minutes', '25');
@@ -605,9 +609,10 @@ async function main(){
   if(celebratedAfterCustom.upper === today) throw new Error('did not expect the banner to fire from a custom exercise alone, got: ' + JSON.stringify(celebratedAfterCustom));
   console.log('OK: logging only a custom exercise does not trigger the banner for an otherwise-incomplete day');
 
-  console.log('=== 27: stretch/core-routine checklist pills work - collapsed by default, checkbox persists and syncs ===');
+  console.log('=== 27: stretch/core-routine checklists in the Mobility card work - collapsed by default, checkbox persists and syncs ===');
   await page.click('.tab:has-text("Extra")');
-  await page.locator('.pill').filter({ hasText: /^Hip Stretch$/ }).click();
+  await page.click('.group-chip:has-text("Mobility")');
+  await page.click('.routine-chip:has-text("Hip")');
   if(await page.locator('.stretch-item').count() !== 5) throw new Error('expected 5 stretch items in Hip Stretch');
   if(await page.locator('.stretch-detail').count() !== 0) throw new Error('expected all stretch details to be collapsed by default');
   await page.locator('.stretch-item').nth(0).locator('input[type=checkbox]').check();
@@ -623,9 +628,10 @@ async function main(){
 
   await page.click('.tab:has-text("Full Body")');
   await page.click('.tab:has-text("Extra")');
-  const hipPillClassPartial = await page.locator('.pill').filter({ hasText: /^Hip Stretch/ }).getAttribute('class');
-  if(hipPillClassPartial.includes('logged-today')) throw new Error('did not expect Hip Stretch pill to show logged-today with only 1/5 items checked, class was: ' + hipPillClassPartial);
-  console.log('OK: Hip Stretch pill does NOT light up as logged-today with only some items checked');
+  await page.click('.group-chip:has-text("Mobility")');
+  const hipPillClassPartial = await page.locator('.group-chip').filter({ hasText: /^Mobility/ }).textContent() + ' ' + await page.locator('.routine-chip').filter({ hasText: /^Hip/ }).getAttribute('class');
+  if(hipPillClassPartial.includes('✓') || / done/.test(hipPillClassPartial)) throw new Error('did not expect Mobility or Hip to show done with only 1/5 items checked, classes were: ' + hipPillClassPartial);
+  console.log('OK: Mobility and its Hip routine do NOT light up as done with only some items checked');
 
   const cloudChecklist = await page.evaluate(() => {
     const db = JSON.parse(sessionStorage.getItem('__mock_supabase_db__'));
@@ -635,7 +641,7 @@ async function main(){
   if(!cloudChecklist || !cloudChecklist.includes(0)) throw new Error('expected completed_indices to sync to the cloud, got: ' + JSON.stringify(cloudChecklist));
   console.log('OK: checklist completion synced to the cloud');
 
-  await page.locator('.pill').filter({ hasText: /^Hip Stretch/ }).click();
+  await page.click('.routine-chip:has-text("Hip")');
   for(let i = 1; i < 5; i++){
     await page.locator('.stretch-item').nth(i).locator('input[type=checkbox]').check();
   }
@@ -643,9 +649,11 @@ async function main(){
   if(await page.locator('.stretch-item.done').count() !== 5) throw new Error('expected all 5 stretch items marked done');
   await page.click('.tab:has-text("Full Body")');
   await page.click('.tab:has-text("Extra")');
-  const hipPillClassFull = await page.locator('.pill').filter({ hasText: /^Hip Stretch/ }).getAttribute('class');
-  if(!hipPillClassFull.includes('logged-today')) throw new Error('expected Hip Stretch pill to show logged-today once ALL 5 items are checked, class was: ' + hipPillClassFull);
-  console.log('OK: Hip Stretch pill lights up as logged-today only once every item is checked');
+  await page.click('.group-chip:has-text("Mobility")');
+  const hipPillClassFull = await page.locator('.group-chip').filter({ hasText: /^Mobility/ }).textContent();
+  const hipChipFull = await page.locator('.routine-chip').filter({ hasText: /^Hip/ }).getAttribute('class');
+  if(!hipPillClassFull.includes('✓') || !/ done/.test(hipChipFull)) throw new Error('expected Mobility and Hip to show done once ALL 5 items are checked, classes were: ' + hipPillClassFull + ' / ' + hipChipFull);
+  console.log('OK: Mobility and its Hip routine light up as done only once every item is checked');
 
   console.log('=== 28: pill row horizontal scroll position survives logging a set / checking a box (does not reset) ===');
   await page.setViewportSize({ width: 375, height: 700 });
@@ -668,18 +676,15 @@ async function main(){
   if(scrollAfterLog !== scrollBefore) throw new Error(`expected pill scroll to survive logging a set, before=${scrollBefore} after=${scrollAfterLog}`);
   console.log('OK: pill row scroll position survives logging a set');
 
+  // Extra's rows are short now (one group at a time), so the check there is that toggling a
+  // checklist detail keeps the same group and routine on screen.
   await page.click('.tab:has-text("Extra")');
-  await page.locator('.pill').filter({ hasText: /^Hip Stretch/ }).click();
-  const extraScrollBefore = await page.evaluate(() => {
-    const el = document.getElementById('pill-scroll');
-    el.scrollLeft = 9999;
-    return el.scrollLeft;
-  });
-  if(extraScrollBefore <= 0) throw new Error('expected the Extra pill row to be scrollable at 375px width, scrollLeft was: ' + extraScrollBefore);
+  await page.click('.group-chip:has-text("Mobility")');
+  await page.click('.routine-chip:has-text("Hip")');
   await page.locator('.stretch-item').nth(0).locator('.stretch-toggle').click();
-  const extraScrollAfter = await page.evaluate(() => document.getElementById('pill-scroll').scrollLeft);
-  if(extraScrollAfter !== extraScrollBefore) throw new Error(`expected pill scroll to survive toggling a stretch detail, before=${extraScrollBefore} after=${extraScrollAfter}`);
-  console.log('OK: pill row scroll position survives toggling a checklist detail');
+  const extraAfterToggle = await page.evaluate(() => ({ group: document.querySelector('.group-chip.active').textContent, routine: document.querySelector('.routine-chip.active').textContent }));
+  if(!/^Mobility/.test(extraAfterToggle.group) || !/^Hip/.test(extraAfterToggle.routine)) throw new Error('expected toggling a stretch detail to keep Mobility and Hip on screen, got: ' + JSON.stringify(extraAfterToggle));
+  console.log('OK: toggling a checklist detail keeps the Extra group and routine');
 
   await page.click('.tab:has-text("Full Body")');
   const scrollAfterTabSwitch = await page.evaluate(() => document.getElementById('pill-scroll').scrollLeft);
@@ -688,6 +693,7 @@ async function main(){
 
   console.log('=== 29: Incline Treadmill Walk edit box keeps all 4 duration fields on one row ===');
   await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Cardio")');
   await page.locator('.pill').filter({ hasText: /^Incline Treadmill Walk/ }).click();
   await page.locator('.hist-row.latest .icon-btn[aria-label="Edit"]').click();
   const editLabels = page.locator('.hist-edit-box .field label');
@@ -708,6 +714,7 @@ async function main(){
   await page.setViewportSize({ width: 1280, height: 720 });
 
   console.log('=== 30: Zone 2 Ride has an MPH field; leaving it blank auto-calculates speed in history ===');
+  await page.click('.group-chip:has-text("Cardio")');
   await page.locator('.pill').filter({ hasText: /^Zone 2 Ride/ }).click();
   if(await page.locator('#f-speed').count() !== 1) throw new Error('expected an MPH field on Zone 2 Ride');
   await page.fill('#f-minutes', '60');
@@ -844,7 +851,8 @@ async function main(){
 
   console.log('=== 36: an entry for an exercise missing server-side self-heals instead of jamming the queue forever ===');
   await page.click('.tab:has-text("Extra")');
-  await page.locator('.pill').filter({ hasText: /^Leg Stretch/ }).click();
+  await page.click('.group-chip:has-text("Mobility")');
+  await page.click('.routine-chip:has-text("Leg")');
   await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'Leg Stretch shell created and pushed');
   const legStretchRowExists = await page.evaluate(() => {
     const db = JSON.parse(sessionStorage.getItem('__mock_supabase_db__'));
@@ -1013,19 +1021,22 @@ async function main(){
   if(await page.locator('.pill').filter({ hasText: /Box Jumps/ }).count() !== 1) throw new Error('expected a single Box Jumps pill on Lower Body (squat day)');
   if(await page.locator('.pill').filter({ hasText: /Lateral Lunge/ }).count() !== 1) throw new Error('expected Lateral Lunge pill on Lower Body (squat day)');
   if(await page.locator('.pill').filter({ hasText: /Skater Bound/ }).count() !== 1) throw new Error('expected Skater Bound pill on Lower Body (moved from Full Body - it is quad/glute-med dominant, not hinge-pattern)');
-  if(await page.locator('.pill').filter({ hasText: /Spanish Squat/ }).count() !== 0) throw new Error('expected Spanish Squat off Lower Body (it moved to Extra, outside preseason)');
+  if(await page.locator('.pill').filter({ hasText: /Spanish Squat/ }).count() !== (await page.evaluate(() => modes.knee) ? 1 : 0)) throw new Error('expected Spanish Squat on Lower Body only as the Knee Care bridge');
   console.log('OK: preseason pills are grouped by movement pattern with each day\'s main lift, not spread evenly; opening a tab still lands on its original main lift');
 
   await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Strength")');
   if(await page.locator('.pill').filter({ hasText: /Copenhagen Plank/ }).count() !== 1) throw new Error('expected Copenhagen Plank to now live on the Extra day');
+  const kneeBeforeSpanish = await page.evaluate(() => { const was = modes.knee; modes.knee = true; render(); return was; }); // Spanish Squat shows with Knee Care
   await page.locator('.pill').filter({ hasText: /Spanish Squat/ }).click();
   await sleep(100);
   const spanish = await page.evaluate(() => ({ pill: !!document.querySelector('.pill.active.cat-strength'), preseasonBadge: !!document.querySelector('.preseason-badge'), flag: !!data['Spanish Squat'].preseason }));
   if(!spanish.pill || spanish.preseasonBadge || spanish.flag) throw new Error('expected Spanish Squat on Extra as a plain strength lift with no preseason flag, got: ' + JSON.stringify(spanish));
   await page.evaluate(() => toggleMode('preseason'));
   await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Strength")');
   if(await page.locator('.pill').filter({ hasText: /Spanish Squat/ }).count() !== 1) throw new Error('expected Spanish Squat to stay on Extra with Preseason Prep off');
-  await page.evaluate(() => toggleMode('preseason'));
+  await page.evaluate((was) => { modes.knee = was; toggleMode('preseason'); }, kneeBeforeSpanish);
   console.log('OK: Copenhagen Plank and Spanish Squat live on Extra; Spanish Squat is no longer a preseason lift');
 
   console.log('=== 42b: power exercises are visually bumped to the front of the pill row while Preseason Prep is on ===');
@@ -1198,6 +1209,7 @@ async function main(){
   if(await page.locator("#rest-timer-badge:visible").count() !== 0) throw new Error("expected second tap on finished badge to dismiss it");
   console.log("OK: second tap on finished badge dismisses it");
   await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Cardio")');
   await page.locator('.pill').filter({ hasText: /^Zone 2 Ride/ }).click();
   if(await page.locator('.rest-action-btn').count() !== 0) throw new Error('did not expect a Start Rest button on a duration-tracked cardio exercise');
   console.log('OK: cardio (duration-tracked) exercises do not get a Start Rest button');
@@ -1311,6 +1323,7 @@ async function main(){
   const logBtnBox = await page.locator('button.log').boundingBox();
   if(Math.abs(dateBox.y - logBtnBox.y) > 5) throw new Error(`expected the Date field and Log Set button to sit on the same row (similar y position), got date.y=${dateBox.y} vs log.y=${logBtnBox.y}`);
   await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Cardio")');
   await page.locator('.pill').filter({ hasText: /^Zone 2 Ride/ }).click();
   const cardioDateBox = await page.locator('#f-date').boundingBox();
   const cardioLogBtnBox = await page.locator('button.log').boundingBox();
@@ -1351,6 +1364,7 @@ async function main(){
 
   console.log('=== 53: Dead Hang exercise defaults to a 3x45 second time interval ===');
   await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Strength")');
   await page.locator('.pill').filter({ hasText: /^Dead Hang$/ }).click();
   await sleep(150);
   const deadHangSets = await page.inputValue('#f-sets');
@@ -1393,25 +1407,45 @@ async function main(){
   await page.setViewportSize({ width: 420, height: 900 });
   console.log('OK: action-row tiles remain equal height at narrow phone widths, even when Progression text wraps to two lines');
 
-  console.log('=== 56: Extra day pills are grouped strength/cardio/core/stretch, color-coded, in that order ===');
+  console.log('=== 56: Extra shows one group at a time: Strength, Cardio, Mobility, Recovery ===');
+  const modesBefore56 = await page.evaluate(() => { const m = JSON.stringify(modes); modes.knee = false; modes.preseason = false; return m; });
   await page.click('.tab:has-text("Extra")');
   await sleep(150);
-  const extraPills = await page.evaluate(() => Array.from(document.querySelectorAll('.pill-row .pill:not(.pill-add)')).map(el => ({ text: el.textContent.trim(), classes: el.className })));
-  const expectedOrder = [
-    ["Farmer's Carry", 'cat-strength'], ['Dead Hang', 'cat-strength'], ['Spanish Squat', 'cat-strength'], ['Push-Ups', 'cat-strength'],
-    ['Zone 2 Ride', 'cat-cardio'], ['Incline Treadmill Walk', 'cat-cardio'],
-    ['5-Minute Core Routine', 'cat-core'],
-    ['Thoracic Spine Stretch', 'cat-stretch'], ['Hip Stretch', 'cat-stretch'],
-    ['Leg Stretch', 'cat-stretch'], ['Full Body Stretch', 'cat-stretch'],
-    ['Sauna', 'cat-recovery'], ['Cold Plunge', 'cat-recovery'], ['Hot Tub', 'cat-recovery'],
-  ];
-  expectedOrder.forEach(([name, cls], i) => {
-    const actualName = extraPills[i] ? extraPills[i].text.replace(/\s*✓$/, '') : undefined;
-    if(actualName !== name) throw new Error(`expected Extra pill ${i} to be "${name}", got: ${JSON.stringify(extraPills[i])}`);
-    if(!extraPills[i].classes.includes(cls)) throw new Error(`expected "${name}" pill to carry class "${cls}", got: ${extraPills[i].classes}`);
+  const extraGroups = {};
+  for(const g of ['Strength', 'Cardio', 'Mobility', 'Recovery']){
+    await page.click(`.group-chip:has-text("${g}")`);
+    extraGroups[g] = await page.evaluate(() => Array.from(document.querySelectorAll('.pill-row .pill:not(.pill-add)')).map(el => ({ text: el.textContent.trim().replace(/\s*✓$/, ''), classes: el.className })).filter(p => p.text !== 'Shoulder Rehab'));
+    if(g === 'Mobility' && (await page.locator('.card h2.ex-name').first().textContent()) !== 'Mobility') throw new Error('expected the Mobility group to open the Mobility card');
+  }
+  const expectGroups = {
+    Strength: [["Farmer's Carry", 'cat-strength'], ['Dead Hang', 'cat-strength'], ['Push-Ups', 'cat-strength']],
+    Cardio: [['Zone 2 Ride', 'cat-cardio'], ['Incline Treadmill Walk', 'cat-cardio']],
+    Mobility: [],
+    Recovery: [['Sauna', 'cat-recovery'], ['Cold Plunge', 'cat-recovery'], ['Hot Tub', 'cat-recovery']],
+  };
+  Object.entries(expectGroups).forEach(([g, want]) => {
+    const got = extraGroups[g].filter(p => !/^(Copenhagen Plank|Spanish Squat)$/.test(p.text) || true);
+    const names = got.map(p => p.text);
+    const wantNames = want.map(w => w[0]);
+    const customs = names.filter(n => !wantNames.includes(n) && g === 'Strength');
+    if(JSON.stringify(names.filter(n => !customs.includes(n))) !== JSON.stringify(wantNames)) throw new Error(`expected Extra ${g} to show ${JSON.stringify(wantNames)}, got: ${JSON.stringify(names)}`);
+    want.forEach(([n, cls]) => { if(!got.find(p => p.text === n).classes.includes(cls)) throw new Error(`expected "${n}" to carry ${cls}`); });
   });
-  if(extraPills.some(p => p.text.startsWith('Copenhagen Plank'))) throw new Error('expected preseason-only Copenhagen Plank to be hidden while Preseason Prep is off');
-  console.log('OK: Extra pills are ordered strength, cardio, core, stretch and each carries its category class');
+  if(extraGroups.Strength.some(p => /^(Copenhagen Plank|Spanish Squat)$/.test(p.text))) throw new Error('expected Copenhagen Plank (Preseason) and Spanish Squat (Knee Care) hidden while their modifiers are off');
+  const kneeExtra = await page.evaluate(() => {
+    modes.knee = true; selectExtraGroup('strength');
+    const extra = [...document.querySelectorAll('.pill-row .pill')].map(e => e.textContent.trim());
+    view = 'lower'; selected = 'Squat'; render();
+    const lower = [...document.querySelectorAll('.pill-row .pill')].map(e => ({ t: e.textContent.trim(), c: e.className }));
+    selected = 'Spanish Squat'; render();
+    const tip = (document.querySelector('.knee-care-line') || {}).textContent;
+    modes.knee = false; view = 'extra'; render();
+    return { extra, lower, tip };
+  });
+  await page.evaluate((m) => { Object.assign(modes, JSON.parse(m)); render(); }, modesBefore56);
+  const lowerSpanish = kneeExtra.lower.find(p => /^Spanish Squat/.test(p.t));
+  if(!kneeExtra.extra.some(t => /^Spanish Squat/.test(t)) || !lowerSpanish || !/knee-pill/.test(lowerSpanish.c) || !/3 sec hold/.test(kneeExtra.tip || '')) throw new Error('expected Spanish Squat on Extra and Lower (unnumbered, knee styling) with its tip while Knee Care is on, got: ' + JSON.stringify(kneeExtra));
+  console.log('OK: Extra groups show Strength (3), Cardio (2, Zone 2 Ride kept), one Mobility card and Recovery (3); Spanish Squat appears only with Knee Care');
 
   console.log('=== 57: logging with a required field empty flashes that field red instead of silently doing nothing ===');
   await page.click('.tab:has-text("Full Body")');
@@ -1432,6 +1466,7 @@ async function main(){
 
   console.log('--- same check for a duration-tracked exercise missing Minutes ---');
   await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Cardio")');
   await page.locator('.pill').filter({ hasText: /^Zone 2 Ride/ }).click();
   await sleep(150);
   await page.fill('#f-minutes', ''); // pre-filled from the last ride when there is one
@@ -1685,7 +1720,7 @@ async function main(){
   console.log('=== 64: preseason-only lifts hide when Preseason Prep is off; Deload Week sits first and overlays the other modifiers ===');
   await page.click('.tab:has-text("Lower Body")');
   await sleep(150);
-  const lowerPillsOff = await page.evaluate(() => [...document.querySelectorAll('.pill-row .pill:not(.pill-add)')].map(p => p.textContent));
+  const lowerPillsOff = await page.evaluate(() => [...document.querySelectorAll('.pill-row .pill:not(.pill-add):not(.knee-pill)')].map(p => p.textContent));
   if(lowerPillsOff.some(t => /Box Jumps|Trap Bar Jump|Skater Bound|Spanish Squat|Lateral Lunge/.test(t))) throw new Error('expected preseason-only lifts hidden with Preseason Prep off, got: ' + lowerPillsOff.join(' | '));
   await page.evaluate(() => toggleMode('preseason'));
   await sleep(150);

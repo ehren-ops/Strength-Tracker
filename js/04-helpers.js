@@ -16,6 +16,7 @@ const SKIP_REASONS = { injury: "Injury", equipment: "Equipment", time: "Time", o
 function skipReason(name, date){ return (skips[date || todayISO()] || {})[name] || null; }
 
 function isLoggedToday(name){
+  if(name === MOBILITY_NAME) return MOBILITY_ROUTINES.some(([n]) => isLoggedToday(n));
   const ex = data[name];
   if(!ex) return false;
   const entry = ex.entries.find(e => e.date === todayISO());

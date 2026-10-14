@@ -33,8 +33,50 @@ function renderTabs(){
 
 function switchView(v){
   view = v;
-  if(v !== "overview" && DAY_ORDER[v] && DAY_ORDER[v].length) selected = DAY_ORDER[v][0];
+  if(v === "extra") selected = extraList(extraGroup)[0];
+  else if(v !== "overview" && DAY_ORDER[v] && DAY_ORDER[v].length) selected = DAY_ORDER[v][0];
   render();
+}
+
+// ---------- Extra groups and the Mobility card ----------
+// One group's row: its exercises in program order plus custom Extra exercises (under Strength),
+// with the stretch and core routines folded into the single Mobility card.
+function extraList(group){
+  if(group === "mobility") return [MOBILITY_NAME];
+  const customs = Object.keys(data).filter(k => !allDayNames().includes(k) && k !== REHAB_NAME && data[k].day === "extra");
+  return activeDayOrder("extra").concat(customs).filter(n => extraGroupOf(n) === group);
+}
+function selectExtraGroup(group){
+  extraGroup = group;
+  saveExtraPrefs();
+  selected = extraList(group)[0];
+  render();
+}
+function currentMobilityRoutine(){
+  if(isMobilityRoutine(mobilityRoutine)) return mobilityRoutine;
+  // Otherwise the routine done most recently, or Hip.
+  let best = MOBILITY_ROUTINES[0][0], bestDate = "";
+  MOBILITY_ROUTINES.forEach(([n]) => (data[n] ? data[n].entries : []).forEach(e => { if(e.date > bestDate){ bestDate = e.date; best = n; } }));
+  return best;
+}
+function selectMobilityRoutine(name){
+  mobilityRoutine = name;
+  saveExtraPrefs();
+  render();
+}
+function renderMobilityCard(){
+  const routine = currentMobilityRoutine();
+  let ex = data[routine];
+  if(!ex){
+    ex = data[routine] = newExerciseShell(routine);
+    persist();
+    enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name: routine } });
+  }
+  const chips = `<div class="routine-chips">${MOBILITY_ROUTINES.map(([n, label]) => {
+    const done = isLoggedToday(n);
+    return `<button type="button" class="routine-chip${n === routine ? " active" : ""}${done ? " done" : ""}" onclick="selectMobilityRoutine('${n}')" aria-pressed="${n === routine}">${label}${done ? " ✓" : ""}</button>`;
+  }).join("")}</div>`;
+  return renderChecklistCard(routine, ex, { title: MOBILITY_NAME, chips });
 }
 
 // Only used for the pill row's visual order - every other DAY_ORDER[day]
@@ -56,13 +98,32 @@ function renderDay(day){
   const customExercises = Object.keys(data).filter(k => k !== REHAB_NAME && !allDayNames().includes(k) && (data[k].day || "full") === day);
   // Shoulder Rehab leads every day's row while it is on, unnumbered so the lifts keep their numbers.
   const lead = modes.shoulder ? [REHAB_NAME] : [];
-  // Push-Ups, the pressing bridge, joins Upper and Full Body after the numbered lifts while it is on.
-  const bridge = modes.shoulder && (day === "upper" || day === "full") ? [PUSHUP_NAME] : [];
-  const list = lead.concat(getDisplayOrder(day), bridge, customExercises);
+  // Bridges join a day after its numbered lifts while their modifier is on: Push-Ups (Shoulder
+  // Rehab) on Upper and Full Body, Spanish Squat (Knee Care) on Lower and Full Body.
+  const bridge = [];
+  if(modes.shoulder && (day === "upper" || day === "full")) bridge.push(PUSHUP_NAME);
+  if(modes.knee && (day === "lower" || day === "full")) bridge.push(...KNEE_ONLY);
+  let list;
+  let groupRow = "";
+  if(day === "extra"){
+    // A routine opened directly (from history or the calendar) opens inside the Mobility card.
+    if(isMobilityRoutine(selected)){ mobilityRoutine = selected; selected = MOBILITY_NAME; }
+    const shown = selected === REHAB_NAME || extraList(extraGroupOf(selected)).includes(selected);
+    if(shown && selected !== REHAB_NAME) extraGroup = extraGroupOf(selected);
+    else if(!shown) selected = extraList(extraGroup)[0];
+    saveExtraPrefs();
+    groupRow = `<div class="group-row">${EXTRA_GROUPS.map(g => `<button type="button" class="group-chip${g.key === extraGroup ? " active" : ""}" onclick="selectExtraGroup('${g.key}')" aria-pressed="${g.key === extraGroup}">${g.label}${g.key === "mobility" && isLoggedToday(MOBILITY_NAME) ? " ✓" : ""}</button>`).join("")}</div>`;
+    list = lead.concat(extraList(extraGroup));
+  } else {
+    list = lead.concat(getDisplayOrder(day), bridge.filter(n => !getDisplayOrder(day).includes(n)), customExercises);
+  }
   if(selected === REHAB_NAME && !modes.shoulder) selected = activeDayOrder(day)[0];
 
-  let html = `<div class="pill-row" id="pill-scroll">`;
+  // Mobility is one card, so its group needs no pill of its own (only Shoulder Rehab, when on).
+  const hidePills = day === "extra" && extraGroup === "mobility" && !lead.length;
+  let html = groupRow + `<div class="pill-row" id="pill-scroll"${hidePills ? ' hidden' : ''}>`;
   list.forEach((name, i) => {
+    if(name === MOBILITY_NAME) return; // the group button stands in for it
     const loggedToday = isLoggedToday(name);
     // Preseason-flagged exercises get a light purple pill so they're
     // visible at a glance in the row, and a darker solid purple instead
@@ -70,7 +131,9 @@ function renderDay(day){
     const isPreseasonPill = modes.preseason && !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseason);
     const pillClasses = ['pill'];
     if(isPreseasonPill) pillClasses.push('preseason-pill');
-    if(name === REHAB_NAME || bridge.includes(name)) pillClasses.push('rehab-pill');
+    if(name === REHAB_NAME || (name === PUSHUP_NAME && bridge.includes(name))) pillClasses.push('rehab-pill');
+    if(day !== "extra" && KNEE_ONLY.has(name)) pillClasses.push('knee-pill');
+    if(name === MOBILITY_NAME) pillClasses.push('cat-stretch');
     if(day === "extra" && EXTRA_CATEGORY[name]) pillClasses.push('cat-' + EXTRA_CATEGORY[name]);
     if(selected===name) pillClasses.push('active');
     const skipped = !loggedToday && skipReason(name);
@@ -88,6 +151,10 @@ function renderDay(day){
   </div>`;
 
   if(DAY_ORDER[day].includes(selected) && !activeDayOrder(day).includes(selected)) selected = activeDayOrder(day)[0];
+  if(selected === MOBILITY_NAME){
+    app.innerHTML = html + renderMobilityCard();
+    return;
+  }
   let ex = selected === REHAB_NAME && modes.shoulder ? ensureRehabExercise() : data[selected];
   if(!ex && (DAY_ORDER[day].includes(selected) || bridge.includes(selected))){
     ex = data[selected] = newExerciseShell(selected);
@@ -177,13 +244,14 @@ function toggleStretchDetail(key){
   render();
 }
 
-function renderChecklistCard(name, ex){
+function renderChecklistCard(name, ex, opts){
   const routine = CHECKLIST_ROUTINES[name];
   const entry = ex.entries.find(e => e.date === todayISO());
   const completed = new Set(entry ? entry.completedIndices || [] : []);
 
   let html = `<div class="card">`;
-  html += `<h2 class="ex-name">${name}</h2>`;
+  html += `<h2 class="ex-name">${opts && opts.title || name}</h2>`;
+  if(opts && opts.chips) html += opts.chips;
   if(routine.intro) html += `<p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.8rem;">${routine.intro}</p>`;
 
   routine.items.forEach((item, idx) => {
@@ -405,7 +473,7 @@ function renderExerciseCard(name, ex){
   const first = hasEntries ? ex.entries[0] : null;
   const suggestion = computeSuggestion(ex, name);
   const skiActive = modes.ski && !!ex.targetRepsSki;
-  const kneeActive = modes.knee && KNEE_SENSITIVE_EXERCISES.has(name);
+  const kneeActive = modes.knee && (KNEE_SENSITIVE_EXERCISES.has(name) || KNEE_ONLY.has(name));
   const backActive = modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name);
   const preseasonActive = modes.preseason && !!ex.preseason;
   const deloadActive = modes.deload && ex.trackBy !== "duration";

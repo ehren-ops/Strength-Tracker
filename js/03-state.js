@@ -15,6 +15,14 @@ let lastSessionExpanded = false;
 let volumeExpanded = false;
 let openHistory = {};
 let openStretchItems = {};
+// Extra tab: the group last shown and the Mobility routine last picked, remembered on this device.
+const EXTRA_GROUP_KEY = "strength-tracker-extra-group";
+const MOBILITY_ROUTINE_KEY = "strength-tracker-mobility-routine";
+let extraGroup = (function(){ try{ return localStorage.getItem(EXTRA_GROUP_KEY) || "strength"; }catch(e){ return "strength"; } })();
+let mobilityRoutine = (function(){ try{ return localStorage.getItem(MOBILITY_ROUTINE_KEY) || ""; }catch(e){ return ""; } })();
+function saveExtraPrefs(){
+  try{ localStorage.setItem(EXTRA_GROUP_KEY, extraGroup); localStorage.setItem(MOBILITY_ROUTINE_KEY, mobilityRoutine); }catch(e){}
+}
 let chartQuarterOffset = {};
 let editingKey = null;
 let deletingKey = null; // history row whose ✕ is armed: the next tap on it deletes

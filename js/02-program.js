@@ -45,8 +45,26 @@ const DAY_ORDER = {
   extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Zone 2 Ride","Incline Treadmill Walk","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
 };
 const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
+// Shown only while Knee Care is on: on Extra, and after the numbered lifts on Lower and Full Body.
+const KNEE_ONLY = new Set(["Spanish Squat"]);
 function activeDayOrder(day){
-  return DAY_ORDER[day].filter(name => modes.preseason || !PRESEASON_ONLY.has(name));
+  return DAY_ORDER[day].filter(name => (modes.preseason || !PRESEASON_ONLY.has(name)) && (modes.knee || !KNEE_ONLY.has(name)));
+}
+// Extra shows one group at a time, picked from buttons above its row. Mobility is a single card
+// holding the stretch and core routines; each routine keeps its own history under its own name.
+const EXTRA_GROUPS = [
+  { key: "strength", label: "Strength" },
+  { key: "cardio", label: "Cardio" },
+  { key: "mobility", label: "Mobility" },
+  { key: "recovery", label: "Recovery" },
+];
+const MOBILITY_NAME = "Mobility";
+const MOBILITY_ROUTINES = [["Hip Stretch", "Hip"], ["Leg Stretch", "Leg"], ["Thoracic Spine Stretch", "Thoracic"], ["Full Body Stretch", "Full Body"], ["5-Minute Core Routine", "Core"]];
+function isMobilityRoutine(name){ return MOBILITY_ROUTINES.some(([n]) => n === name); }
+function extraGroupOf(name){
+  if(name === MOBILITY_NAME || isMobilityRoutine(name)) return "mobility";
+  const c = EXTRA_CATEGORY[name];
+  return c === "cardio" || c === "recovery" ? c : "strength"; // strength, Copenhagen Plank and custom Extra exercises
 }
 const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
 const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
@@ -92,6 +110,7 @@ const KNEE_CARE_TIP = {
   "Walking Lunge": "Shorter steps, less depth.",
   "Box Jumps": "Lower box, softer landing, slow step-down.",
   "Skater Bound": "Shorter bound, skip the landing hold.",
+  "Spanish Squat": "Tendon-friendly squat: 3x10 with a 3 sec hold at the bottom. Before squats or on off days.",
 };
 const LOW_BACK_CARE_TIP = {
   "Squat": "Lighter load or less depth.",
@@ -323,6 +342,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v81";
+const APP_VERSION = "v82";
 const APP_UPDATED = "Oct 14, 2026";
 
