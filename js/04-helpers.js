@@ -170,7 +170,7 @@ function repLabel(sets, reps, unit){
 }
 
 function formatEntryValue(e, ex){
-  if(ex.trackBy === "weight") return `${e.weight}lbs ${repLabel(e.sets, e.reps, ex.unit)}`;
+  if(ex.trackBy === "weight") return `${e.weight} lb ${repLabel(e.sets, e.reps, ex.unit)}`;
   if(ex.trackBy === "duration"){
     let s = `${e.minutes} min`;
     if(e.distance != null && e.distance !== "") s += `, ${e.distance} mi`;

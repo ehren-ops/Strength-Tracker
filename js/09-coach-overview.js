@@ -690,7 +690,7 @@ function renderOverview(){
       const pctText = pct === null ? "-" : `${pct>0?'+':''}${pct.toFixed(0)}%`;
       html += `<div class="session-row">
         <span>${DAY_TITLES[day]}</span>
-        <span class="exact">${latest !== null ? latest.toLocaleString()+" lbs" : "-"}</span>
+        <span class="exact">${latest !== null ? latest.toLocaleString()+" lb" : "-"}</span>
         <span class="exact" style="color:${pctColor};">${pctText}</span>
       </div>`;
     });
@@ -701,7 +701,7 @@ function renderOverview(){
       html += `<div style="margin-top:0.9rem;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
           <span style="font-weight:600;font-size:0.85rem;">${DAY_TITLES[day]}</span>
-          ${history.length ? `<span style="font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.76rem;color:var(--slate);">${history[history.length-1].weight.toLocaleString()} lbs last session</span>` : ''}
+          ${history.length ? `<span style="font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.76rem;color:var(--slate);">${history[history.length-1].weight.toLocaleString()} lb last session</span>` : ''}
         </div>`;
       if(history.length){
         html += renderChart({ trackBy:"weight", entries: history }, null, false, "volume:" + day);
@@ -733,7 +733,7 @@ function renderOverview(){
       const width = Math.min(Math.abs(o.pct),100);
       const freq = frequencyLabel(data[o.name]);
       html += `<div class="bar-row">
-        <div class="top"><span style="font-weight:500;">${o.name}</span><span style="font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.72rem;color:${color};">${o.pct>0?'+':''}${o.pct.toFixed(0)}% · ${o.firstVal}→${o.lastVal}${o.trackBy==='weight'?'lbs':' reps'}</span></div>
+        <div class="top"><span style="font-weight:500;">${o.name}</span><span style="font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.72rem;color:${color};">${o.pct>0?'+':''}${o.pct.toFixed(0)}% · ${o.firstVal}→${o.lastVal}${o.trackBy==='weight'?' lb':' reps'}</span></div>
         <div class="bar-track"><div class="bar-fill" style="width:${width}%;background:${color};"></div></div>
         ${freq ? `<div style="font-size:0.66rem;color:var(--slate);margin-top:0.15rem;">${freq}</div>` : ''}
       </div>`;

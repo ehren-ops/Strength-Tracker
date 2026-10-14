@@ -279,7 +279,7 @@ async function main(){
   const recBox = await page.textContent('.rec-box');
   console.log('recommendation shown:', recBox.replace(/\s+/g, ' ').trim());
   if(!recBox.toLowerCase().includes('tender')) throw new Error('expected the concerning note to be surfaced in the recommendation, got: ' + recBox);
-  const nextWeightMatch = recBox.match(/Next(?: time)?:\s*(\d+)\s*lbs/);
+  const nextWeightMatch = recBox.match(/Next(?: time)?:\s*(\d+)\s*lb\b/);
   if(!nextWeightMatch || Number(nextWeightMatch[1]) !== 150) throw new Error('expected next weight to hold at 150 despite two clean hits, got: ' + (nextWeightMatch && nextWeightMatch[1]));
   console.log('OK: progression held at 150 lbs and the note was surfaced, instead of blindly advancing on reps/RPE alone');
 
@@ -422,7 +422,7 @@ async function main(){
   await page.click('button.log:has-text("Log set")');
   const careRec = await page.textContent('.rec-box');
   console.log('recommendation shown:', careRec.replace(/\s+/g, ' ').trim());
-  const careNextMatch = careRec.match(/Next(?: time)?:\s*(\d+(?:\.\d+)?)\s*lbs/);
+  const careNextMatch = careRec.match(/Next(?: time)?:\s*(\d+(?:\.\d+)?)\s*lb\b/);
   if(!careNextMatch || Number(careNextMatch[1]) !== 45) throw new Error('expected next weight to be cut to 45 lbs (10% off 50), got: ' + (careNextMatch && careNextMatch[1]));
   if(!careRec.includes('Knee Care: ~10% lighter, holding')) throw new Error('expected the knee care message in the recommendation');
   const tipText = await page.locator('.knee-care-line').textContent();
@@ -441,7 +441,7 @@ async function main(){
   const deloadRec = await page.textContent('.rec-box');
   console.log('recommendation shown:', deloadRec.replace(/\s+/g, ' ').trim());
   if(!deloadRec.includes('sessions straight')) throw new Error('expected the deload message to win over the knee/back care message, got: ' + deloadRec);
-  const deloadNextMatch = deloadRec.match(/Next(?: time)?:\s*(\d+(?:\.\d+)?)\s*lbs/);
+  const deloadNextMatch = deloadRec.match(/Next(?: time)?:\s*(\d+(?:\.\d+)?)\s*lb\b/);
   if(!deloadNextMatch || Number(deloadNextMatch[1]) !== 170) throw new Error('expected the standard 15% deload (170 lbs from 200), not the 10% care-mode cut, got: ' + (deloadNextMatch && deloadNextMatch[1]));
   console.log('OK: deload logic still wins over care-mode reduction when both would apply');
 
@@ -467,7 +467,7 @@ async function main(){
   if(await page.locator('.plate-line').count() !== 1) throw new Error('expected plate math on Squat');
   const plateText = await page.locator('.plate-line').textContent();
   console.log('Squat plate line:', plateText.trim());
-  if(!plateText.includes('Load:')) throw new Error('expected "Load:" plate text on Squat, got: ' + plateText);
+  if(!plateText.includes('Load ')) throw new Error('expected "Load:" plate text on Squat, got: ' + plateText);
 
   await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
   if(await page.locator('.plate-line').count() !== 1) throw new Error('expected plate math on Bench Press');
@@ -1827,7 +1827,7 @@ async function main(){
       pool: guidancePools.flat(), next: sug.weight, e1rm: trend.e1rmChange4WeeksPct, sessions: trend.sessionsLast4Weeks };
   });
   const wantE1 = Math.round((175 * (1 + 8 / 30) - 165 * (1 + 8 / 30)) / (165 * (1 + 8 / 30)) * 1000) / 10;
-  if(!/^157\.5 lbs/.test(afterDeload.big) || !/Logged today/.test(afterDeload.label) || !/^Last: 175 lb$/.test(afterDeload.corner || '') || afterDeload.since !== '+10 since first' || !/^222 lbs/.test(afterDeload.onerm) || afterDeload.next !== 180
+  if(!/^157\.5 lb/.test(afterDeload.big) || !/Logged today/.test(afterDeload.label) || !/^Last: 175 lb$/.test(afterDeload.corner || '') || afterDeload.since !== '+10 lb since first' || !/^222 lb/.test(afterDeload.onerm) || afterDeload.next !== 180
     || !afterDeload.pool.includes('Last full session: 175 lb, 3x8 at RPE 7.') || !afterDeload.pool.includes('Deload last time: 157.5 lb, 2x8.')
     || afterDeload.e1rm !== wantE1 || afterDeload.sessions !== 3) throw new Error('expected the card to stand on the last full session after a deload, got: ' + JSON.stringify(afterDeload));
   console.log('OK: with a deload logged today the card shows it as today\'s locked-in 157.5, "Last: 175" in the corner, +10 since first, Est. 1RM 222 and next 180, with the deload named, not a drop');
@@ -2058,11 +2058,11 @@ async function main(){
     return { bss: read('Bulgarian Split Squat'), squat: read('Squat'), fly: read('Cable Chest Fly'), copen: read('Copenhagen Plank'),
       walk: read('Walking Lunge'), lateral: read('Lateral Lunge'), walkUnits: sidesText('Walking Lunge') };
   });
-  if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lbs\/hand · 3x8\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
-  if(!sides.squat.labels.includes('Lb total') || !/^\d+ lbs · 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
+  if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lb\/hand · 3x8\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
+  if(!sides.squat.labels.includes('Lb total') || !/^\d+ lb · 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
   if(!sides.fly.labels.includes('Lb / hand')) throw new Error('expected Cable Chest Fly labeled per hand (each stack), got: ' + JSON.stringify(sides.fly));
   if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
-  if(!sides.walk.labels.includes('Lb / hand') || !sides.walk.labels.includes('Steps total') || !/lbs\/hand · 3x8 steps/.test(sides.walk.next) || !/total steps/.test(sides.walkUnits)) throw new Error('expected Walking Lunge per hand with total steps, got: ' + JSON.stringify([sides.walk, sides.walkUnits]));
+  if(!sides.walk.labels.includes('Lb / hand') || !sides.walk.labels.includes('Steps total') || !/lb\/hand · 3x8 steps/.test(sides.walk.next) || !/total steps/.test(sides.walkUnits)) throw new Error('expected Walking Lunge per hand with total steps, got: ' + JSON.stringify([sides.walk, sides.walkUnits]));
   if(!sides.lateral.labels.includes('Reps / side') || !/3x8\/side/.test(sides.lateral.next)) throw new Error('expected Lateral Lunge reps per side, got: ' + JSON.stringify(sides.lateral));
   console.log('OK: Bulgarian Split Squat reads lb/hand and reps/leg, Squat lb total, Cable Chest Fly lb/hand, Copenhagen Plank seconds/side, Walking Lunge total steps, Lateral Lunge reps/side');
 
@@ -2212,8 +2212,8 @@ async function main(){
       big: div.querySelector('.big-val').textContent, label: div.querySelector('.big-label').textContent, plan: div.querySelector('.rec-plan').textContent, load: div.querySelector('.rec-load').textContent,
       next: w && w.nextElementSibling && w.nextElementSibling.className };
   });
-  if(!head.cornerInTitle || !/^Last: 175 lb$/.test(head.corner) || !head.deltaInHistory || head.text !== '+10 since first' || head.label !== 'Today' || !/^180 lbs/.test(head.big)
-    || head.plan !== '3x8 · +5 lbs' || !/^Load: 180 lb · /.test(head.load) || head.next !== 'rec-box') throw new Error('expected today\'s 180 big, "Last: 175" top right, "3x8 · +5 lbs", the load total before the plates and +10 since first in Recent History, got: ' + JSON.stringify(head));
+  if(!head.cornerInTitle || !/^Last: 175 lb$/.test(head.corner) || !head.deltaInHistory || head.text !== '+10 lb since first' || head.label !== 'Today' || !/^180 lb/.test(head.big)
+    || head.plan !== '3x8 · +5 lb' || !/^Load 180 lb = /.test(head.load) || head.next !== 'rec-box') throw new Error('expected today\'s 180 big, "Last: 175" top right, "3x8 · +5 lbs", the load total before the plates and +10 since first in Recent History, got: ' + JSON.stringify(head));
   console.log('OK: TODAY 180 lbs, "' + head.corner + '" top right, "' + head.plan + '", "' + head.load + '", and +10 since first in the Recent History heading');
 
   console.log('=== 76: heart rate per lift arrives after the fact and shows in history, the breakdown and the Next tile ===');

@@ -187,7 +187,7 @@ function render1RMInline(name, ex, last){
   const label = ex.actual1RM ? "1RM (actual)" : "Est. 1RM";
   return `<div class="onerm-box" onclick="start1RM('${name.replace(/'/g,"\\'")}')">
     <span class="onerm-label">${label}</span>
-    <span class="onerm-val">${oneRM} lbs ✎</span>
+    <span class="onerm-val">${oneRM} lb ✎</span>
   </div>`;
 }
 
@@ -317,7 +317,7 @@ function guidanceHtml(msg, pool){
 }
 function composeGuidance(msg, name, ex, last, work){
   return guidanceHtml(msg, [
-    ...noteInsights(ex.entries), lastSessionLine(ex, work), deloadSessionLine(ex, last), hrLine(name, last), ...trendLine(name, ex),
+    lastSessionLine(ex, work), ...noteInsights(ex.entries), deloadSessionLine(ex, last), hrLine(name, last), ...trendLine(name, ex),
     bestLine(ex, work), progressionRule(name, ex), effortLine(ex), daysSinceLine(last), LOG_TIMING_TIP, NOTE_TIP,
   ]);
 }
@@ -437,13 +437,14 @@ function loadText(name, ex, sug){
     return parts.length ? `Last setting: ${parts.join(" · ")}` : "Conversational pace";
   }
   if(ex.trackBy === "reps") return sug && sug.powerHold ? "Bodyweight: go higher or farther, not more reps" : "Bodyweight";
-  if(!sug) return ex.equipment === "barbell" ? "Load: plates shown after your first log" : sidesOf(name).weight === "hand" ? "Load: weight in each hand" : "Load: total weight";
+  if(!sug) return ex.equipment === "barbell" ? "Plates show after your first log" : sidesOf(name).weight === "hand" ? "Load is the weight in each hand" : "Load is the total weight";
   const w = sug.weight;
   if(!(w > 0)) return "Bodyweight";
-  if(ex.equipment === "barbell") return `Load: ${w} lb · ${platesLabel(w, ex.equipment)}`;
+  // The total first, then how it's made: "Load 180 lb = 1×45 + 2×10 + 1×2.5 per side".
+  if(ex.equipment === "barbell") return `Load ${w} lb = ${platesLabel(w, ex.equipment).replace("No plates needed", "the bar alone")}`;
   const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;
-  if(maxW) return `Load: one ${w} lb bell${w >= maxW ? " (heaviest available)" : ""}`;
-  return sidesOf(name).weight === "hand" ? `Load: ${w} lb in each hand` : `Load: ${w} lb total`;
+  if(maxW) return `Load ${w} lb = one bell${w >= maxW ? " (heaviest available)" : ""}`;
+  return sidesOf(name).weight === "hand" ? `Load ${w} lb in each hand` : `Load ${w} lb total`;
 }
 
 let lastDateShown = false;
@@ -462,10 +463,10 @@ function planShape(name, ex, s){
   if(ex.trackBy === "reps") return `${s.sets} sets`;
   return "";
 }
-// Today against the last full session: +5 lbs, −15 lbs, +2 reps, +5 min, or same.
+// Today against the last full session: +5 lb, −15 lb, +2 reps, +5 min, or same.
 function stepText(ex, s, prior){
   if(!prior) return "";
-  const [d, unit] = ex.trackBy === "weight" ? [s.weight - prior.weight, "lbs"]
+  const [d, unit] = ex.trackBy === "weight" ? [s.weight - prior.weight, "lb"]
     : ex.trackBy === "duration" ? [s.minutes - prior.minutes, "min"] : [s.reps - prior.reps, ex.unit === "sec" ? "sec" : "reps"];
   if(!isFinite(d)) return "";
   const n = Math.round(Math.abs(d) * 10) / 10;
@@ -511,8 +512,8 @@ function renderExerciseCard(name, ex){
   const delta = ex.entries.length > 1
     ? (ex.trackBy==="weight" ? work.weight-first.weight : ex.trackBy==="duration" ? work.minutes-first.minutes : work.reps-first.reps)
     : 0;
-  const deltaColor = delta>0 ? "color:var(--emerald)" : delta<0 ? "color:var(--amber)" : "color:var(--slate)";
-  const deltaHtml = ex.entries.length > 1 && !recovery ? `<span class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</span>` : "";
+  const deltaUnit = ex.trackBy === "weight" ? "lb" : ex.trackBy === "duration" ? "min" : ex.unit === "sec" ? "sec" : "reps";
+  const deltaHtml = ex.entries.length > 1 && !recovery ? `<span class="delta-line ${delta > 0 ? "delta-up" : delta < 0 ? "delta-down" : ""}">${delta>0?'+':''}${delta} ${deltaUnit} since first</span>` : "";
   // The big number is the weight to lift today, or what was logged today once it is. The top right
   // keeps the last day a full session was lifted, before today, so the two never get mixed up.
   const today = todayISO();
@@ -568,7 +569,7 @@ function renderExerciseCard(name, ex){
     html += renderTips(name);
   } else {
     const sideTag = s => s ? `<span class="side-tag">${s}</span>` : "";
-    const bigOf = v => ex.trackBy==="weight" ? v.weight+" lbs" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
+    const bigOf = v => ex.trackBy==="weight" ? v.weight+" lb" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
       : ex.trackBy==="duration" ? v.minutes+" min" + (v.tempF != null ? sideTag(` ${v.tempF}°F`) : "") : v.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
     let bigVal, bigLabel;
     if(recovery){ bigVal = bigOf(work); bigLabel = "Last"; }
@@ -592,7 +593,7 @@ function renderExerciseCard(name, ex){
       let msg;
       let nextLabel;
       if(ex.trackBy === "weight"){
-        nextLabel = `<b>${suggestion.weight} lbs${weightSuffix(name)}</b> · ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}${repsSuffix(name)}`;
+        nextLabel = `<b>${suggestion.weight} lb${weightSuffix(name)}</b> · ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}${repsSuffix(name)}`;
         // When the prior session's actual reps beat the target, call that out by
         // name with the real number instead of flattening it to a plain "hit
         // target" - going over is a stronger, more specific signal than a bare hit.
@@ -689,7 +690,7 @@ function renderExerciseCard(name, ex){
       if(todayLog) headline = `Next time: ${nextLabel}`;
       else if(suggestion.shoulderPaused) headline = "Paused today";
       else headline = [planShape(name, ex, suggestion), stepText(ex, suggestion, prior)].filter(Boolean).join(" · ");
-      recHtml = renderNextTile(headline, ex, composeGuidance(msg, name, ex, last, work), suggestion.shoulderPaused ? "Load: none today" : loadText(name, ex, suggestion));
+      recHtml = renderNextTile(headline, ex, composeGuidance(msg, name, ex, last, work), suggestion.shoulderPaused ? "No load today" : loadText(name, ex, suggestion));
     }
 
     // Recovery: this week's total and the last session instead of a plan and a graph.

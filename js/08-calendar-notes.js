@@ -217,7 +217,7 @@ function generateCoachNotes(){
     sentences.push(`${names} moved up in weight and still landed it - good sign, keep building there.`);
   }
   if(missed.length){
-    const names = missed.slice(0,2).map(i => i.ex.trackBy==="weight" ? `${i.name} (${i.entry.weight}lbs)` : i.name).join(" and ");
+    const names = missed.slice(0,2).map(i => i.ex.trackBy==="weight" ? `${i.name} (${i.entry.weight} lb)` : i.name).join(" and ");
     sentences.push(`${names} missed target - hold steady there next time instead of adding more.`);
   }
   if(concerns.length){

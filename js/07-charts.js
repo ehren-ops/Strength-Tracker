@@ -158,7 +158,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     const x1 = xAt(points.length-1), y1 = yAt(lastP.y);
     const x2 = xAt(points.length), y2 = yAt(projY);
     svg += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="var(--chart-line)" stroke-width="2" stroke-dasharray="5 4"/>`;
-    const projLabel = ex.trackBy==="weight" ? `${suggestion.weight}lbs ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}` : ex.trackBy==="duration" ? `${suggestion.minutes} min` : repLabel(suggestion.sets,suggestion.reps,ex.unit);
+    const projLabel = ex.trackBy==="weight" ? `${suggestion.weight} lb ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}` : ex.trackBy==="duration" ? `${suggestion.minutes} min` : repLabel(suggestion.sets,suggestion.reps,ex.unit);
     svg += `<circle cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="4" fill="var(--chart-white)" stroke="var(--chart-line)" stroke-width="2"><title>Suggested next: ${projLabel}</title></circle>`;
     svg += `<text x="${x2.toFixed(1)}" y="${H-4}" font-size="8" fill="var(--chart-line)" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">Next</text>`;
   }
