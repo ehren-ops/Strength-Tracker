@@ -60,6 +60,26 @@ const MODIFIER_TAGS = [
   { key: "preseason", re: /\bpreseason\b/i, label: "Preseason", color: "var(--preseason)" },
   { key: "ski", re: /\bski( season)?\b/i, label: "Ski", color: "var(--ski)" },
 ];
+// The tags a lift's sessions carry while a modifier is on and changes or notes that lift (the same
+// lifts that show its badge), in a fixed order: "Deload, Rehab, Knee Care". Pre-filled in the
+// note and kept on log, so history, the graph and the coach all see which sessions were planned.
+function activeModifierTags(name, ex){
+  if(!ex || ex.trackBy === "checklist" || isRecovery(name)) return [];
+  const on = [];
+  if(modes.deload && ex.trackBy !== "duration") on.push("deload");
+  if(isShoulderModified(name)) on.push("shoulder");
+  if(modes.knee && (KNEE_SENSITIVE_EXERCISES.has(name) || KNEE_ONLY.has(name))) on.push("knee");
+  if(modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name)) on.push("back");
+  if(modes.preseason && ex.preseason) on.push("preseason");
+  if(modes.ski && ex.targetRepsSki) on.push("ski");
+  return on.map(k => MODIFIER_TAGS.find(t => t.key === k));
+}
+// Adds whichever of these tags the note is missing, in front of what was typed.
+function withModifierTags(note, tags){
+  const n = (note || "").trim();
+  const missing = tags.filter(t => !t.re.test(n)).map(t => t.label);
+  return missing.length ? [...missing, n].filter(Boolean).join(", ") : n;
+}
 function modifierTag(entry){
   if(entry.deload) return MODIFIER_TAGS[0];
   const note = entry.note || "";
@@ -131,12 +151,17 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     // A Deload Week session (tagged when logged with the modifier on) is planned, so it gets its own
     // diamond in the Deload badge color instead of the short-set or missed-rep flag its lighter load
     // and fewer sets would otherwise earn.
-    const tag = isRealExercise ? modifierTag(p.entry) : null;
+    const tagged = isRealExercise ? modifierTag(p.entry) : null;
+    // Preseason and Ski change the target reps rather than the load, so their sessions are judged
+    // against that target: hit it and it's their diamond, fall short and it's still a miss.
+    const modTarget = tagged && tagged.key === "preseason" && ex.targetRepsPreseason ? ex.targetRepsPreseason
+      : tagged && tagged.key === "ski" && ex.targetRepsSki ? ex.targetRepsSki : null;
+    const tag = tagged && !(modTarget && p.entry.reps < modTarget) ? tagged : null;
     const isPlanned = !!tag;
     const isDeload = !isPlanned && deloadFlags[i];
     // A set logged with Preseason Prep on is judged against the preseason target (Squat: 5 reps,
     // 4 sec lowering): fewer reps on purpose, drawn in the Preseason badge color, not as a miss.
-    const targetReps = entryTargetReps(ex, p.entry);
+    const targetReps = modTarget || entryTargetReps(ex, p.entry);
     const isUnder = isRealExercise && !isPlanned && !isDeload && ex.trackBy !== "duration" && p.entry.sets < 3;
     const isMissed = isRealExercise && !isPlanned && !isDeload && !isUnder && ex.trackBy !== "duration" && p.entry.reps < targetReps;
     const isPreseason = isRealExercise && !isPlanned && !isDeload && !isUnder && !isMissed && !!p.entry.preseason && !!ex.targetRepsPreseason;

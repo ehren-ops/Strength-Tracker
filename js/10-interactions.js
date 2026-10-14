@@ -115,10 +115,11 @@ function logEntry(){
       note: (noteEl.value || "").trim(),
     };
   }
-  if(modes.deload && ex.trackBy !== "duration"){ entry.deload = true; entry.note = withDeloadNote(entry.note); }
+  if(modes.deload && ex.trackBy !== "duration") entry.deload = true;
+  // Every modifier on for this lift keeps its tag in the note, in front of whatever was typed.
+  entry.note = withModifierTags(entry.note, activeModifierTags(selected, ex));
   // Logged at the preseason target (Squat: 5 reps, 4 sec lowering), so charts judge it against that.
   if(modes.preseason && ex.targetRepsPreseason && ex.trackBy !== "duration") entry.preseason = true;
-  if(isShoulderModified(selected) && entry.date >= (shoulderRehab.startedOn || entry.date)) entry.note = withRehabNote(entry.note);
   // When it was logged, so a session's actual exercise order can be compared with the planned one.
   entry.loggedAt = new Date().toISOString();
   ex.entries.push(entry);

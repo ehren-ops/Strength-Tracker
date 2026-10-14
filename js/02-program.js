@@ -123,34 +123,34 @@ const LOW_BACK_CARE_TIP = {
 // One form pointer and one swap per exercise, shown under the Next box. Kept to a few words each
 // so the card stays short. The swap is for a busy station or an off day for that joint.
 const EXERCISE_TIPS = {
-  "Squat": ["Brace, knees track over toes, hips and chest rise together.", "Goblet squat or leg press."],
-  "Bench Press": ["Shoulder blades pinned, bar to lower chest, feet driving.", "DB bench or Smith bench."],
-  "Incline DB Press": ["30-45° bench, elbows about 45°, control the bottom.", "Landmine press or incline Smith press."],
-  "RDL": ["Soft knees, hips back, bar close to the legs, flat back.", "DB RDL or cable pull-through."],
+  "Squat": ["Brace, knees out, hips and chest rise as one.", "Goblet squat or leg press."],
+  "Bench Press": ["Blades pinned, forearms vertical, legs drive.", "DB bench or Smith bench."],
+  "Incline DB Press": ["30-45° bench, elbows ~45°, control the bottom.", "Landmine press or incline Smith press."],
+  "RDL": ["Soft knees, hips back, bar on legs, flat back.", "DB RDL or cable pull-through."],
   "Bulgarian Split Squat": ["Slight forward lean, drive through the front heel.", "Reverse lunge or split squat, back foot down."],
-  "Hip Thrust": ["Upper back on the bench, ribs down, 1 sec squeeze at the top.", "Floor glute bridge with the bar, or Smith hip thrust."],
-  "Barbell Row": ["Hinge about 45°, brace, pull to the lower ribs, no jerk.", "Chest-supported DB row or seated cable row."],
+  "Hip Thrust": ["Upper back on bench, ribs down, 1 sec squeeze.", "Floor glute bridge with the bar, or Smith hip thrust."],
+  "Barbell Row": ["Hinge ~45°, brace, pull to low ribs, no jerk.", "Chest-supported DB row or seated cable row."],
   "Cable Chest Fly": ["Soft elbows locked in place, squeeze at the middle.", "DB fly or pec deck."],
-  "Face Pulls": ["Rope to the eyes, elbows high, thumbs back at the end.", "Band pull-apart or reverse fly."],
-  "Back Extension": ["Hinge at the hips, squeeze glutes, stop at a straight line.", "Reverse hyper or light good morning."],
+  "Face Pulls": ["Rope to eyes, elbows high, thumbs back.", "Band pull-apart or reverse fly."],
+  "Back Extension": ["Hinge at hips, squeeze glutes, stop level.", "Reverse hyper or light good morning."],
   "Seated Calf Raise": ["Full stretch at the bottom, 1 sec pause, slow lower.", "Smith seated calf raise or DB on the knees."],
-  "Cable Lat Pulldown": ["Chest up, elbows to back pockets, no swinging back.", "Assisted pull-up or single-arm pulldown."],
+  "Cable Lat Pulldown": ["Chest up, elbows to back pockets, no swing.", "Assisted pull-up or single-arm pulldown."],
   "Bicep Curl": ["Elbows pinned, no swing, slow on the way down.", "Hammer curl or cable curl."],
   "Tricep Pushdown": ["Elbows tucked, full lockout, control the return.", "Overhead cable extension or close-grip push-up."],
-  "Med Ball Slam": ["Reach tall, slam with the hips and abs, every rep fast.", "Kettlebell swing or rope slams."],
+  "Med Ball Slam": ["Reach tall, slam with hips and abs, fast reps.", "Kettlebell swing or rope slams."],
   "Kettlebell Swings": ["Hinge, not squat; snap the hips, arms only guide.", "Cable pull-through or DB swing."],
   "Walking Lunge": ["Long step, back knee near the floor, torso tall.", "Reverse lunge in place or step-ups."],
   "Standing Calf Raise": ["Straight knees, full stretch, pause at the top.", "Smith or leg-press calf raise."],
   "Box Jumps": ["Land soft and quiet in a half squat, step down.", "Squat jumps or fast low step-ups."],
-  "Lateral Lunge": ["Sit back into the bent hip, other leg straight, chest up.", "Cossack squat or lateral band walk."],
+  "Lateral Lunge": ["Sit into bent hip, other leg straight, chest up.", "Cossack squat or lateral band walk."],
   "Trap Bar Jump": ["Jump tall, land soft, reset before each rep.", "DB jump or bodyweight squat jump."],
   "Skater Bound": ["Push sideways off the outside leg, stick the landing.", "Lateral line hops or lateral step-ups."],
-  "Spanish Squat": ["3x10 banded: band behind the knees, sit straight down, 3 sec hold.", "Wall sit or slow box squat."],
-  "Push-Ups": ["Hands about shoulder width, elbows about 45°, body in one straight line.", "Incline push-up on a bench, or from the knees."],
+  "Spanish Squat": ["Band behind knees, sit straight down, 3 sec hold.", "Wall sit or slow box squat."],
+  "Push-Ups": ["Hands shoulder width, elbows ~45°, body straight.", "Incline push-up on a bench, or from the knees."],
   "Farmer's Carry": ["Tall posture, shoulders packed, short quick steps.", "Suitcase carry or trap bar hold."],
   "Dead Hang": ["Active shoulders, full grip, steady breathing.", "Assisted hang with feet on a box."],
   "Copenhagen Plank": ["Hips high, body straight, top leg does the work.", "Knee-on-bench version or side plank."],
-  "Lateral Raise": ["Slight lean, lead with the elbows, stop at shoulder height.", "Cable or machine lateral raise."],
+  "Lateral Raise": ["Slight lean, lead with elbows, stop at shoulder.", "Cable or machine lateral raise."],
   "Zone 2 Ride": ["Conversational pace, steady cadence.", "Rower or incline walk at the same effort."],
   "Incline Treadmill Walk": ["No handrails, tall posture, steady pace.", "Stair climber or Zone 2 bike."],
 };
@@ -342,6 +342,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v89";
+const APP_VERSION = "v90";
 const APP_UPDATED = "Oct 14, 2026";
 

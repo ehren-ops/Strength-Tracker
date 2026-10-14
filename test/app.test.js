@@ -2618,6 +2618,34 @@ async function main(){
     || !['Rehab', 'Knee Care', 'Deload', 'Preseason'].every(l => r84.labels.includes(l))) throw new Error('expected modifier diamonds for tagged sessions and a red flag only for the untagged miss, got: ' + JSON.stringify(r84));
   console.log('OK: Rehab, Knee Care, Deload and Preseason sessions get their own colored diamonds; only the untagged "tender knee" miss stays red');
 
+  console.log('=== 85: every modifier on for a lift pre-fills its tag in the note and keeps it on log ===');
+  const r85 = await page.evaluate(() => {
+    const savedModes = JSON.stringify(modes), savedBss = data['Bulgarian Split Squat'];
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const note = n => { view = 'lower'; selected = n; render(); return document.getElementById('f-note').value; };
+    const out = { off: note('Squat') };
+    modes.knee = true; modes.back = true;
+    out.squatCare = note('Squat');
+    out.rdl = note('RDL');
+    modes.knee = false; modes.back = false; modes.preseason = true; modes.ski = true; modes.deload = true;
+    out.squatAll = note('Squat');
+    out.calf = note('Standing Calf Raise');
+    modes.preseason = false; modes.ski = false; modes.deload = false; modes.knee = true;
+    data['Bulgarian Split Squat'] = Object.assign(newExerciseShell('Bulgarian Split Squat'), { entries: [] });
+    note('Bulgarian Split Squat');
+    document.getElementById('f-weight').value = '40'; document.getElementById('f-sets').value = '3'; document.getElementById('f-reps').value = '8';
+    document.getElementById('f-note').value = 'felt solid';
+    logEntry();
+    out.logged = data['Bulgarian Split Squat'].entries[0].note;
+    data['Bulgarian Split Squat'] = savedBss;
+    Object.assign(modes, JSON.parse(savedModes)); render();
+    return out;
+  });
+  const ok85 = r85.off === '' && r85.squatCare === 'Knee Care, Back Care' && r85.rdl === 'Back Care' &&
+    r85.squatAll === 'Deload, Preseason, Ski' && r85.calf === 'Deload, Preseason' && r85.logged === 'Knee Care, felt solid';
+  if(!ok85) throw new Error('expected each modifier on for a lift to pre-fill its tag, got: ' + JSON.stringify(r85));
+  console.log('OK: Squat pre-fills "Knee Care, Back Care", RDL "Back Care", Squat "Deload, Preseason, Ski"; a typed note logs as "' + r85.logged + '"');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

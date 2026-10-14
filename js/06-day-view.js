@@ -612,7 +612,7 @@ function renderExerciseCard(name, ex){
           const h = suggestion.shoulderHold;
           msg = name === "Bicep Curl"
             ? `Shoulder Rehab: hammer curls only at ${suggestion.weight} lb, lower over 3 sec. No adding weight yet.`
-            : `Rehab: ${suggestion.weight} lb${h.fullWeight ? ` (${Math.round(h.pct * 100)}% of ${h.fullWeight})` : ""}, close grip, short of the chest. Hold until phase 3.`;
+            : `Rehab: ${suggestion.weight} lb${h.fullWeight ? ` (${Math.round(h.pct * 100)}% of ${h.fullWeight})` : ""}, medium grip, short of the chest. Hold until phase 3.`;
         } else if(suggestion.shoulderBuild && !suggestion.deloadWeek){
           msg = `Shoulder Rehab phase 3: full range, ${suggestion.weight} lb. Add 5 lb a session at 3 of 10 or less, up to ${suggestion.shoulderBuild.fullWeight} lb.`;
         } else if(suggestion.shoulderReturn && !suggestion.deloadWeek){
@@ -964,7 +964,7 @@ function renderForm(name, ex){
   html += `</div>`;
   if(plan) html += `<p class="prefill-note">${mods.length ? `Pre-filled: ${mods.join(", ")} plan` : "Pre-filled: next progression"}</p>`;
   html += `<div class="form-row">
-    ${ex.trackBy === "duration" && !recovery ? rpeField : ""}<div class="field field-note"><input type="text" id="f-note" aria-label="Note" value="${[modes.deload && ex.trackBy !== "duration" && DELOAD_NOTE, isShoulderModified(name) && REHAB_NOTE].filter(Boolean).join(", ")}" placeholder="${recovery ? 'Note, e.g. after lifting' : ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
+    ${ex.trackBy === "duration" && !recovery ? rpeField : ""}<div class="field field-note"><input type="text" id="f-note" aria-label="Note" value="${withModifierTags("", activeModifierTags(name, ex))}" placeholder="${recovery ? 'Note, e.g. after lifting' : ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
   </div>`;
   html += `<div class="date-log-row">
     <div class="field"><input type="date" id="f-date" aria-label="Date" value="${todayISO()}"></div>

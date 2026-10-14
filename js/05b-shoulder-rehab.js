@@ -18,7 +18,7 @@ const RIGHT_PRESS_TIP = "Right arm: single-arm DB floor press or landmine press 
 // Held lifts start at a share of the last working weight from before rehab and stay there.
 const SHOULDER_HOLD_PCT = { "Bench Press": 0.85, "Bicep Curl": 0.7 };
 const SHOULDER_CARE_TIP = {
-  "Bench Press": "About 85% of your pre-rehab weight, close grip, stop 2-3 in short of the chest (pins or a board). Over 3 of 10: drop 10 lb, or stop until phase 3. Incline push-ups or a right-arm DB floor press keep pressing trained.",
+  "Bench Press": "85% of pre-rehab weight, medium grip (forearms vertical), elbows ~45°, stop 2-3 in above the chest. Over 3 of 10: drop 10 lb. Incline push-ups or a right-arm DB floor press also work.",
   "Bicep Curl": "Hammer curls only, both arms, light, lower over 3 seconds. Skip if the front of the left shoulder aches.",
 };
 const SHOULDER_PAUSED_TIP = "Paused for Shoulder Rehab. Back once the side-raise press is pain-free.";
@@ -243,7 +243,7 @@ function renderRehabCard(){
 
   const paused = [...SHOULDER_PAUSED].filter(n => data[n] || allDayNames().includes(n));
   if(week < HAMMER_FROM_WEEK) paused.push("Bicep Curl for the left arm (hammer curls from week 3)");
-  html += `<div class="rehab-hold"><b>Paused in the app:</b> ${paused.join(", ")}. <b>Bench:</b> ${phase === 3 ? "full range, building back up" : "85% of your pre-rehab weight, close grip, stop short of the chest"}. <b>Pressing bridge:</b> ${phase === 3 ? "floor push-ups" : "incline push-ups"}, on Upper and Full Body.${week >= HAMMER_FROM_WEEK ? " <b>Curls:</b> hammer only, light." : ""} <b>Also hold off:</b> dips, upright rows, behind-neck pressing, straight-bar curls, racquet and throwing.</div>`;
+  html += `<div class="rehab-hold"><b>Paused in the app:</b> ${paused.join(", ")}. <b>Bench:</b> ${phase === 3 ? "full range, building back up" : "85% of your pre-rehab weight, medium grip, elbows about 45°, stop short of the chest"}. <b>Pressing bridge:</b> ${phase === 3 ? "floor push-ups" : "incline push-ups"}, on Upper and Full Body.${week >= HAMMER_FROM_WEEK ? " <b>Curls:</b> hammer only, light." : ""} <b>Also hold off:</b> dips, upright rows, behind-neck pressing, straight-bar curls, racquet and throwing.</div>`;
 
   html += `<div class="rehab-foot"><span class="rehab-check">Through it when a full-effort side-raise press is pain-free.</span>`;
   if(phase === 2) html += `<button type="button" class="skip-btn" onclick="setRehabPhase3(true)">Move to Phase 3</button>`;
@@ -308,7 +308,7 @@ function rehabCoachBlock(){
     block.heldLifts = Object.keys(SHOULDER_CARE_TIP).filter(isShoulderHeld);
     block.bench = rehabPhase() === 3
       ? "Phase 3: full-range bench building back 5 lb a session toward the pre-rehab weight."
-      : "Held at 85% of the last pre-rehab working weight, close grip, stopping short of the chest; drop 10 lb if over 3 of 10.";
+      : "Held at 85% of the last pre-rehab working weight, medium grip (forearms vertical) with elbows about 45° after a close grip hurt the left shoulder more, stopping short of the chest; drop 10 lb if over 3 of 10.";
     block.pushUps = "Push-Ups are the pressing bridge: incline in phases 1-2, floor to full depth in phase 3.";
     block.rightSide = "Rehab is for the left shoulder. The right is trained too: rotation work both sides with the right about 50% heavier, right-arm hammer curls from week 1, single-arm right pressing (DB floor press, landmine) allowed. No pain cap on the right, but the same ache there means treat it like the left.";
     block.notes = "Sessions of paused or held lifts logged during rehab carry \"Rehab\" in the note.";
