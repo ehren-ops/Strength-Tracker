@@ -48,6 +48,24 @@ function toggleCharts(){
 }
 
 // ---------- chart (pure inline SVG, no external library) ----------
+// A session done under a modifier on purpose: tagged Deload when logged in Deload Week, or carrying
+// a modifier's name in its note ("Rehab", "Knee Care", "Preseason"...). The graph marks these
+// with a diamond in the modifier's color instead of a short-set or missed-rep flag. Plain words
+// like "knee" or "back" stay concerns, not tags, so only the modifier names count.
+const MODIFIER_TAGS = [
+  { key: "deload", re: /\bdeload\b/i, label: "Deload", title: "Deload Week", color: "var(--deload)" },
+  { key: "shoulder", re: /\b(shoulder )?rehab\b/i, label: "Rehab", color: "var(--shoulder)" },
+  { key: "knee", re: /\bknee care\b/i, label: "Knee Care", color: "var(--knee)" },
+  { key: "back", re: /\b(low )?back care\b/i, label: "Back Care", color: "var(--back)" },
+  { key: "preseason", re: /\bpreseason\b/i, label: "Preseason", color: "var(--preseason)" },
+  { key: "ski", re: /\bski( season)?\b/i, label: "Ski", color: "var(--ski)" },
+];
+function modifierTag(entry){
+  if(entry.deload) return MODIFIER_TAGS[0];
+  const note = entry.note || "";
+  return MODIFIER_TAGS.find(t => t.re.test(note)) || null;
+}
+
 function renderChart(ex, suggestion, isRealExercise, chartKey){
   const W = 320, H = 130, padR = 14, padT = 10, padB = 20;
   const entries = ex.entries;
@@ -113,7 +131,8 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     // A Deload Week session (tagged when logged with the modifier on) is planned, so it gets its own
     // diamond in the Deload badge color instead of the short-set or missed-rep flag its lighter load
     // and fewer sets would otherwise earn.
-    const isPlanned = isRealExercise && !!p.entry.deload;
+    const tag = isRealExercise ? modifierTag(p.entry) : null;
+    const isPlanned = !!tag;
     const isDeload = !isPlanned && deloadFlags[i];
     // A set logged with Preseason Prep on is judged against the preseason target (Squat: 5 reps,
     // 4 sec lowering): fewer reps on purpose, drawn in the Preseason badge color, not as a miss.
@@ -123,7 +142,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     const isPreseason = isRealExercise && !isPlanned && !isDeload && !isUnder && !isMissed && !!p.entry.preseason && !!ex.targetRepsPreseason;
     const isExtra = isRealExercise && !isPlanned && !isDeload && !isUnder && !isMissed && !isPreseason && ex.trackBy !== "duration" &&
       (p.entry.reps > targetReps || p.entry.sets > 3);
-    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" - "+p.entry.note:""}${isPlanned?" - Deload Week (planned)":""}${isDeload?" - dropped after missed sessions":""}${isPreseason?" - Preseason target "+targetReps+" reps":""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
+    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" - "+p.entry.note:""}${isPlanned?` - ${tag.title || tag.label} (planned)`:""}${isDeload?" - dropped after missed sessions":""}${isPreseason?" - Preseason target "+targetReps+" reps":""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
 
     function labelWithHalo(text, color){
       // Above the point when there's room, otherwise just below it so it never covers the dot.
@@ -135,8 +154,8 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
 
     if(isPlanned){
       const cx = xAt(i), cy = yAt(p.y), r = 5.5;
-      svg += `<path d="M${cx.toFixed(1)},${(cy-r).toFixed(1)} L${(cx+r).toFixed(1)},${cy.toFixed(1)} L${cx.toFixed(1)},${(cy+r).toFixed(1)} L${(cx-r).toFixed(1)},${cy.toFixed(1)} Z" fill="var(--deload)" stroke="var(--chart-white)" stroke-width="1.2" class="deload-mark"><title>${titleText}</title></path>`;
-      labelWithHalo("Deload", "var(--deload)");
+      svg += `<path d="M${cx.toFixed(1)},${(cy-r).toFixed(1)} L${(cx+r).toFixed(1)},${cy.toFixed(1)} L${cx.toFixed(1)},${(cy+r).toFixed(1)} L${(cx-r).toFixed(1)},${cy.toFixed(1)} Z" fill="${tag.color}" stroke="var(--chart-white)" stroke-width="1.2" class="mod-mark${tag.key === "deload" ? " deload-mark" : ""}" data-tag="${tag.key}"><title>${titleText}</title></path>`;
+      labelWithHalo(tag.label, tag.color);
     } else if(isDeload){
       svg += `<line x1="${xAt(i).toFixed(1)}" y1="${padT}" x2="${xAt(i).toFixed(1)}" y2="${H-padB}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>`;
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="5" fill="var(--chart-white)" stroke="var(--danger)" stroke-width="2"><title>${titleText}</title></circle>`;
@@ -155,7 +174,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     } else {
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="var(--chart-line)"><title>${titleText}</title></circle>`;
     }
-    svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'var(--danger)':isPlanned?'var(--deload)':'var(--chart-axis)'}" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${isDeload?'D':p.entry.label}</text>`;
+    svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'var(--danger)':isPlanned?tag.color:'var(--chart-axis)'}" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${isDeload?'D':p.entry.label}</text>`;
   });
 
   // dashed projection segment

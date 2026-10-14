@@ -2593,6 +2593,31 @@ async function main(){
   if(r83.preseason !== 1 || r83.missed !== 2 || !r83.title || !r83.back || r83.target !== '5/8') throw new Error('expected one preseason point (5 reps at the 5-rep preseason target), the 4-rep preseason set and the untagged 5-rep set as misses, got: ' + JSON.stringify(r83));
   console.log('OK: a preseason 3x5 squat is drawn in the Preseason color; short of the preseason target or logged without the modifier it is still a miss');
 
+  console.log('=== 84: sessions tagged with a modifier in their note get that modifier\'s diamond on the graph, not a red flag ===');
+  const r84 = await page.evaluate(() => {
+    const d = n => shiftISO(todayISO(), n);
+    const ex = Object.assign(newExerciseShell('Barbell Row'), { entries: [
+      { clientId: 't1', date: d(-12), weight: 135, sets: 3, reps: 8, label: 'S1' },
+      { clientId: 't2', date: d(-9), weight: 115, sets: 3, reps: 6, note: 'Rehab, left shoulder tender', label: 'S2' },
+      { clientId: 't3', date: d(-7), weight: 120, sets: 2, reps: 8, note: 'Knee Care day', label: 'S3' },
+      { clientId: 't4', date: d(-5), weight: 117.5, sets: 2, reps: 8, deload: true, note: 'Deload', label: 'S4' },
+      { clientId: 't5', date: d(-3), weight: 135, sets: 3, reps: 6, note: 'tender knee', label: 'S5' },
+      { clientId: 't6', date: d(-1), weight: 135, sets: 3, reps: 6, note: 'preseason block', label: 'S6' },
+    ] });
+    const div = document.createElement('div');
+    div.innerHTML = renderChart(ex, null, true, 'tag-test');
+    return {
+      tags: [...div.querySelectorAll('.mod-mark')].map(m => m.dataset.tag),
+      deloadMarks: div.querySelectorAll('.deload-mark').length,
+      labels: [...div.querySelectorAll('text')].map(t => t.textContent).filter(t => /Rehab|Knee Care|Deload|Preseason|3×6/.test(t)),
+      missedRed: div.querySelectorAll('circle[fill="var(--chart-missed)"]').length,
+      underRed: div.querySelectorAll('circle[fill="var(--chart-under)"]').length,
+    };
+  });
+  if(JSON.stringify(r84.tags) !== JSON.stringify(['shoulder', 'knee', 'deload', 'preseason']) || r84.deloadMarks !== 1 || r84.missedRed !== 1 || r84.underRed !== 0
+    || !['Rehab', 'Knee Care', 'Deload', 'Preseason'].every(l => r84.labels.includes(l))) throw new Error('expected modifier diamonds for tagged sessions and a red flag only for the untagged miss, got: ' + JSON.stringify(r84));
+  console.log('OK: Rehab, Knee Care, Deload and Preseason sessions get their own colored diamonds; only the untagged "tender knee" miss stays red');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
