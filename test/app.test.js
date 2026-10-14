@@ -329,7 +329,7 @@ async function main(){
   });
   if(walkEntry.minutes !== 30 || walkEntry.distance !== 1.8 || walkEntry.incline !== 8) throw new Error('Incline Treadmill Walk entry did not save correctly: ' + JSON.stringify(walkEntry));
   const historyText = await page.locator('.hist-row.latest .exact').first().textContent();
-  if(!historyText.includes('30 min') || !historyText.includes('1.8 mi') || !historyText.includes('8% incline')) throw new Error('history row does not display time/distance/incline correctly: ' + historyText);
+  if(!historyText.includes('30 min') || !historyText.includes('1.8 mi') || !historyText.includes('8%')) throw new Error('history row does not display time/distance/incline correctly: ' + historyText);
   console.log('OK: Incline Treadmill Walk logs minutes + distance + incline, displays correctly:', historyText);
 
   const cloudCardioRows = await page.evaluate(() => {
@@ -1419,7 +1419,7 @@ async function main(){
   }
   const expectGroups = {
     Strength: [["Farmer's Carry", 'cat-strength'], ['Dead Hang', 'cat-strength'], ['Push-Ups', 'cat-strength']],
-    Cardio: [['Zone 2 Ride', 'cat-cardio'], ['Incline Treadmill Walk', 'cat-cardio']],
+    Cardio: [['Incline Treadmill Walk', 'cat-cardio'], ['Zone 2 Ride', 'cat-cardio']],
     Mobility: [],
     Recovery: [['Sauna', 'cat-recovery'], ['Cold Plunge', 'cat-recovery'], ['Hot Tub', 'cat-recovery']],
   };

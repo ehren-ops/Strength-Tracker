@@ -748,6 +748,17 @@ function renderSkipControl(name){
   return `<div class="skip-ctl"><button type="button" class="skip-btn" onclick="startSkip('${q}')">Skip today</button></div>`;
 }
 
+// Cardio in two short lines for the history column: "35 min · 1.8 mi" over "3.1 mph · 12%", so the
+// note keeps the same room it has on a lift.
+function cardioCell(e, ex){
+  const has = v => v != null && v !== "";
+  let speed = has(e.speed) ? `${e.speed} mph` : null;
+  if(!speed && ex.trackSpeed && has(e.distance) && e.minutes) speed = `~${Math.round((e.distance / (e.minutes / 60)) * 10) / 10} mph`;
+  const top = [`${e.minutes} min`, has(e.distance) && `${e.distance} mi`].filter(Boolean).join(" · ");
+  const bottom = [speed, has(e.incline) && `${e.incline}%`].filter(Boolean).join(" · ");
+  return bottom ? `${top}<br>${bottom}` : top;
+}
+
 function renderHistRow(e, idx, isLatest, ex, name){
   const key = name + "|" + idx;
 
@@ -785,7 +796,7 @@ function renderHistRow(e, idx, isLatest, ex, name){
   const tag = isLatest ? (e.date === todayISO() ? "Today" : "Latest") : "";
   html += `<span>${fmtDate(e.date)}${e.confirmed===false?'<span class="est">*</span>':''}${tag ? `<br><span class="latest-tag">${tag}</span>` : ''}</span>`;
   const hr = hrFor(name, e.date);
-  html += `<span class="exact">${formatEntryValue(e, ex)}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">${hrShort(hr)}</span>` : ""}</span>`;
+  html += `<span class="exact">${ex.trackBy === "duration" && !isRecovery(name) ? cardioCell(e, ex) : formatEntryValue(e, ex)}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">${hrShort(hr)}</span>` : ""}</span>`;
   html += `<span class="exact">${e.difficulty ?? "-"}</span>`;
   html += `<span class="hist-note-cell">`;
   html += `<span class="note">${e.note ? escapeHtml(e.note) : ""}</span>`;
@@ -964,7 +975,7 @@ function renderForm(name, ex){
   html += `</div>`;
   if(plan) html += `<p class="prefill-note">${mods.length ? `Pre-filled: ${mods.join(", ")} plan` : "Pre-filled: next progression"}</p>`;
   html += `<div class="form-row">
-    ${ex.trackBy === "duration" && !recovery ? rpeField : ""}<div class="field field-note"><input type="text" id="f-note" aria-label="Note" value="${withModifierTags("", activeModifierTags(name, ex))}" placeholder="${recovery ? 'Note, e.g. after lifting' : ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
+    ${ex.trackBy === "duration" && !recovery ? rpeField : ""}<div class="field field-note">${ex.trackBy === "duration" && !recovery ? "<label>Note</label>" : ""}<input type="text" id="f-note" aria-label="Note" value="${withModifierTags("", activeModifierTags(name, ex))}" placeholder="${recovery ? 'Note, e.g. after lifting' : ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
   </div>`;
   html += `<div class="date-log-row">
     <div class="field"><input type="date" id="f-date" aria-label="Date" value="${todayISO()}"></div>

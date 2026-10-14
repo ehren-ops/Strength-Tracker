@@ -210,7 +210,6 @@
   .hist.open{display:block;}
   .hist-row{display:grid;grid-template-columns:42px 96px 24px minmax(0,1fr);column-gap:0.5rem;align-items:baseline;font-size:0.72rem;padding:0.22rem 0;font-family:var(--font-body);font-variant-numeric:tabular-nums;color:var(--slate);border-bottom:1px solid var(--hairline);}
   .hist-row > :last-child{overflow-wrap:anywhere;min-width:0;}
-  .hist-row.cardio{grid-template-columns:42px 112px 24px minmax(0,1fr);}
   .hist-note-cell{display:flex;align-items:flex-start;justify-content:space-between;gap:0.3rem;}
   .hist-note-cell .note{flex:1 1 auto;min-width:0;margin:0;font-family:var(--font-body);font-style:normal;font-size:0.7rem;line-height:1.25;}
   .hist-note-cell .row-actions{flex:0 0 auto;white-space:nowrap;}

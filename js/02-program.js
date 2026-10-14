@@ -42,7 +42,7 @@ const DAY_ORDER = {
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
   // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
-  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Zone 2 Ride","Incline Treadmill Walk","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
+  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Incline Treadmill Walk","Zone 2 Ride","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
 };
 const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
 // Shown only while Knee Care is on: on Extra, and after the numbered lifts on Lower and Full Body.
@@ -342,6 +342,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v92";
+const APP_VERSION = "v93";
 const APP_UPDATED = "Oct 14, 2026";
 
