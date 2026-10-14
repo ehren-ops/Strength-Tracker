@@ -542,7 +542,7 @@ function renderExerciseCard(name, ex){
   html += renderForm(name, ex);
 
   if(!hasEntries){
-    html += `<div style="margin-top:0.7rem;"><p style="color:var(--slate);font-size:0.8rem;font-style:italic;">Nothing logged yet.</p></div>`;
+    html += `<div class="hist-foot"><p style="color:var(--slate);font-size:0.8rem;font-style:italic;margin:0;">Nothing logged yet.</p>${renderSkipControl(name)}</div>`;
   } else {
     // keep original array index attached so edit/delete target the right entry
     const reversed = ex.entries.map((e,i) => ({ e, i })).reverse(); // most recent first
@@ -556,8 +556,10 @@ function renderExerciseCard(name, ex){
     html += `<div class="hist-row header${cardioCls}"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;
     recent.forEach((r, idx) => { html += renderHistRow(r.e, r.i, idx === 0, ex, name); });
 
+    // One footer row: earlier history on the left, Skip today on the right.
+    // While picking a skip reason the link steps aside so the reasons fit on this one row.
+    html += `<div class="hist-foot">${older.length && skipPicking !== name ? `<button class="hist-toggle" onclick="toggleHistory('${name.replace(/'/g,"\\'")}')">Show earlier history (${older.length})</button>` : ""}${renderSkipControl(name)}</div>`;
     if(older.length){
-      html += `<button class="hist-toggle" onclick="toggleHistory('${name.replace(/'/g,"\\'")}')">Show earlier history (${older.length})</button>`;
       html += `<div class="hist ${openHistory[name] ? 'open' : ''}" id="hist-${cssId(name)}">`;
       older.forEach(r => { html += renderHistRow(r.e, r.i, false, ex, name); });
       html += `</div>`;
@@ -568,25 +570,24 @@ function renderExerciseCard(name, ex){
     }
     html += `</div>`;
   }
-  html += renderSkipControl(name);
   html += `</div>`;
   return html;
 }
 
-// Bottom right of the card: skip this lift today, for injury or another reason. Hidden once the
-// lift is logged today; while skipped, shows the reason and an undo.
+// Right end of the history footer: skip this lift today, for injury or another reason. Hidden once
+// the lift is logged today; while skipped, shows the reason and an undo.
 function renderSkipControl(name){
   if(isLoggedToday(name)) return "";
   const q = name.replace(/'/g, "\\'");
   const reason = skipReason(name);
   if(reason){
-    return `<div class="skip-row"><span class="skip-state">Skipped today: ${SKIP_REASONS[reason]}</span><button type="button" class="skip-btn" onclick="undoSkip('${q}')">Undo</button></div>`;
+    return `<div class="skip-ctl"><span class="skip-state">Skipped: ${SKIP_REASONS[reason]}</span><button type="button" class="skip-btn" onclick="undoSkip('${q}')">Undo</button></div>`;
   }
   if(skipPicking === name){
-    return `<div class="skip-row skip-picking">${Object.entries(SKIP_REASONS).map(([k, label]) =>
-      `<button type="button" class="skip-reason" onclick="skipExercise('${q}', '${k}')">${label}</button>`).join("")}<button type="button" class="skip-btn" onclick="cancelSkip()">Cancel</button></div>`;
+    return `<div class="skip-ctl skip-picking">${Object.entries(SKIP_REASONS).map(([k, label]) =>
+      `<button type="button" class="skip-reason" onclick="skipExercise('${q}', '${k}')">${label}</button>`).join("")}<button type="button" class="skip-btn skip-cancel" onclick="cancelSkip()" aria-label="Cancel">✕</button></div>`;
   }
-  return `<div class="skip-row"><button type="button" class="skip-btn" onclick="startSkip('${q}')">Skip today</button></div>`;
+  return `<div class="skip-ctl"><button type="button" class="skip-btn" onclick="startSkip('${q}')">Skip today</button></div>`;
 }
 
 function renderHistRow(e, idx, isLatest, ex, name){

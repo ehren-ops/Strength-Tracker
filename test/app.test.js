@@ -2261,7 +2261,7 @@ async function main(){
   const skipRow = await page.evaluate(() => (JSON.parse(sessionStorage.getItem('__mock_supabase_db__')).skips || []).map(r => r.exercise_name + ':' + r.reason));
   // Undo from the card
   await page.evaluate(n => { selected = n; render(); }, upperFirst);
-  await page.click('.skip-row button:has-text("Undo")');
+  await page.click('.skip-ctl button:has-text("Undo")');
   await sleep(150);
   const undone = await page.evaluate(n => skipReason(n), upperFirst);
   if(undone !== null) throw new Error('expected Undo to clear the skip');

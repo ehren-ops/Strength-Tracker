@@ -218,10 +218,12 @@
   .ai-panel-head .ai-toggle{color:var(--ai-accent);white-space:nowrap;}
   .row-actions{display:inline-flex;gap:0.65rem;margin-left:0.4rem;}
   .icon-btn.del-btn.armed{color:#fff;background:var(--danger);border-radius:4px;}
-  .skip-row{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:0.3rem;margin-top:0.7rem;font-size:0.72rem;}
-  .skip-picking .skip-btn, .skip-picking .skip-reason{padding:0.3rem 0.45rem;}
+  .hist-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;margin-top:0.6rem;}
+  .hist-foot .hist-toggle{margin-top:0;}
+  .skip-ctl{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:0.25rem;font-size:0.72rem;}
   .skip-state{color:var(--slate);}
   .skip-btn, .skip-reason{background:var(--surface);border:1px solid var(--line);color:var(--slate);font-size:0.72rem;font-weight:600;padding:0.3rem 0.6rem;border-radius:7px;cursor:pointer;}
+  .skip-picking .skip-btn, .skip-picking .skip-reason{font-size:0.68rem;padding:0.25rem 0.4rem;}
   .skip-reason{color:var(--ink);}
   .pill.skipped-today{text-decoration:line-through;opacity:0.6;}
   .icon-btn{background:none;border:none;color:var(--slate);font-size:0.78rem;cursor:pointer;padding:0 0.15rem;}
