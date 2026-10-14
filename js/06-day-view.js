@@ -440,10 +440,33 @@ function loadText(name, ex, sug){
   if(!sug) return ex.equipment === "barbell" ? "Load: plates shown after your first log" : sidesOf(name).weight === "hand" ? "Load: weight in each hand" : "Load: total weight";
   const w = sug.weight;
   if(!(w > 0)) return "Bodyweight";
-  if(ex.equipment === "barbell") return `Load: ${platesLabel(w, ex.equipment)}`;
+  if(ex.equipment === "barbell") return `Load: ${w} lb · ${platesLabel(w, ex.equipment)}`;
   const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;
   if(maxW) return `Load: one ${w} lb bell${w >= maxW ? " (heaviest available)" : ""}`;
   return sidesOf(name).weight === "hand" ? `Load: ${w} lb in each hand` : `Load: ${w} lb total`;
+}
+
+// A session in a few characters, for the "Last:" corner: 175 lb, 50 lb/hand, 3x10, 45 min.
+function shortValue(name, ex, e){
+  if(ex.trackBy === "weight") return `${e.weight} lb${sidesOf(name).weight === "hand" ? "/hand" : ""}`;
+  if(ex.trackBy === "duration") return `${e.minutes} min`;
+  return repLabel(e.sets, e.reps, ex.unit) + repsSuffix(name);
+}
+// The plan without the number already shown big: sets and reps for a lift, sets for a reps-only
+// exercise, nothing for cardio.
+function planShape(name, ex, s){
+  if(ex.trackBy === "weight") return repLabel(s.sets, s.reps, ex.unit) + repsSuffix(name);
+  if(ex.trackBy === "reps") return `${s.sets} sets`;
+  return "";
+}
+// Today against the last full session: +5 lbs, −15 lbs, +2 reps, +5 min, or same.
+function stepText(ex, s, prior){
+  if(!prior) return "";
+  const [d, unit] = ex.trackBy === "weight" ? [s.weight - prior.weight, "lbs"]
+    : ex.trackBy === "duration" ? [s.minutes - prior.minutes, "min"] : [s.reps - prior.reps, ex.unit === "sec" ? "sec" : "reps"];
+  if(!isFinite(d)) return "";
+  const n = Math.round(Math.abs(d) * 10) / 10;
+  return d > 0 ? `+${n} ${unit}` : d < 0 ? `−${n} ${unit}` : "same as last";
 }
 
 // Recovery tile, same shape as the Next tile: the last 7 days, the usual dose, the last session.
@@ -481,13 +504,18 @@ function renderExerciseCard(name, ex){
   const shoulderPaused = isShoulderPaused(name), shoulderActive = isShoulderModified(name);
 
   const isCustom = !allDayNames().includes(name);
-  // "+20 since first" rides at the right end of the title row, so the Next tile sits right under
-  // the weight and 1RM instead of below a line of its own.
+  // "+20 since first" rides in the Recent History heading, with the rest of the card's history.
   const delta = ex.entries.length > 1
     ? (ex.trackBy==="weight" ? work.weight-first.weight : ex.trackBy==="duration" ? work.minutes-first.minutes : work.reps-first.reps)
     : 0;
   const deltaColor = delta>0 ? "color:var(--emerald)" : delta<0 ? "color:var(--amber)" : "color:var(--slate)";
-  const deltaHtml = ex.entries.length > 1 && !recovery ? `<span class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</span>` : "";
+  const deltaHtml = ex.entries.length > 1 && !recovery ? ` · <span class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</span>` : "";
+  // The big number is the weight to lift today, or what was logged today once it is. The top right
+  // keeps the last day a full session was lifted, before today, so the two never get mixed up.
+  const today = todayISO();
+  const todayLog = recovery ? null : [...ex.entries].reverse().find(e => e.date === today) || null;
+  const prior = [...ex.entries].reverse().find(e => e.date < today && !e.deload) || null;
+  const priorHtml = prior && !recovery ? `<span class="last-line">Last: ${shortValue(name, ex, prior)} · ${fmtShortDate(prior.date)}</span>` : "";
 
   // Active modifiers: badges, then their notes, under the current weight rather than above it.
   const badges = [skiActive && '<span class="ski-badge">🎿 Ski</span>', kneeActive && '<span class="knee-badge">🦵 Knee Care</span>',
@@ -527,7 +555,7 @@ function renderExerciseCard(name, ex){
       </span>
     </div>`;
   } else {
-    html += `<div class="ex-title-row"><h2 class="ex-name">${name}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>${deltaHtml}</div>`;
+    html += `<div class="ex-title-row"><h2 class="ex-name">${name}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>${priorHtml}</div>`;
   }
   if(!hasEntries){
     html += modHtml;
@@ -536,11 +564,18 @@ function renderExerciseCard(name, ex){
     html += renderTips(name);
   } else {
     const sideTag = s => s ? `<span class="side-tag">${s}</span>` : "";
-    const bigVal = ex.trackBy==="weight" ? work.weight+" lbs" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
-      : ex.trackBy==="duration" ? work.minutes+" min" + (work.tempF != null ? sideTag(` ${work.tempF}°F`) : "") : work.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
+    const bigOf = v => ex.trackBy==="weight" ? v.weight+" lbs" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
+      : ex.trackBy==="duration" ? v.minutes+" min" + (v.tempF != null ? sideTag(` ${v.tempF}°F`) : "") : v.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
+    let bigVal, bigLabel;
+    if(recovery){ bigVal = bigOf(work); bigLabel = "Last"; }
+    else if(todayLog){ bigVal = bigOf(todayLog); bigLabel = "Logged today ✓"; }
+    else if(suggestion && suggestion.shoulderPaused){ bigVal = "Paused"; bigLabel = "Today"; }
+    else if(suggestion){ bigVal = bigOf(suggestion); bigLabel = "Today"; }
+    else { bigVal = bigOf(work); bigLabel = "Last"; }
 
     html += `<div class="weight-row">
       <div class="weight-main">
+        <span class="big-label${todayLog ? " locked" : ""}">${bigLabel}</span>
         <span class="big-val">${bigVal}</span>
       </div>
       ${ex.trackBy === "weight" ? render1RMInline(name, ex, work) : ''}
@@ -644,7 +679,13 @@ function renderExerciseCard(name, ex){
           : suggestion.powerHold ? `Power: hold reps; go higher or farther only while every rep stays fast.`
           : `Add 2 reps.`;
       }
-      recHtml = renderNextTile(`Next: ${nextLabel}`, ex, composeGuidance(msg, name, ex, last, work), suggestion.shoulderPaused ? "Load: none today" : loadText(name, ex, suggestion));
+      // Before today's log the weight is the big number, so the headline is the sets and reps and the
+      // step from the last full session. Once today is logged, it plans the next session in full.
+      let headline;
+      if(todayLog) headline = `Next time: ${nextLabel}`;
+      else if(suggestion.shoulderPaused) headline = "Paused today";
+      else headline = [planShape(name, ex, suggestion), stepText(ex, suggestion, prior)].filter(Boolean).join(" · ");
+      recHtml = renderNextTile(headline, ex, composeGuidance(msg, name, ex, last, work), suggestion.shoulderPaused ? "Load: none today" : loadText(name, ex, suggestion));
     }
 
     // Recovery: this week's total and the last session instead of a plan and a graph.
@@ -662,7 +703,7 @@ function renderExerciseCard(name, ex){
     const older = reversed.slice(3);
 
     html += `<div style="margin-top:0.9rem;">`;
-    html += `<h3 class="section" style="margin-bottom:0.4rem;">Recent History</h3>`;
+    html += `<h3 class="section" style="margin-bottom:0.4rem;">Recent History${deltaHtml}</h3>`;
     const histColLabel = recovery ? "Session" : ex.trackBy==="duration" ? "Cardio" : ex.trackBy==="weight" ? "Load" + (sidesOf(name).weight === "total" ? "" : "/" + sidesOf(name).weight) : "Sets" + repsSuffix(name);
     const cardioCls = ex.trackBy==="duration" ? " cardio" : "";
     html += `<div class="hist-row header${cardioCls}"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;

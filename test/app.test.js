@@ -279,7 +279,7 @@ async function main(){
   const recBox = await page.textContent('.rec-box');
   console.log('recommendation shown:', recBox.replace(/\s+/g, ' ').trim());
   if(!recBox.toLowerCase().includes('tender')) throw new Error('expected the concerning note to be surfaced in the recommendation, got: ' + recBox);
-  const nextWeightMatch = recBox.match(/Next:\s*(\d+)\s*lbs/);
+  const nextWeightMatch = recBox.match(/Next(?: time)?:\s*(\d+)\s*lbs/);
   if(!nextWeightMatch || Number(nextWeightMatch[1]) !== 150) throw new Error('expected next weight to hold at 150 despite two clean hits, got: ' + (nextWeightMatch && nextWeightMatch[1]));
   console.log('OK: progression held at 150 lbs and the note was surfaced, instead of blindly advancing on reps/RPE alone');
 
@@ -422,7 +422,7 @@ async function main(){
   await page.click('button.log:has-text("Log set")');
   const careRec = await page.textContent('.rec-box');
   console.log('recommendation shown:', careRec.replace(/\s+/g, ' ').trim());
-  const careNextMatch = careRec.match(/Next:\s*(\d+(?:\.\d+)?)\s*lbs/);
+  const careNextMatch = careRec.match(/Next(?: time)?:\s*(\d+(?:\.\d+)?)\s*lbs/);
   if(!careNextMatch || Number(careNextMatch[1]) !== 45) throw new Error('expected next weight to be cut to 45 lbs (10% off 50), got: ' + (careNextMatch && careNextMatch[1]));
   if(!careRec.includes('Knee Care: ~10% lighter, holding')) throw new Error('expected the knee care message in the recommendation');
   const tipText = await page.locator('.knee-care-line').textContent();
@@ -441,7 +441,7 @@ async function main(){
   const deloadRec = await page.textContent('.rec-box');
   console.log('recommendation shown:', deloadRec.replace(/\s+/g, ' ').trim());
   if(!deloadRec.includes('sessions straight')) throw new Error('expected the deload message to win over the knee/back care message, got: ' + deloadRec);
-  const deloadNextMatch = deloadRec.match(/Next:\s*(\d+(?:\.\d+)?)\s*lbs/);
+  const deloadNextMatch = deloadRec.match(/Next(?: time)?:\s*(\d+(?:\.\d+)?)\s*lbs/);
   if(!deloadNextMatch || Number(deloadNextMatch[1]) !== 170) throw new Error('expected the standard 15% deload (170 lbs from 200), not the 10% care-mode cut, got: ' + (deloadNextMatch && deloadNextMatch[1]));
   console.log('OK: deload logic still wins over care-mode reduction when both would apply');
 
@@ -1823,14 +1823,14 @@ async function main(){
     const sug = computeSuggestion(ex, 'Squat');
     const trend = liftTrend('Squat', ex, todayISO());
     Object.assign(modes, saved);
-    return { big: div.querySelector('.big-val').textContent, since: (div.querySelector('.delta-line') || {}).textContent, onerm: div.querySelector('.onerm-val').textContent,
+    return { big: div.querySelector('.big-val').textContent, label: div.querySelector('.big-label').textContent, corner: (div.querySelector('.last-line') || {}).textContent, since: (div.querySelector('.delta-line') || {}).textContent, onerm: div.querySelector('.onerm-val').textContent,
       pool: guidancePools.flat(), next: sug.weight, e1rm: trend.e1rmChange4WeeksPct, sessions: trend.sessionsLast4Weeks };
   });
   const wantE1 = Math.round((175 * (1 + 8 / 30) - 165 * (1 + 8 / 30)) / (165 * (1 + 8 / 30)) * 1000) / 10;
-  if(!/^175 lbs/.test(afterDeload.big) || afterDeload.since !== '+10 since first' || !/^222 lbs/.test(afterDeload.onerm) || afterDeload.next !== 180
+  if(!/^157\.5 lbs/.test(afterDeload.big) || !/Logged today/.test(afterDeload.label) || !/^Last: 175 lb · /.test(afterDeload.corner || '') || afterDeload.since !== '+10 since first' || !/^222 lbs/.test(afterDeload.onerm) || afterDeload.next !== 180
     || !afterDeload.pool.includes('Last full session: 175 lb, 3x8 at RPE 7.') || !afterDeload.pool.includes('Deload last time: 157.5 lb, 2x8.')
     || afterDeload.e1rm !== wantE1 || afterDeload.sessions !== 3) throw new Error('expected the card to stand on the last full session after a deload, got: ' + JSON.stringify(afterDeload));
-  console.log('OK: after a deload the card shows 175 lbs, +10 since first, Est. 1RM 222 and next 180, with the deload named, not a drop');
+  console.log('OK: with a deload logged today the card shows it as today\'s locked-in 157.5, "Last: 175" in the corner, +10 since first, Est. 1RM 222 and next 180, with the deload named, not a drop');
   // Coming back: the first session after a deload holds pressing lifts at the pre-deload weight;
   // after 14+ days with no training at all, lifts restart near 90% and ramp 95% then 100%.
   const comeback = await page.evaluate(() => {
@@ -2053,13 +2053,13 @@ async function main(){
       const div = document.createElement('div');
       div.innerHTML = renderExerciseCard(name, ex);
       ex.entries = saved;
-      return { labels: [...div.querySelectorAll('.form-row .field label')].map(l => l.textContent), next: div.querySelector('.rec-headline').textContent };
+      return { labels: [...div.querySelectorAll('.form-row .field label')].map(l => l.textContent), next: div.querySelector('.big-val').textContent + ' · ' + div.querySelector('.rec-plan').textContent };
     };
     return { bss: read('Bulgarian Split Squat'), squat: read('Squat'), fly: read('Cable Chest Fly'), copen: read('Copenhagen Plank'),
       walk: read('Walking Lunge'), lateral: read('Lateral Lunge'), walkUnits: sidesText('Walking Lunge') };
   });
   if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lbs\/hand · 3x8\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
-  if(!sides.squat.labels.includes('Lb total') || !/lbs total · 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
+  if(!sides.squat.labels.includes('Lb total') || !/^\d+ lbs · 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
   if(!sides.fly.labels.includes('Lb / hand')) throw new Error('expected Cable Chest Fly labeled per hand (each stack), got: ' + JSON.stringify(sides.fly));
   if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
   if(!sides.walk.labels.includes('Lb / hand') || !sides.walk.labels.includes('Steps total') || !/lbs\/hand · 3x8 steps/.test(sides.walk.next) || !/total steps/.test(sides.walkUnits)) throw new Error('expected Walking Lunge per hand with total steps, got: ' + JSON.stringify([sides.walk, sides.walkUnits]));
@@ -2206,11 +2206,15 @@ async function main(){
     div.innerHTML = renderExerciseCard('Squat', ex);
     ex.entries = saved;
     const d = div.querySelector('.delta-line');
+    const c = div.querySelector('.last-line');
     const w = div.querySelector('.weight-row');
-    return { inTitle: !!(d && d.parentElement.classList.contains('ex-title-row')), text: d && d.textContent, next: w && w.nextElementSibling && w.nextElementSibling.className };
+    return { cornerInTitle: !!(c && c.parentElement.classList.contains('ex-title-row')), corner: c && c.textContent, deltaInHistory: !!(d && /Recent History/.test(d.parentElement.textContent)), text: d && d.textContent,
+      big: div.querySelector('.big-val').textContent, label: div.querySelector('.big-label').textContent, plan: div.querySelector('.rec-plan').textContent, load: div.querySelector('.rec-load').textContent,
+      next: w && w.nextElementSibling && w.nextElementSibling.className };
   });
-  if(!head.inTitle || head.text !== '+10 since first' || head.next !== 'rec-box') throw new Error('expected "+10 since first" in the title row and the Next tile right under the weight row, got: ' + JSON.stringify(head));
-  console.log('OK: "+10 since first" sits top right in the title row; the Next tile follows the weight row');
+  if(!head.cornerInTitle || !/^Last: 175 lb · /.test(head.corner) || !head.deltaInHistory || head.text !== '+10 since first' || head.label !== 'Today' || !/^180 lbs/.test(head.big)
+    || head.plan !== '3x8 · +5 lbs' || !/^Load: 180 lb · /.test(head.load) || head.next !== 'rec-box') throw new Error('expected today\'s 180 big, "Last: 175" top right, "3x8 · +5 lbs", the load total before the plates and +10 since first in Recent History, got: ' + JSON.stringify(head));
+  console.log('OK: TODAY 180 lbs, "' + head.corner + '" top right, "' + head.plan + '", "' + head.load + '", and +10 since first in the Recent History heading');
 
   console.log('=== 76: heart rate per lift arrives after the fact and shows in history, the breakdown and the Next tile ===');
   const aiCallsBeforeHr = aiBreakdownCallCount;
@@ -2437,7 +2441,7 @@ async function main(){
     r79.pushups[0] === r79.pushupsLen && r79.pushups[1] > 0 && r79.pushups[2] === -1 &&
     /incline/.test(r79.pushupCard.tip || '') && r79.pushupCard.note === 'Rehab' && r79.pushupCard.exists &&
     r79.benchP3.first === 157.5 && r79.benchP3.build && r79.benchP3.next === 155 &&
-    r79.fly && r79.curlWeek1 && /paused/.test(r79.flyCard.next) && !r79.flyCard.skip && /Right arm/.test(r79.flyCard.tip) &&
+    r79.fly && r79.curlWeek1 && /paused/i.test(r79.flyCard.next) && !r79.flyCard.skip && /Right arm/.test(r79.flyCard.tip) &&
     r79.benchNote === 'Rehab' && r79.benchLogged === 'Rehab, felt fine' && /keep as is/.test(r79.row.tip || '') && !r79.row.badge && r79.row.note === '' &&
     /right arm/.test(r79.week2Hammer || '') &&
     r79.p1.items === 3 && r79.p1.week === 'Week 1 · Phase 1' && r79.p1.done && r79.p1.pain === 2 && r79.p1.painOn === '2' && r79.p1.notTraining &&
