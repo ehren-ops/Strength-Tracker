@@ -37,7 +37,8 @@ function describeSuggestion(ex, name){
   const s = computeSuggestion(ex, name);
   if(!s) return null;
   if(ex.trackBy === "weight"){
-    const why = s.shoulderPaused ? "paused for shoulder rehab" : s.shoulderHold ? (name === "Bicep Curl" ? "shoulder rehab: hammer curls only, held" : "shoulder rehab: held, close grip, short range")
+    const why = s.shoulderPaused ? "paused for shoulder rehab" : s.shoulderHold ? (name === "Bicep Curl" ? "shoulder rehab: hammer curls only, held" : "shoulder rehab: held at about 85% of pre-rehab weight, close grip, short range")
+      : s.shoulderBuild ? `shoulder rehab phase 3: full range, building back toward ${s.shoulderBuild.fullWeight} lb`
       : s.shoulderReturn ? `back from shoulder rehab, step ${s.shoulderReturn.step} of 3 back to ${s.shoulderReturn.fullWeight} lb`
       : s.deloadWeek ? "deload week" : s.reentry ? `rebuilding after time off, step ${s.reentry.step} of 3 back to ${s.reentry.fullWeight} lb` : s.postDeloadHold ? "first session back from deload, holding pre-deload weight" : s.noteTarget != null ? "set by last note" : s.noteCue === "up" ? "add weight, note said so" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
       : s.noteConcern ? "hold, note flagged" : s.noteCue === "hold" ? "hold, note said so" : s.difficultyNote === "hard" ? "hold, last RPE high" : "hold";
@@ -48,7 +49,7 @@ function describeSuggestion(ex, name){
 }
 // Movement pattern per lift, so the coach can compare push vs pull, squat vs hinge, etc.
 const LIFT_PATTERNS = {
-  "Bench Press": "push", "Incline DB Press": "push", "Cable Chest Fly": "push", "Tricep Pushdown": "push", "Lateral Raise": "push",
+  "Bench Press": "push", "Incline DB Press": "push", "Cable Chest Fly": "push", "Tricep Pushdown": "push", "Lateral Raise": "push", "Push-Ups": "push",
   "Barbell Row": "pull", "Cable Lat Pulldown": "pull", "Face Pulls": "pull", "Bicep Curl": "pull", "Dead Hang": "pull",
   "RDL": "hinge", "Hip Thrust": "hinge", "Back Extension": "hinge", "Kettlebell Swings": "hinge",
   "Squat": "squat", "Spanish Squat": "squat",
@@ -535,7 +536,7 @@ function renderShoulderModifier(){
   else if(shoulderRehab.startedOn) status = `Last run: ${fmtShortDate(shoulderRehab.startedOn)} to ${fmtShortDate(shoulderRehab.endedOn || shoulderRehab.startedOn)}. Paused lifts ramp back 85, 92.5, 100%.`;
   else status = `Not started`;
   return renderModifierRow("shoulder", "🩹", "Shoulder Rehab",
-    "Adds a daily rehab card to every day. Pauses flies, incline press, lateral raises and slams; holds bench at a close grip; curls come back as hammer curls in week 3. Rows, pushdowns, legs and riding carry on.",
+    "Adds a daily rehab card to every day and push-ups to Upper and Full Body. Pauses flies, incline press, lateral raises and slams; bench drops to 85% with a close grip; curls come back as hammer curls in week 3. Rows, pushdowns, legs and riding carry on.",
     `<div class="shoulder-status">${status}</div>`);
 }
 

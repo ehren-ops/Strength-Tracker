@@ -395,7 +395,7 @@ function computeSuggestion(ex, name){
   const lastBase = (baseline.length ? baseline : ex.entries)[ (baseline.length ? baseline : ex.entries).length - 1 ];
   const sets = Math.max(2, Math.round((lastBase.sets || core.sets || 3) * 2 / 3));
   if(ex.trackBy !== "weight") return { ...core, sets, reps: lastBase.reps, deloadWeek: true };
-  const alreadyReduced = !!(core.careFlags && core.careFlags.length) || core.deload || (core.noteTarget != null && core.noteTarget < lastBase.weight);
+  const alreadyReduced = !!(core.careFlags && core.careFlags.length) || !!core.shoulderHold || core.deload || (core.noteTarget != null && core.noteTarget < lastBase.weight);
   const weight = alreadyReduced ? core.weight : Math.round((lastBase.weight * 0.9) / 2.5) * 2.5;
   return { ...core, weight, sets, reps: ex.targetReps || core.reps, readyToProgress: false, deloadWeek: true, deloadKeptReduction: alreadyReduced };
 }

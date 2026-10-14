@@ -1398,7 +1398,7 @@ async function main(){
   await sleep(150);
   const extraPills = await page.evaluate(() => Array.from(document.querySelectorAll('.pill-row .pill:not(.pill-add)')).map(el => ({ text: el.textContent.trim(), classes: el.className })));
   const expectedOrder = [
-    ["Farmer's Carry", 'cat-strength'], ['Dead Hang', 'cat-strength'], ['Spanish Squat', 'cat-strength'],
+    ["Farmer's Carry", 'cat-strength'], ['Dead Hang', 'cat-strength'], ['Spanish Squat', 'cat-strength'], ['Push-Ups', 'cat-strength'],
     ['Zone 2 Ride', 'cat-cardio'], ['Incline Treadmill Walk', 'cat-cardio'],
     ['5-Minute Core Routine', 'cat-core'],
     ['Thoracic Spine Stretch', 'cat-stretch'], ['Hip Stretch', 'cat-stretch'],
@@ -2310,7 +2310,10 @@ async function main(){
     delete data[REHAB_NAME];
     const pills = () => [...document.querySelectorAll('#pill-scroll .pill:not(.pill-add)')].map(p => p.textContent.trim());
     view = 'upper'; selected = 'Bench Press'; render();
-    out.off = { first: pills()[0], rehabPill: !!document.querySelector('.pill.rehab-pill'), bench: computeSuggestion(data['Bench Press'], 'Bench Press').weight };
+    out.off = { first: pills()[0], rehabPill: !!document.querySelector('.pill.rehab-pill'), bench: computeSuggestion(data['Bench Press'], 'Bench Press').weight, pushupsOnUpper: pills().includes('Push-Ups') };
+    view = 'extra'; selected = DAY_ORDER.extra[0]; render();
+    out.off.pushupsOnExtra = pills().some(p => /^Push-Ups/.test(p));
+    view = 'upper'; selected = 'Bench Press'; render();
 
     toggleMode('shoulder');
     out.firstPills = ['full', 'upper', 'lower', 'extra'].map(d => { view = d; selected = DAY_ORDER[d][0]; render(); return pills().slice(0, 2); });
@@ -2318,6 +2321,17 @@ async function main(){
     out.flyPill = document.querySelector('.pill.skipped-today') && document.querySelector('.pill.skipped-today').textContent;
     const b = computeSuggestion(data['Bench Press'], 'Bench Press');
     out.bench = { weight: b.weight, hold: !!b.shoulderHold, badge: !!document.querySelector('.shoulder-badge'), tip: (document.querySelector('.shoulder-care-line') || {}).textContent };
+    data['Bench Press'].entries.push({ clientId: 'r79-b2', date: today, confirmed: true, weight: 150, sets: 3, reps: 8 });
+    out.benchAfter150 = computeSuggestion(data['Bench Press'], 'Bench Press').weight;
+    modes.deload = true;
+    out.benchDeload = computeSuggestion(data['Bench Press'], 'Bench Press').weight;
+    modes.deload = false;
+    data['Bench Press'].entries.pop();
+    out.pushups = ['upper', 'full', 'lower'].map(d => { view = d; selected = DAY_ORDER[d][0]; render(); const ps = pills(); return ps.includes('Push-Ups') ? ps.indexOf('Push-Ups') : -1; });
+    out.pushupsLen = (() => { view = 'upper'; render(); return activeDayOrder('upper').length + 1; })();
+    selected = 'Push-Ups'; render();
+    out.pushupCard = { tip: (document.querySelector('.shoulder-care-line') || {}).textContent, note: document.getElementById('f-note') && document.getElementById('f-note').value, exists: !!data['Push-Ups'] };
+    view = 'upper'; selected = 'Bench Press'; render();
     out.fly = !!computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly').shoulderPaused;
     out.curlWeek1 = !!computeSuggestion(data['Bicep Curl'], 'Bicep Curl').shoulderPaused;
     selected = 'Cable Chest Fly'; render();
@@ -2350,6 +2364,11 @@ async function main(){
     const c = computeSuggestion(data['Bicep Curl'], 'Bicep Curl');
     out.p2.curl = { weight: c.weight, hold: !!c.shoulderHold };
     setRehabPhase3(true);
+    const b3 = computeSuggestion(data['Bench Press'], 'Bench Press');
+    data['Bench Press'].entries.push({ clientId: 'r79-b3', date: today, confirmed: true, weight: 150, sets: 3, reps: 8 });
+    const b3b = computeSuggestion(data['Bench Press'], 'Bench Press');
+    data['Bench Press'].entries.pop();
+    out.benchP3 = { first: b3.weight, build: !!b3.shoulderBuild, next: b3b.weight };
     out.p3 = { items: document.querySelectorAll('.rehab-card .stretch-item').length, week: document.querySelector('.rehab-week').textContent, synced: shoulderRehab.phase3 };
     out.coach = rehabCoachBlock();
 
@@ -2372,7 +2391,11 @@ async function main(){
     r79.off.first.startsWith('1. Bench Press') && !r79.off.rehabPill && r79.off.bench === 190 &&
     r79.firstPills.every((p, i) => p[0] === 'Shoulder Rehab' && (i === 3 ? !/^\d/.test(p[1]) : /^1\. /.test(p[1]))) &&
     /Cable Chest Fly/.test(r79.flyPill || '') &&
-    r79.bench.weight === 185 && r79.bench.hold && r79.bench.badge && /Close grip/.test(r79.bench.tip || '') &&
+    r79.bench.weight === 157.5 && r79.bench.hold && r79.bench.badge && /85%/.test(r79.bench.tip || '') &&
+    r79.benchAfter150 === 150 && r79.benchDeload === 150 && !r79.off.pushupsOnUpper && r79.off.pushupsOnExtra &&
+    r79.pushups[0] === r79.pushupsLen && r79.pushups[1] > 0 && r79.pushups[2] === -1 &&
+    /incline/.test(r79.pushupCard.tip || '') && r79.pushupCard.note === 'Rehab' && r79.pushupCard.exists &&
+    r79.benchP3.first === 157.5 && r79.benchP3.build && r79.benchP3.next === 155 &&
     r79.fly && r79.curlWeek1 && /paused/.test(r79.flyCard.next) && !r79.flyCard.skip && /Right arm/.test(r79.flyCard.tip) &&
     r79.benchNote === 'Rehab' && r79.benchLogged === 'Rehab, felt fine' && /keep as is/.test(r79.row.tip || '') && !r79.row.badge && r79.row.note === '' &&
     /right arm/.test(r79.week2Hammer || '') &&
@@ -2383,7 +2406,7 @@ async function main(){
     r79.ret.w1 === 25 && r79.ret.s1 === 1 && r79.ret.w2 === 27.5 && r79.ret.s2 === 2 && r79.ret.bench === 190 && r79.ret.endedOn &&
     !r79.afterOff.rehabPill && r79.afterOff.first.startsWith('1. Bench Press');
   if(!ok79) throw new Error('expected Shoulder Rehab to work as designed, got: ' + JSON.stringify(r79));
-  console.log('OK: off changes nothing; on, the rehab card leads every day (lifts keep their numbers), flies paused, bench held at 185, curls paused then hammer at 20; phases 1/2/3 show 3/9/11 items; pain saves; off ramps the fly 25 then 27.5');
+  console.log('OK: off changes nothing; on, the rehab card leads every day (lifts keep their numbers), flies paused, bench at 85% (157.5 from 185, never above the last log, kept through a deload) and rebuilt in phase 3, Push-Ups joins Upper and Full, curls paused then hammer at 20; phases 1/2/3 show 3/9/11 items; pain saves; off ramps the fly 25 then 27.5');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

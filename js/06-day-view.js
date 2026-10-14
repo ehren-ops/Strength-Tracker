@@ -56,7 +56,9 @@ function renderDay(day){
   const customExercises = Object.keys(data).filter(k => k !== REHAB_NAME && !allDayNames().includes(k) && (data[k].day || "full") === day);
   // Shoulder Rehab leads every day's row while it is on, unnumbered so the lifts keep their numbers.
   const lead = modes.shoulder ? [REHAB_NAME] : [];
-  const list = lead.concat(getDisplayOrder(day), customExercises);
+  // Push-Ups, the pressing bridge, joins Upper and Full Body after the numbered lifts while it is on.
+  const bridge = modes.shoulder && (day === "upper" || day === "full") ? [PUSHUP_NAME] : [];
+  const list = lead.concat(getDisplayOrder(day), bridge, customExercises);
   if(selected === REHAB_NAME && !modes.shoulder) selected = activeDayOrder(day)[0];
 
   let html = `<div class="pill-row" id="pill-scroll">`;
@@ -68,7 +70,7 @@ function renderDay(day){
     const isPreseasonPill = modes.preseason && !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseason);
     const pillClasses = ['pill'];
     if(isPreseasonPill) pillClasses.push('preseason-pill');
-    if(name === REHAB_NAME) pillClasses.push('rehab-pill');
+    if(name === REHAB_NAME || bridge.includes(name)) pillClasses.push('rehab-pill');
     if(day === "extra" && EXTRA_CATEGORY[name]) pillClasses.push('cat-' + EXTRA_CATEGORY[name]);
     if(selected===name) pillClasses.push('active');
     const skipped = !loggedToday && skipReason(name);
@@ -87,7 +89,7 @@ function renderDay(day){
 
   if(DAY_ORDER[day].includes(selected) && !activeDayOrder(day).includes(selected)) selected = activeDayOrder(day)[0];
   let ex = selected === REHAB_NAME && modes.shoulder ? ensureRehabExercise() : data[selected];
-  if(!ex && DAY_ORDER[day].includes(selected)){
+  if(!ex && (DAY_ORDER[day].includes(selected) || bridge.includes(selected))){
     ex = data[selected] = newExerciseShell(selected);
     persist();
     enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name: selected } });
@@ -396,7 +398,7 @@ function renderExerciseCard(name, ex){
   const backActive = modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name);
   const preseasonActive = modes.preseason && !!ex.preseason;
   const deloadActive = modes.deload && ex.trackBy !== "duration";
-  const shoulderPaused = isShoulderPaused(name), shoulderActive = shoulderPaused || isShoulderHeld(name);
+  const shoulderPaused = isShoulderPaused(name), shoulderActive = isShoulderModified(name);
 
   const isCustom = !allDayNames().includes(name);
   // "+20 since first" rides at the right end of the title row, so the Next tile sits right under
@@ -487,9 +489,12 @@ function renderExerciseCard(name, ex){
             ? `Left arm paused until week 3 of Shoulder Rehab. Right-arm hammer curls are fine now.`
             : `Paused for Shoulder Rehab until the side-raise press is pain-free.`;
         } else if(suggestion.shoulderHold){
+          const h = suggestion.shoulderHold;
           msg = name === "Bicep Curl"
             ? `Shoulder Rehab: hammer curls only at ${suggestion.weight} lb, lower over 3 sec. No adding weight yet.`
-            : `Shoulder Rehab: hold ${suggestion.weight} lb, close grip, stop short of the chest. Only at 3 of 10 pain or less.`;
+            : `Rehab: ${suggestion.weight} lb${h.fullWeight ? ` (${Math.round(h.pct * 100)}% of ${h.fullWeight})` : ""}, close grip, short of the chest. Hold until phase 3.`;
+        } else if(suggestion.shoulderBuild && !suggestion.deloadWeek){
+          msg = `Shoulder Rehab phase 3: full range, ${suggestion.weight} lb. Add 5 lb a session at 3 of 10 or less, up to ${suggestion.shoulderBuild.fullWeight} lb.`;
         } else if(suggestion.shoulderReturn && !suggestion.deloadWeek){
           const r = suggestion.shoulderReturn, left = SHOULDER_RETURN_STEPS.length - r.step;
           msg = left

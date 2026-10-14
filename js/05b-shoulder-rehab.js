@@ -15,8 +15,10 @@ const SHOULDER_RETURN_WINDOW_DAYS = 56; // after 8 weeks off rehab the ramp no l
 const HAMMER_FROM_WEEK = 3;
 // The rehab is for the left shoulder; the right is trained alongside it (see REHAB_RIGHT_SIDE).
 const RIGHT_PRESS_TIP = "Right arm: single-arm DB floor press or landmine press keeps pressing trained.";
+// Held lifts start at a share of the last working weight from before rehab and stay there.
+const SHOULDER_HOLD_PCT = { "Bench Press": 0.85, "Bicep Curl": 0.7 };
 const SHOULDER_CARE_TIP = {
-  "Bench Press": "Close grip, stop short of the chest, only at 3 of 10 pain or less. No full-range barbell bench until the left is ready. " + RIGHT_PRESS_TIP,
+  "Bench Press": "About 85% of your pre-rehab weight, close grip, stop 2-3 in short of the chest (pins or a board). Over 3 of 10: drop 10 lb, or stop until phase 3. Incline push-ups or a right-arm DB floor press keep pressing trained.",
   "Bicep Curl": "Hammer curls only, both arms, light, lower over 3 seconds. Skip if the front of the left shoulder aches.",
 };
 const SHOULDER_PAUSED_TIP = "Paused for Shoulder Rehab. Back once the side-raise press is pain-free.";
@@ -24,6 +26,14 @@ const SHOULDER_PAUSED_TIPS = {
   "Cable Chest Fly": "Paused for Shoulder Rehab. " + RIGHT_PRESS_TIP,
   "Incline DB Press": "Paused for Shoulder Rehab. " + RIGHT_PRESS_TIP,
   "Bicep Curl": "Left arm paused until week 3. Right arm: slow hammer curls, 3 × 10 light, can start now.",
+};
+const BENCH_PHASE3_TIP = "Phase 3: full-range bench is back. Add 5 lb a session while it stays at 3 of 10 or less, up to your pre-rehab weight.";
+// Push-ups are the pressing bridge: incline while the shoulder settles, the floor in phase 3. While
+// rehab is on they also join the Upper and Full Body rows, after the numbered lifts.
+const PUSHUP_NAME = "Push-Ups";
+const PUSHUP_TIP = {
+  early: "Shoulder Rehab: incline only, hands on a bench or counter, shoulder width, elbows about 45°. Stop a few inches short of the bottom. 3 of 10 or less.",
+  phase3: "Shoulder Rehab phase 3: floor push-ups to full depth. Pain-free here is a good sign for full-range bench.",
 };
 // Lifts the modifier leaves alone but has a word on, shown while it is on.
 const SHOULDER_KEEP_TIP = {
@@ -83,12 +93,14 @@ function isShoulderPaused(name){
 function isShoulderHeld(name){
   return !!modes.shoulder && !isShoulderPaused(name) && !!SHOULDER_CARE_TIP[name];
 }
-function isShoulderModified(name){ return isShoulderPaused(name) || isShoulderHeld(name); }
+function isShoulderModified(name){ return isShoulderPaused(name) || isShoulderHeld(name) || (!!modes.shoulder && name === PUSHUP_NAME); }
 // The line on a lift's card while rehab is on: paused, held, or kept with a word. Null otherwise.
 function shoulderCardTip(name){
   if(!modes.shoulder) return null;
   if(isShoulderPaused(name)) return SHOULDER_PAUSED_TIPS[name] || SHOULDER_PAUSED_TIP;
+  if(name === "Bench Press" && rehabPhase() === 3) return BENCH_PHASE3_TIP;
   if(isShoulderHeld(name)) return SHOULDER_CARE_TIP[name];
+  if(name === PUSHUP_NAME) return rehabPhase() === 3 ? PUSHUP_TIP.phase3 : PUSHUP_TIP.early;
   return SHOULDER_KEEP_TIP[name] || null;
 }
 function withRehabNote(note){
@@ -102,7 +114,7 @@ function ensureRehabNotes(){
   if(!from) return 0;
   const to = modes.shoulder ? todayISO() : (shoulderRehab.endedOn || from);
   let changed = 0;
-  [...SHOULDER_RETURN, ...Object.keys(SHOULDER_CARE_TIP)].forEach(name => {
+  [...SHOULDER_RETURN, ...Object.keys(SHOULDER_CARE_TIP), PUSHUP_NAME].forEach(name => {
     const ex = data[name];
     if(!ex) return;
     ex.entries.forEach(e => {
@@ -231,7 +243,7 @@ function renderRehabCard(){
 
   const paused = [...SHOULDER_PAUSED].filter(n => data[n] || allDayNames().includes(n));
   if(week < HAMMER_FROM_WEEK) paused.push("Bicep Curl for the left arm (hammer curls from week 3)");
-  html += `<div class="rehab-hold"><b>Paused in the app:</b> ${paused.join(", ")}. <b>Bench:</b> held, close grip, stop short of the chest.${week >= HAMMER_FROM_WEEK ? " <b>Curls:</b> hammer only, light." : ""} <b>Also hold off:</b> dips, upright rows, behind-neck pressing, straight-bar curls, racquet and throwing.</div>`;
+  html += `<div class="rehab-hold"><b>Paused in the app:</b> ${paused.join(", ")}. <b>Bench:</b> ${phase === 3 ? "full range, building back up" : "85% of your pre-rehab weight, close grip, stop short of the chest"}. <b>Pressing bridge:</b> ${phase === 3 ? "floor push-ups" : "incline push-ups"}, on Upper and Full Body.${week >= HAMMER_FROM_WEEK ? " <b>Curls:</b> hammer only, light." : ""} <b>Also hold off:</b> dips, upright rows, behind-neck pressing, straight-bar curls, racquet and throwing.</div>`;
 
   html += `<div class="rehab-foot"><span class="rehab-check">Through it when a full-effort side-raise press is pain-free.</span>`;
   if(phase === 2) html += `<button type="button" class="skip-btn" onclick="setRehabPhase3(true)">Move to Phase 3</button>`;
@@ -251,10 +263,19 @@ function applyShoulder(core, ex, name, baseline){
     if(isShoulderPaused(name)) return { ...core, readyToProgress: false, shoulderPaused: true };
     if(!isShoulderHeld(name)) return core;
     const last = baseline[baseline.length - 1];
-    let cap = last.weight;
-    // Hammer curls start light: well under the last straight-bar curl from before rehab.
-    if(name === "Bicep Curl" && shoulderRehab.startedOn && last.date < shoulderRehab.startedOn) cap = roundLoad(last.weight * 0.7);
-    return { ...core, weight: Math.min(core.weight, cap), readyToProgress: false, shoulderHold: true };
+    const pre = shoulderRehab.startedOn ? baseline.filter(e => e.date < shoulderRehab.startedOn).pop() : null;
+    // Never above the rehab share of the pre-rehab weight (bench 85%, hammer curls 70%), and never
+    // above what was last logged, so a step down for pain sticks.
+    const start = pre && pre.weight > 0 ? roundLoad(pre.weight * SHOULDER_HOLD_PCT[name]) : last.weight;
+    const cap = Math.min(start, last.weight);
+    // Phase 3: full-range bench builds back up from there, 5 lb a session, up to the pre-rehab weight.
+    if(name === "Bench Press" && rehabPhase() === 3){
+      const top = pre && pre.weight > 0 ? pre.weight : core.weight;
+      const hit = last.reps >= effectiveTargetReps(ex);
+      const weight = last.date < (shoulderRehab.startedOn || "") ? start : Math.min(top, hit ? last.weight + 5 : last.weight);
+      return { ...core, weight, reps: effectiveTargetReps(ex), readyToProgress: hit, reentry: undefined, shoulderBuild: { fullWeight: top } };
+    }
+    return { ...core, weight: Math.min(core.weight, cap), readyToProgress: false, shoulderHold: { pct: SHOULDER_HOLD_PCT[name], fullWeight: pre ? pre.weight : null } };
   }
   if(!shoulderRehab.startedOn || !SHOULDER_RETURN.has(name)) return core;
   if((core.careFlags && core.careFlags.length) || core.noteTarget != null || core.reentry) return core;
@@ -285,6 +306,10 @@ function rehabCoachBlock(){
     block.phase = rehabPhase();
     block.pausedLifts = [...SHOULDER_PAUSED, "Bicep Curl"].filter(n => isShoulderPaused(n) && (data[n] || allDayNames().includes(n)));
     block.heldLifts = Object.keys(SHOULDER_CARE_TIP).filter(isShoulderHeld);
+    block.bench = rehabPhase() === 3
+      ? "Phase 3: full-range bench building back 5 lb a session toward the pre-rehab weight."
+      : "Held at 85% of the last pre-rehab working weight, close grip, stopping short of the chest; drop 10 lb if over 3 of 10.";
+    block.pushUps = "Push-Ups are the pressing bridge: incline in phases 1-2, floor to full depth in phase 3.";
     block.rightSide = "Rehab is for the left shoulder. The right is trained too: rotation work both sides with the right about 50% heavier, right-arm hammer curls from week 1, single-arm right pressing (DB floor press, landmine) allowed. No pain cap on the right, but the same ache there means treat it like the left.";
     block.notes = "Sessions of paused or held lifts logged during rehab carry \"Rehab\" in the note.";
     block.last14Days = { daysOn: recent.daysOn, daysWithRehabDone: recent.daysDone, painScores0to10: recent.pain };
