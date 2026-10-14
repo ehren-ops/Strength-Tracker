@@ -514,6 +514,21 @@ function keepDeloadOn(){
   render();
 }
 
+// Overview sections that fold away by tapping their heading, remembered on this device like the
+// graph toggle. Folded, the heading carries a one-line summary instead.
+const OVERVIEW_COLLAPSED_KEY = "strength-tracker-overview-collapsed";
+let overviewCollapsed = (function(){ try{ return JSON.parse(localStorage.getItem(OVERVIEW_COLLAPSED_KEY)) || {}; }catch(e){ return {}; } })();
+function toggleOverviewSection(key){
+  overviewCollapsed[key] = !overviewCollapsed[key];
+  try{ localStorage.setItem(OVERVIEW_COLLAPSED_KEY, JSON.stringify(overviewCollapsed)); }catch(e){}
+  render();
+}
+function collapsibleHead(key, title, summary){
+  const closed = !!overviewCollapsed[key];
+  return `<button type="button" class="section-toggle${closed ? " closed" : ""}" onclick="toggleOverviewSection('${key}')" aria-expanded="${!closed}">
+    <h3 class="section">${title}</h3>${closed && summary ? `<span class="section-summary">${summary}</span>` : ""}</button>`;
+}
+
 // One modifier: a title row with its on/off switch, then a short description.
 // The hidden label keeps "Name: ON/OFF" readable for screen readers.
 function renderModifierRow(key, emoji, name, desc, extraHtml){
@@ -664,8 +679,12 @@ function renderOverview(){
   }
   html += `</div>`;
 
-  html += `<div class="card"><h3 class="section">% Change Since First Logged</h3>`;
-  if(!overviewData.length){
+  const changeAvg = overviewData.length ? Math.round(overviewData.reduce((s, o) => s + o.pct, 0) / overviewData.length) : 0;
+  html += `<div class="card">${collapsibleHead("change", "% Change Since First Logged",
+    overviewData.length ? `avg ${changeAvg > 0 ? "+" : ""}${changeAvg}%` : "")}`;
+  if(overviewCollapsed.change){
+    // folded: the heading's summary is enough
+  } else if(!overviewData.length){
     html += `<p style="font-size:0.85rem;color:var(--slate);font-style:italic;">Need at least 2 sessions on a lift to show change.</p>`;
   } else {
     overviewData.forEach(o => {
@@ -681,14 +700,16 @@ function renderOverview(){
   }
   html += `</div>`;
 
+  const modNames = { deload: "Deload", ski: "Ski", preseason: "Preseason", knee: "Knee Care", back: "Back Care", shoulder: "Shoulder Rehab" };
+  const modsOn = MODE_DEFS.filter(m => modes[m.key]).map(m => modNames[m.key] || m.key);
   html += `<div class="card">
-    <h3 class="section">Training Modifiers</h3>
-    ${renderDeloadModifier()}
+    ${collapsibleHead("modifiers", "Training Modifiers", modsOn.length ? `On: ${modsOn.join(", ")}` : "All off")}
+    ${overviewCollapsed.modifiers ? "" : `${renderDeloadModifier()}
     ${renderModifierRow("ski", "🎿", "Ski Season", "Squat, Bulgarian Split Squat and Walking Lunge shift to lower reps with a slower lowering phase. Roughly Nov to March.")}
     ${renderModifierRow("preseason", "🏔️", "Preseason Prep", "Adds power, lateral, lowering-phase and calf work to your lift days for the 7 to 10 week ramp into ski season. Power work goes first; stop a set when speed drops.")}
     ${renderModifierRow("knee", "🦵", "Knee Care", "Squat, Bulgarian Split Squat and Walking Lunge hold and drop about 10% while your knee settles. Everything else trains as normal.")}
     ${renderModifierRow("back", "🩺", "Low Back Care", "Squat, RDL, Barbell Row, Kettlebell Swings and Hip Thrust (swap to a glute bridge) hold and drop about 10% while your lower back settles. Everything else trains as normal.")}
-    ${renderShoulderModifier()}
+    ${renderShoulderModifier()}`}
   </div>`;
 
   html += renderBackupSyncCard();

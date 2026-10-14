@@ -2408,6 +2408,25 @@ async function main(){
   if(!ok79) throw new Error('expected Shoulder Rehab to work as designed, got: ' + JSON.stringify(r79));
   console.log('OK: off changes nothing; on, the rehab card leads every day (lifts keep their numbers), flies paused, bench at 85% (157.5 from 185, never above the last log, kept through a deload) and rebuilt in phase 3, Push-Ups joins Upper and Full, curls paused then hammer at 20; phases 1/2/3 show 3/9/11 items; pain saves; off ramps the fly 25 then 27.5');
 
+  console.log('=== 80: the Training Modifiers and % Change sections fold away from their headings ===');
+  const r80 = await page.evaluate(() => {
+    view = 'overview'; render();
+    const state = () => ({
+      mods: document.querySelectorAll('.mod-row').length,
+      bars: document.querySelectorAll('.bar-row').length,
+      summaries: [...document.querySelectorAll('.section-summary')].map(e => e.textContent),
+    });
+    const open = state();
+    toggleOverviewSection('modifiers'); toggleOverviewSection('change');
+    const closed = state();
+    const saved = localStorage.getItem('strength-tracker-overview-collapsed');
+    toggleOverviewSection('modifiers'); toggleOverviewSection('change');
+    return { open, closed, saved, reopened: state() };
+  });
+  if(r80.open.mods !== 6 || r80.closed.mods !== 0 || r80.closed.bars !== 0 || r80.closed.summaries.length !== 2 || !/"modifiers":true/.test(r80.saved) || r80.reopened.mods !== 6 || r80.reopened.bars !== r80.open.bars)
+    throw new Error('expected both Overview sections to fold and unfold from their headings, got: ' + JSON.stringify(r80));
+  console.log('OK: both sections fold to a one-line summary (' + r80.closed.summaries.join(' | ') + ') and come back; the choice is remembered');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
