@@ -67,8 +67,10 @@ function renderDay(day){
     if(isPreseasonPill) pillClasses.push('preseason-pill');
     if(day === "extra" && EXTRA_CATEGORY[name]) pillClasses.push('cat-' + EXTRA_CATEGORY[name]);
     if(selected===name) pillClasses.push('active');
+    const skipped = !loggedToday && skipReason(name);
     if(loggedToday) pillClasses.push('logged-today');
-    html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')">${(day !== "extra" && i < activeDayOrder(day).length) ? (i+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
+    if(skipped) pillClasses.push('skipped-today');
+    html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')"${skipped ? ` title="Skipped today: ${SKIP_REASONS[skipped]}"` : ''}>${(day !== "extra" && i < activeDayOrder(day).length) ? (i+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
   });
   html += `<div class="pill pill-add" onclick="toggleAddExercise()">+</div></div>`;
   html += `<div id="add-ex-row" style="display:none" class="add-ex-row">
@@ -566,8 +568,25 @@ function renderExerciseCard(name, ex){
     }
     html += `</div>`;
   }
+  html += renderSkipControl(name);
   html += `</div>`;
   return html;
+}
+
+// Bottom right of the card: skip this lift today, for injury or another reason. Hidden once the
+// lift is logged today; while skipped, shows the reason and an undo.
+function renderSkipControl(name){
+  if(isLoggedToday(name)) return "";
+  const q = name.replace(/'/g, "\\'");
+  const reason = skipReason(name);
+  if(reason){
+    return `<div class="skip-row"><span class="skip-state">Skipped today: ${SKIP_REASONS[reason]}</span><button type="button" class="skip-btn" onclick="undoSkip('${q}')">Undo</button></div>`;
+  }
+  if(skipPicking === name){
+    return `<div class="skip-row skip-picking">${Object.entries(SKIP_REASONS).map(([k, label]) =>
+      `<button type="button" class="skip-reason" onclick="skipExercise('${q}', '${k}')">${label}</button>`).join("")}<button type="button" class="skip-btn" onclick="cancelSkip()">Cancel</button></div>`;
+  }
+  return `<div class="skip-row"><button type="button" class="skip-btn" onclick="startSkip('${q}')">Skip today</button></div>`;
 }
 
 function renderHistRow(e, idx, isLatest, ex, name){
@@ -600,14 +619,6 @@ function renderHistRow(e, idx, isLatest, ex, name){
     </div>`;
   }
 
-  if(deletingKey === key){
-    return `<div class="hist-row${isLatest?' latest':''}" style="grid-template-columns:1fr auto auto;">
-      <span style="color:var(--slate);">Delete this entry?</span>
-      <button class="danger-btn" onclick="confirmDeleteEntry('${name.replace(/'/g,"\\'")}', ${idx})">Yes, delete</button>
-      <button class="cancel-btn" onclick="cancelDelete()">Cancel</button>
-    </div>`;
-  }
-
   // Narrow date, numbers and RPE columns; the note takes the rest in the body font, which fits
   // far more per line than the mono numbers.
   let html = `<div class="hist-row${isLatest?' latest':''}${ex.trackBy==="duration"?' cardio':''}">`;
@@ -620,7 +631,7 @@ function renderHistRow(e, idx, isLatest, ex, name){
   html += `<span class="note">${e.note ? escapeHtml(e.note) : ""}</span>`;
   html += `<span class="row-actions">
     <button class="icon-btn" onclick="startEdit('${name.replace(/'/g,"\\'")}', ${idx})" aria-label="Edit">✎</button>
-    <button class="icon-btn" onclick="startDelete('${name.replace(/'/g,"\\'")}', ${idx})" aria-label="Delete">✕</button>
+    <button class="icon-btn del-btn${deletingKey === key ? " armed" : ""}" onclick="tapDelete('${name.replace(/'/g,"\\'")}', ${idx})" aria-label="${deletingKey === key ? "Tap again to delete" : "Delete"}">✕</button>
   </span>`;
   html += `</span>`;
   html += `</div>`;
@@ -629,8 +640,43 @@ function renderHistRow(e, idx, isLatest, ex, name){
 
 function startEdit(name, idx){ editingKey = name + "|" + idx; deletingKey = null; render(); }
 function cancelEdit(){ editingKey = null; render(); }
-function startDelete(name, idx){ deletingKey = name + "|" + idx; editingKey = null; render(); }
+// Delete takes two taps: the first turns the ✕ red, the second (within a few seconds) deletes.
+function tapDelete(name, idx){
+  const key = name + "|" + idx;
+  clearTimeout(deleteArmTimer);
+  if(deletingKey === key){ confirmDeleteEntry(name, idx); return; }
+  deletingKey = key; editingKey = null;
+  render();
+  deleteArmTimer = setTimeout(() => { if(deletingKey === key){ deletingKey = null; render(); } }, 4000);
+}
 function cancelDelete(){ deletingKey = null; render(); }
+
+function startSkip(name){ skipPicking = name; render(); }
+function cancelSkip(){ skipPicking = null; render(); }
+function skipExercise(name, reason){
+  const d = todayISO();
+  (skips[d] = skips[d] || {})[name] = reason;
+  saveSkips();
+  skipPicking = null;
+  enqueueOp({ id: genId(), type: "upsert_skip", payload: { date: d, name } });
+  ["full", "upper", "lower"].filter(day => day === view || DAY_ORDER[day].includes(name)).forEach(checkCoreWorkoutComplete);
+  // On to the next lift of the day that isn't done yet.
+  if(DAY_ORDER[view]){
+    const list = getDisplayOrder(view);
+    const next = list.slice(list.indexOf(name) + 1).concat(list).find(n => n !== name && !isLoggedToday(n) && !skipReason(n));
+    if(next) selected = next;
+  }
+  render();
+}
+function undoSkip(name, quiet){
+  const d = todayISO();
+  if(!skips[d] || !skips[d][name]) return;
+  delete skips[d][name];
+  if(!Object.keys(skips[d]).length) delete skips[d];
+  saveSkips();
+  enqueueOp({ id: genId(), type: "delete_skip", payload: { date: d, name } });
+  if(!quiet) render();
+}
 
 function startDeleteExercise(name){ deletingExercise = name; render(); }
 function cancelDeleteExercise(){ deletingExercise = null; render(); }

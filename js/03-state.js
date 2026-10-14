@@ -17,7 +17,14 @@ let openHistory = {};
 let openStretchItems = {};
 let chartQuarterOffset = {};
 let editingKey = null;
-let deletingKey = null;
+let deletingKey = null; // history row whose ✕ is armed: the next tap on it deletes
+let deleteArmTimer = null;
+// Lifts skipped on purpose, by date: { "2026-10-14": { "Bench Press": "injury" } }. A skip counts
+// the lift as done for the day and tells the coach why it is missing; history is untouched.
+const SKIPS_KEY = "strength-tracker-skips";
+let skips = (function(){ try{ return JSON.parse(localStorage.getItem(SKIPS_KEY) || "{}") || {}; }catch(e){ return {}; } })();
+function saveSkips(){ try{ localStorage.setItem(SKIPS_KEY, JSON.stringify(skips)); }catch(e){} }
+let skipPicking = null; // lift whose skip reasons are showing
 let deletingExercise = null;
 let editing1RM = null;
 // Data-driven table for the four "training modifier" toggles, instead of a

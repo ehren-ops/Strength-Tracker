@@ -233,6 +233,11 @@ function coachTz(){
 }
 function activeModes(){ return Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])); }
 
+// Lifts skipped on purpose that day, with the reason, so the coach never reads them as missed.
+function skippedOn(date){
+  return Object.entries(skips[date] || {}).map(([name, reason]) => ({ name, reason }));
+}
+
 // One session plus the last 8 results per lift, so the note can see trends, not just today.
 function buildSessionCoachPayload(date){
   const exercises = [];
@@ -255,7 +260,7 @@ function buildSessionCoachPayload(date){
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
   const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
-  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date) };
+  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date), skipped: skippedOn(date) };
 }
 
 // The past week plus 6 weeks of history per lift, enough to judge loading blocks and deloads.
@@ -276,7 +281,8 @@ function buildWeeklyCoachPayload(){
     .map(d => [d, sessionOrder(d)]).filter(([, o]) => o));
   const weekLogTimes = Object.fromEntries([...sessionDates].filter(d => d >= shiftISO(weekEnd, -6)).sort()
     .map(d => [d, sessionAnchors(d)]).filter(([, l]) => l.length >= 2));
-  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd) };
+  const weekSkips = Object.fromEntries(Object.keys(skips).filter(d => d >= shiftISO(weekEnd, -6) && d <= weekEnd).sort().map(d => [d, skippedOn(d)]));
+  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), skipped: weekSkips, modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd) };
 }
 
 async function generateCoach(kind){
@@ -427,6 +433,8 @@ function renderLastSessionBreakdown(){
       ? "Heart rate: waiting for Whoop to sync to Strava"
       : "";
     if(hrLine) html += `<div class="session-hr-summary">${hrLine}</div>`;
+    const skippedList = skippedOn(lastDate).filter(sk => !names.includes(sk.name));
+    if(skippedList.length) html += `<div class="session-hr-summary">Skipped: ${skippedList.map(sk => `${escapeHtml(sk.name)} (${SKIP_REASONS[sk.reason].toLowerCase()})`).join(", ")}</div>`;
     names.forEach(n => {
       const ex = data[n];
       const entry = ex.entries.slice().reverse().find(e => e.date === lastDate);

@@ -117,6 +117,7 @@ function logEntry(){
   // When it was logged, so a session's actual exercise order can be compared with the planned one.
   entry.loggedAt = new Date().toISOString();
   ex.entries.push(entry);
+  if(entry.date === todayISO()) undoSkip(selected, true); // logged after all: the skip no longer applies
   persist();
   enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: selected, clientId: entry.clientId } });
   // Check every day this lift belongs to, not just the open tab: Upper and Full share lifts, so

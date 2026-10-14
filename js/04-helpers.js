@@ -12,6 +12,9 @@ function todayISO(){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
+const SKIP_REASONS = { injury: "Injury", equipment: "Equipment", time: "Time", other: "Other" };
+function skipReason(name, date){ return (skips[date || todayISO()] || {})[name] || null; }
+
 function isLoggedToday(name){
   const ex = data[name];
   if(!ex) return false;
@@ -100,7 +103,7 @@ function checkCoreWorkoutComplete(day){
   // optional, so skipping one never blocks the popup, with Preseason Prep on or
   // off. Ski, care and deload modes change prescriptions, never this list.
   const coreList = DAY_ORDER[day].filter(name => !PRESEASON_ONLY.has(name));
-  if(!coreList.every(name => isLoggedToday(name))) return;
+  if(!coreList.every(name => isLoggedToday(name) || skipReason(name))) return;
   const today = todayISO();
   if(celebratedToday[day] === today) return;
   celebratedToday[day] = today;

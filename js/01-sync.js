@@ -231,6 +231,20 @@ async function runOp(op){
     if(error) throw error;
     return true;
   }
+  if(op.type === "upsert_skip"){
+    const reason = (skips[op.payload.date] || {})[op.payload.name];
+    if(!reason) return true; // undone before it synced
+    const { error } = await supabaseClient.from("skips").upsert({
+      user_id: userId, skip_date: op.payload.date, exercise_name: op.payload.name, reason,
+    }, { onConflict: "user_id,skip_date,exercise_name" });
+    if(error) throw error;
+    return true;
+  }
+  if(op.type === "delete_skip"){
+    const { error } = await supabaseClient.from("skips").delete().eq("user_id", userId).eq("skip_date", op.payload.date).eq("exercise_name", op.payload.name);
+    if(error) throw error;
+    return true;
+  }
   if(op.type === "delete_entry"){
     const { error } = await supabaseClient.from("entries").delete().eq("user_id", userId).eq("client_id", op.payload.clientId);
     if(error) throw error;
@@ -397,6 +411,15 @@ async function pullRemoteAndMerge(){
     saveDeloadDates();
   }
 
+  // Skips from other devices: added where this one has none for that lift and day.
+  const { data: skipRows, error: skErr } = await supabaseClient.from("skips").select("*").eq("user_id", userId);
+  if(skErr) console.error(skErr);
+  (skipRows || []).forEach(r => {
+    const day = (skips[r.skip_date] = skips[r.skip_date] || {});
+    if(!day[r.exercise_name]) day[r.exercise_name] = r.reason;
+  });
+  if((skipRows || []).length) saveSkips();
+
   const { data: breakdownRows, error: bdErr } = await supabaseClient.from("ai_breakdowns").select("*").eq("user_id", userId);
   if(bdErr) console.error(bdErr);
   (breakdownRows || []).forEach(r => {
@@ -424,6 +447,9 @@ function reconcileAllToQueue(){
     });
   });
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  Object.entries(skips).forEach(([date, byName]) => Object.keys(byName).forEach(name => {
+    enqueueOp({ id: genId(), type: "upsert_skip", payload: { date, name } });
+  }));
   ["session", "weekly"].forEach(kind => {
     Object.keys(coachStore(kind)).forEach(date => {
       enqueueOp({ id: genId(), type: "upsert_breakdown", payload: { kind, date } });

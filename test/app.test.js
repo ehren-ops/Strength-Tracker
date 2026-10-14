@@ -2236,6 +2236,50 @@ async function main(){
   if(JSON.stringify(loggedOrder) !== JSON.stringify(['Lateral Raise', 'Squat', 'Bench Press', 'Barbell Row', 'Back Extension'])) throw new Error('expected the session list in logged order, got: ' + JSON.stringify(loggedOrder));
   console.log('OK: the post-workout breakdown lists lifts in the order they were logged');
 
+  console.log('=== 77: skip a lift for injury from its card; deleting a history entry takes two taps ===');
+  await page.click('.tab:has-text("Upper Body")');
+  // A lift with history that isn't logged today (a logged lift has nothing to skip).
+  const upperFirst = await page.evaluate(() => {
+    const n = 'Face Pulls';
+    window.__todayFacePulls = data[n].entries.filter(e => e.date === todayISO());
+    data[n].entries = data[n].entries.filter(e => e.date !== todayISO());
+    data[n].entries.push({ clientId: 'skip-hist', date: shiftISO(todayISO(), -3), weight: 50, sets: 3, reps: 8, difficulty: 7, label: 'S1' });
+    return n;
+  });
+  await page.evaluate(n => { selected = n; render(); }, upperFirst);
+  await page.click('.skip-btn:has-text("Skip today")');
+  await page.click('.skip-reason:has-text("Injury")');
+  await sleep(150);
+  const skipState = await page.evaluate(n => ({
+    reason: skipReason(n), selectedMoved: selected !== n || getDisplayOrder('upper').every(x => x === n || isLoggedToday(x) || skipReason(x)),
+    pillSkipped: [...document.querySelectorAll('.pill.skipped-today')].some(p => p.textContent.includes(n)),
+    coach: buildSessionCoachPayload(todayISO()).skipped,
+  }), upperFirst);
+  if(skipState.reason !== 'injury' || !skipState.selectedMoved || !skipState.pillSkipped || !skipState.coach.some(x => x.name === upperFirst && x.reason === 'injury')) throw new Error('expected the lift skipped for injury, marked on its pill, sent to the coach, and the card moved on, got: ' + JSON.stringify(skipState));
+  await waitForText(page, '#sync-status', t => !/pending|Syncing/i.test(t), 10000, 'skip sync').catch(() => {});
+  await sleep(300);
+  const skipRow = await page.evaluate(() => (JSON.parse(sessionStorage.getItem('__mock_supabase_db__')).skips || []).map(r => r.exercise_name + ':' + r.reason));
+  // Undo from the card
+  await page.evaluate(n => { selected = n; render(); }, upperFirst);
+  await page.click('.skip-row button:has-text("Undo")');
+  await sleep(150);
+  const undone = await page.evaluate(n => skipReason(n), upperFirst);
+  if(undone !== null) throw new Error('expected Undo to clear the skip');
+  // Two-tap delete: first tap arms (red), second deletes; a lone tap disarms on its own.
+  const gap = await page.evaluate(() => getComputedStyle(document.querySelector('.row-actions')).columnGap);
+  const delCountBefore = await page.evaluate(n => data[n].entries.length, upperFirst);
+  const delBtn = page.locator('.hist-row:not(.header) .del-btn').first();
+  await delBtn.click();
+  await sleep(100);
+  const armed = await page.locator('.hist-row:not(.header) .del-btn.armed').count();
+  const afterOne = await page.evaluate(n => data[n].entries.length, upperFirst);
+  await page.locator('.hist-row:not(.header) .del-btn.armed').first().click();
+  await sleep(150);
+  const afterTwo = await page.evaluate(n => data[n].entries.length, upperFirst);
+  if(armed !== 1 || afterOne !== delCountBefore || afterTwo !== delCountBefore - 1) throw new Error('expected first tap to arm the red ✕ and the second to delete, got: ' + JSON.stringify({ armed, delCountBefore, afterOne, afterTwo }));
+  await page.evaluate(() => { data['Face Pulls'].entries = data['Face Pulls'].entries.filter(e => e.clientId !== 'skip-hist').concat(window.__todayFacePulls || []); render(); });
+  console.log('OK: skip for injury marks the pill, moves on, syncs (' + JSON.stringify(skipRow) + ') and reaches the coach; Undo clears it; ✕ deletes on the second tap; edit/delete gap ' + gap);
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

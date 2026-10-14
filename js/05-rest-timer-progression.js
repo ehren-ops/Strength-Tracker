@@ -337,7 +337,6 @@ function applyNoteTarget(core, ex, last){
 const BREAK_DAYS = 14;
 const REENTRY_STEPS = [0.9, 0.95, 1];
 const roundLoad = w => Math.round(w / 2.5) * 2.5;
-function daysBetween(a, b){ return Math.round((Date.parse(b) - Date.parse(a)) / 86400000); }
 // Time off means no training at all, not one lift skipped: any logged session of any lift in
 // between breaks it. A lift done every couple of weeks never counts as coming back from a break.
 function trainedBetween(a, b){
