@@ -1403,6 +1403,7 @@ async function main(){
     ['5-Minute Core Routine', 'cat-core'],
     ['Thoracic Spine Stretch', 'cat-stretch'], ['Hip Stretch', 'cat-stretch'],
     ['Leg Stretch', 'cat-stretch'], ['Full Body Stretch', 'cat-stretch'],
+    ['Sauna', 'cat-recovery'], ['Cold Plunge', 'cat-recovery'], ['Hot Tub', 'cat-recovery'],
   ];
   expectedOrder.forEach(([name, cls], i) => {
     const actualName = extraPills[i] ? extraPills[i].text.replace(/\s*✓$/, '') : undefined;
@@ -2426,6 +2427,41 @@ async function main(){
   if(r80.open.mods !== 6 || r80.closed.mods !== 0 || r80.closed.bars !== 0 || r80.closed.summaries.length !== 2 || !/"modifiers":true/.test(r80.saved) || r80.reopened.mods !== 6 || r80.reopened.bars !== r80.open.bars)
     throw new Error('expected both Overview sections to fold and unfold from their headings, got: ' + JSON.stringify(r80));
   console.log('OK: both sections fold to a one-line summary (' + r80.closed.summaries.join(' | ') + ') and come back; the choice is remembered');
+
+  console.log('=== 81: sauna, cold plunge and hot tub log minutes and temperature for the coach, outside the lift logic ===');
+  const r81 = await page.evaluate(() => {
+    const keep = JSON.stringify(['Sauna', 'Cold Plunge', 'Hot Tub'].map(n => data[n] || null));
+    const lastBefore = lastTrainingDate();
+    view = 'extra'; selected = 'Sauna'; render();
+    const form = { minutes: document.getElementById('f-minutes').value, temp: document.getElementById('f-temp').value, rpe: !!document.getElementById('f-difficulty'), skip: !!document.querySelector('.skip-ctl'), chart: !!document.querySelector('.card svg.chart') };
+    document.getElementById('f-minutes').value = '18';
+    document.getElementById('f-temp').value = '185';
+    logEntry();
+    selected = 'Sauna'; render();
+    const e = data['Sauna'].entries[data['Sauna'].entries.length - 1];
+    const card = { big: document.querySelector('.big-val').textContent, tile: document.querySelector('.rec-plan').textContent, load: document.querySelector('.rec-load').textContent, hist: document.querySelector('.hist-row.latest').textContent };
+    const out = {
+      form, card, saved: { minutes: e.minutes, tempF: e.tempF, difficulty: e.difficulty },
+      tempCol: entryToRow(e, 'x', 'y').temp_f,
+      suggestion: computeSuggestion(data['Sauna'], 'Sauna'),
+      notTraining: lastTrainingDate() === lastBefore,
+      notInLogTimes: !sessionLogTimes(todayISO()).some(l => l.name === 'Sauna'),
+      coachSession: buildSessionCoachPayload(todayISO()).recovery,
+      coachWeekly: buildWeeklyCoachPayload().recovery,
+      inExercises: buildWeeklyCoachPayload().exercises.some(x => x.name === 'Sauna'),
+    };
+    const restore = JSON.parse(keep);
+    ['Sauna', 'Cold Plunge', 'Hot Tub'].forEach((n, i) => { if(restore[i]) data[n] = restore[i]; else delete data[n]; });
+    persist(); render();
+    return out;
+  });
+  const ok81 = r81.form.minutes === '15' && r81.form.temp === '180' && !r81.form.rpe && !r81.form.skip && !r81.form.chart &&
+    r81.saved.minutes === 18 && r81.saved.tempF === 185 && r81.tempCol === 185 && r81.saved.difficulty == null &&
+    /18 min/.test(r81.card.big) && /185°F/.test(r81.card.big) && /Last 7 days: 1× · 18 min/.test(r81.card.tile) && /185°F/.test(r81.card.load) && /at 185°F/.test(r81.card.hist) &&
+    r81.suggestion === null && r81.notTraining && r81.notInLogTimes && !r81.inExercises &&
+    r81.coachSession.some(l => /Sauna 18 min at 185°F/.test(l)) && r81.coachWeekly.length === r81.coachSession.length;
+  if(!ok81) throw new Error('expected recovery logging to work as designed, got: ' + JSON.stringify(r81));
+  console.log('OK: Sauna starts at 15 min / 180°F, logs 18 min at 185°F with no RPE, shows the 7-day total, sends "' + r81.coachSession[r81.coachSession.length - 1] + '" to the coach, and stays out of lift logic');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

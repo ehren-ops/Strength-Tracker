@@ -42,7 +42,7 @@ const DAY_ORDER = {
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
   // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
-  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Zone 2 Ride","Incline Treadmill Walk","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch"],
+  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Zone 2 Ride","Incline Treadmill Walk","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
 };
 const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
 function activeDayOrder(day){
@@ -67,7 +67,19 @@ const EXTRA_CATEGORY = {
   "Hip Stretch": "stretch",
   "Leg Stretch": "stretch",
   "Full Body Stretch": "stretch",
+  "Sauna": "recovery",
+  "Cold Plunge": "recovery",
+  "Hot Tub": "recovery",
 };
+// Recovery: heat and cold, logged as minutes and temperature for the coach's analysis rather than
+// for progression, so these cards carry no suggestion, graph or RPE, and stay out of everything
+// that counts lift sessions (time off, readiness, calendar, heart rate, session order).
+const RECOVERY = {
+  "Sauna": { temp: 180, minutes: 15, guide: "Typical: 15-20 min at 175-195°F, 2-4× a week. After lifting or on rest days, not right before a lift." },
+  "Cold Plunge": { temp: 50, minutes: 3, guide: "Typical: 2-5 min at 39-55°F. Keep it 6+ hours after a lift if building muscle is the goal." },
+  "Hot Tub": { temp: 102, minutes: 15, guide: "Typical: 15-20 min at 100-104°F. Good for loosening up; hydrate after." },
+};
+function isRecovery(name){ return Object.prototype.hasOwnProperty.call(RECOVERY, name); }
 
 // Fixed classification, not user-editable per exercise - no need for these
 // to live on the exercise object or round-trip through Supabase like the
@@ -191,6 +203,9 @@ const EXERCISE_DEFAULTS = {
   "Skater Bound": { trackBy: "reps", targetReps: 4, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "3x4 per side, stick each landing 2 sec." },
   "Spanish Squat": { trackBy: "reps", targetReps: 10, preseason: false, preseasonWeek3: false },
   "Push-Ups": { trackBy: "reps", targetReps: 12 },
+  "Sauna": { trackBy: "duration" },
+  "Cold Plunge": { trackBy: "duration" },
+  "Hot Tub": { trackBy: "duration" },
   "Thoracic Spine Stretch": { trackBy: "checklist" },
   "Hip Stretch": { trackBy: "checklist" },
   "Leg Stretch": { trackBy: "checklist" },
@@ -308,6 +323,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v80";
+const APP_VERSION = "v81";
 const APP_UPDATED = "Oct 14, 2026";
 

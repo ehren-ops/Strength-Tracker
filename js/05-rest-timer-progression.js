@@ -341,11 +341,11 @@ const roundLoad = w => Math.round(w / 2.5) * 2.5;
 // Time off means no training at all, not one lift skipped: any logged session of any lift in
 // between breaks it. A lift done every couple of weeks never counts as coming back from a break.
 function trainedBetween(a, b){
-  return Object.entries(data).some(([n, x]) => n !== REHAB_NAME && x.entries.some(e => e.date > a && e.date < b));
+  return Object.entries(data).some(([n, x]) => n !== REHAB_NAME && !isRecovery(n) && x.entries.some(e => e.date > a && e.date < b));
 }
 function lastTrainingDate(){
   let d = "";
-  Object.entries(data).forEach(([n, x]) => { if(n !== REHAB_NAME) x.entries.forEach(e => { if(e.date > d) d = e.date; }); });
+  Object.entries(data).forEach(([n, x]) => { if(n !== REHAB_NAME && !isRecovery(n)) x.entries.forEach(e => { if(e.date > d) d = e.date; }); });
   return d;
 }
 function applyReturn(core, ex, name, baseline){
@@ -386,7 +386,7 @@ function applyReturn(core, ex, name, baseline){
 }
 
 function computeSuggestion(ex, name){
-  if(!ex.entries.length) return null;
+  if(!ex.entries.length || isRecovery(name)) return null;
   const baseline = ex.entries.filter(e => !e.deload);
   const baseEntries = baseline.length ? baseline : ex.entries;
   const lastBaseEntry = baseEntries[baseEntries.length - 1];

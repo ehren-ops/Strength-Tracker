@@ -34,7 +34,7 @@ function guessDayForNames(names){
 function getSessionsByDate(){
   const map = {}, firstAt = {};
   Object.entries(data).forEach(([name, ex]) => {
-    if(ex.trackBy === "checklist") return;
+    if(ex.trackBy === "checklist" || isRecovery(name)) return;
     ex.entries.forEach(e => {
       if(!e.date) return;
       if(!map[e.date]) map[e.date] = [];
@@ -165,8 +165,8 @@ function renderCalendar(){
 
 function getLastSessionDate(){
   let maxDate = null;
-  Object.values(data).forEach(ex => {
-    if(ex.trackBy === "checklist") return;
+  Object.entries(data).forEach(([name, ex]) => {
+    if(ex.trackBy === "checklist" || isRecovery(name)) return;
     ex.entries.forEach(e => {
       if(e.date && (!maxDate || e.date > maxDate)) maxDate = e.date;
     });
@@ -180,7 +180,7 @@ function generateCoachNotes(){
 
   const items = [];
   Object.entries(data).forEach(([name, ex]) => {
-    if(ex.trackBy === "checklist") return;
+    if(ex.trackBy === "checklist" || isRecovery(name)) return;
     for(let i = ex.entries.length - 1; i >= 0; i--){
       if(ex.entries[i].date === lastDate){
         const entry = ex.entries[i];

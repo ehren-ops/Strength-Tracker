@@ -163,6 +163,7 @@ function entryToRow(entry, exerciseId, userId){
     difficulty: entry.difficulty ?? null,
     note: entry.note || "",
     completed_indices: entry.completedIndices ?? null,
+    temp_f: entry.tempF ?? null,
     deload: !!entry.deload,
     // undefined (dropped from the request) rather than null for entries logged before this
     // existed, so an edit never wipes the time the server backfilled.
@@ -184,6 +185,7 @@ function rowToEntry(row){
     difficulty: row.difficulty,
     note: row.note || "",
     completedIndices: row.completed_indices || undefined,
+    tempF: row.temp_f ?? undefined,
     deload: row.deload || undefined,
     loggedAt: row.logged_at || undefined,
   };

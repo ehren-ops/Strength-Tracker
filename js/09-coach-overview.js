@@ -113,7 +113,7 @@ function patternSummary(asOf){
 function sessionOrder(date){
   const done = [];
   Object.entries(data).forEach(([name, ex]) => {
-    if(ex.trackBy === "checklist") return;
+    if(ex.trackBy === "checklist" || isRecovery(name)) return;
     ex.entries.forEach(e => { if(e.date === date) done.push({ name, at: e.loggedAt }); });
   });
   if(!done.length || done.some(d => !d.at)) return null;
@@ -137,7 +137,7 @@ function sessionOrder(date){
 function sessionLogTimes(date){
   const logs = [];
   Object.entries(data).forEach(([name, ex]) => {
-    if(ex.trackBy === "checklist") return;
+    if(ex.trackBy === "checklist" || isRecovery(name)) return;
     ex.entries.forEach(e => { if(e.date === date && e.loggedAt) logs.push({ name, at: e.loggedAt }); });
   });
   return logs.sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
@@ -147,7 +147,7 @@ function sessionLogTimes(date){
 function sessionAnchors(date){
   const logs = [];
   Object.entries(data).forEach(([name, ex]) => {
-    if(ex.trackBy === "checklist") return;
+    if(ex.trackBy === "checklist" || isRecovery(name)) return;
     ex.entries.forEach(e => { if(e.date === date && e.loggedAt) logs.push({ name, at: e.loggedAt, kind: "log", sets: e.sets || null }); });
   });
   (restTaps[date] || []).forEach(t => { if(data[t.name]) logs.push({ name: t.name, at: t.at, kind: "rest" }); });
@@ -241,12 +241,30 @@ function skippedOn(date){
   return Object.entries(skips[date] || {}).map(([name, reason]) => ({ name, reason }));
 }
 
+// Sauna, cold plunge and hot tub sessions between two dates, one line each, with how they sat
+// against lifting that day: after the last lift was logged, on a lift day, or a day with no lifting.
+function recoveryLog(from, to){
+  const lines = [];
+  Object.keys(RECOVERY).forEach(name => {
+    const ex = data[name];
+    if(!ex) return;
+    ex.entries.filter(e => e.date >= from && e.date <= to).forEach(e => {
+      const lifts = sessionLogTimes(e.date);
+      const lastLift = lifts.length ? lifts[lifts.length - 1].at : null;
+      const liftDay = Object.entries(data).some(([n, x]) => x.trackBy !== "checklist" && !isRecovery(n) && x.entries.some(l => l.date === e.date));
+      const when = !liftDay ? "no lifting that day" : (e.loggedAt && lastLift && e.loggedAt > lastLift) ? "after lifting" : "lift day";
+      lines.push({ date: e.date, at: e.loggedAt || "", text: `${e.date} ${name} ${e.minutes} min${e.tempF != null ? ` at ${e.tempF}°F` : ""}, ${when}${e.note ? ` "${String(e.note).slice(0, 80)}"` : ""}` });
+    });
+  });
+  return lines.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.at < b.at ? -1 : 1).map(l => l.text);
+}
+
 // One session plus the last 8 results per lift, so the note can see trends, not just today.
 function buildSessionCoachPayload(date){
   const exercises = [];
   let prevDate = null;
   Object.entries(data).forEach(([name, ex]) => {
-    if(ex.trackBy === "checklist") return;
+    if(ex.trackBy === "checklist" || isRecovery(name)) return;
     ex.entries.forEach(e => { if(e.date < date && (!prevDate || e.date > prevDate)) prevDate = e.date; });
     let idx = -1;
     ex.entries.forEach((e, i) => { if(e.date === date) idx = i; });
@@ -263,7 +281,7 @@ function buildSessionCoachPayload(date){
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
   const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
-  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date), skipped: skippedOn(date), rehab: rehabCoachBlock() };
+  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date), skipped: skippedOn(date), rehab: rehabCoachBlock(), recovery: recoveryLog(shiftISO(date, -6), date) };
 }
 
 // The past week plus 6 weeks of history per lift, enough to judge loading blocks and deloads.
@@ -273,7 +291,7 @@ function buildWeeklyCoachPayload(){
   const sessionDates = new Set();
   const exercises = [];
   Object.entries(data).forEach(([name, ex]) => {
-    if(ex.trackBy === "checklist") return;
+    if(ex.trackBy === "checklist" || isRecovery(name)) return;
     const recent = ex.entries.filter(e => e.date >= since && e.date <= weekEnd);
     if(!recent.length) return;
     recent.forEach(e => sessionDates.add(e.date));
@@ -285,7 +303,7 @@ function buildWeeklyCoachPayload(){
   const weekLogTimes = Object.fromEntries([...sessionDates].filter(d => d >= shiftISO(weekEnd, -6)).sort()
     .map(d => [d, sessionAnchors(d)]).filter(([, l]) => l.length >= 2));
   const weekSkips = Object.fromEntries(Object.keys(skips).filter(d => d >= shiftISO(weekEnd, -6) && d <= weekEnd).sort().map(d => [d, skippedOn(d)]));
-  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), skipped: weekSkips, modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd), rehab: rehabCoachBlock() };
+  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), skipped: weekSkips, modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd), rehab: rehabCoachBlock(), recovery: recoveryLog(shiftISO(weekEnd, -13), weekEnd) };
 }
 
 async function generateCoach(kind){
@@ -460,8 +478,8 @@ function renderLastSessionBreakdown(){
 // clock starts at the first logged session.
 function deloadStatus(){
   let firstDate = null;
-  Object.values(data).forEach(ex => {
-    if(ex.trackBy === "checklist") return;
+  Object.entries(data).forEach(([name, ex]) => {
+    if(ex.trackBy === "checklist" || isRecovery(name)) return;
     ex.entries.forEach(e => { if(e.date && (!firstDate || e.date < firstDate)) firstDate = e.date; });
   });
   const anchor = modes.deload ? null : (deloadDates.endedOn || firstDate);
@@ -588,7 +606,7 @@ function renderOverview(){
   }).filter(Boolean).sort((a,b) => b.pct - a.pct);
 
   const avgPct = overviewData.length ? overviewData.reduce((s,o)=>s+o.pct,0)/overviewData.length : 0;
-  const totalSessions = Object.entries(data).reduce((s,[n,ex])=>n === REHAB_NAME ? s : s+ex.entries.length,0);
+  const totalSessions = Object.entries(data).reduce((s,[n,ex])=>n === REHAB_NAME || isRecovery(n) ? s : s+ex.entries.length,0);
   const progressing = overviewData.filter(o=>o.pct>0).length;
   const holding = overviewData.filter(o=>o.pct===0).length;
   const declining = overviewData.filter(o=>o.pct<0).length;

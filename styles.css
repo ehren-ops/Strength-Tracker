@@ -21,6 +21,7 @@
     --cat-cardio:#C2447D; --cat-cardio-bg:#FBEAF2; --cat-cardio-border:#F0C4DC; --cat-cardio-text:#8C2F5C;
     --cat-core:#1B8A7A; --cat-core-bg:#E3F5F2; --cat-core-border:#B8E3DC; --cat-core-text:#0F5C51;
     --cat-stretch:#6B8E4E; --cat-stretch-bg:#EEF3E6; --cat-stretch-border:#CFE0BB; --cat-stretch-text:#4A6134;
+    --cat-recovery:#8A5A2B; --cat-recovery-bg:#F6EDE3; --cat-recovery-border:#E2CBB2; --cat-recovery-text:#64401D;
     --ai-bg:#E6EEE3; --ai-border:#B9CCB4; --ai-text:#1F3A2A; --ai-accent:#0F6B4A;
     --deload:#3D6B7D; --deload-on-text:#FFFFFF; --deload-border:#B7CDD5; --deload-text:#24495A;
     --font-display:'Fjalla One',sans-serif; --name-size:1.475rem; --font-body:'IBM Plex Sans',sans-serif;
@@ -50,6 +51,7 @@
     --cat-cardio:#FF6A00; --cat-cardio-bg:rgba(255,106,0,0.12); --cat-cardio-border:#FF6A00; --cat-cardio-text:#FFB37A;
     --cat-core:#39FF6A; --cat-core-bg:rgba(57,255,106,0.12); --cat-core-border:#39FF6A; --cat-core-text:#A8FFC0;
     --cat-stretch:#2DD4BF; --cat-stretch-bg:rgba(45,212,191,0.12); --cat-stretch-border:#2DD4BF; --cat-stretch-text:#99F6EC;
+    --cat-recovery:#FFC48A; --cat-recovery-bg:rgba(255,196,138,0.12); --cat-recovery-border:#FFC48A; --cat-recovery-text:#FFE0C2;
     --font-display:'Orbitron',sans-serif; --name-size:1.72rem; --font-body:'Rajdhani',sans-serif;
   }
   *{box-sizing:border-box;}
@@ -102,6 +104,8 @@
   .pill.cat-core.active{background:var(--cat-core);border-color:var(--cat-core);color:#fff;}
   .pill.cat-stretch{background:var(--cat-stretch-bg);border-color:var(--cat-stretch-border);color:var(--cat-stretch-text);}
   .pill.cat-stretch.active{background:var(--cat-stretch);border-color:var(--cat-stretch);color:#fff;}
+  .pill.cat-recovery{background:var(--cat-recovery-bg);border-color:var(--cat-recovery-border);color:var(--cat-recovery-text);}
+  .pill.cat-recovery.active{background:var(--cat-recovery);border-color:var(--cat-recovery);color:#fff;}
   .pill.logged-today:not(.active){opacity:0.55;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:0.7rem;}
   .ex-name{font-family:var(--font-display);font-size:var(--name-size);line-height:1.1;text-transform:uppercase;color:var(--accent-2);margin:0 0 0.6rem;}
@@ -344,6 +348,7 @@
   :root[data-theme="dark"] .pill.cat-strength.active,
   :root[data-theme="dark"] .pill.cat-cardio.active,
   :root[data-theme="dark"] .pill.cat-core.active,
-  :root[data-theme="dark"] .pill.cat-stretch.active{color:#050308;}
+  :root[data-theme="dark"] .pill.cat-stretch.active,
+  :root[data-theme="dark"] .pill.cat-recovery.active{color:#050308;}
 /* Unclamped while fitGuidance() measures how many sentences fill two lines. */
 .rec-desc.fitting{display:block;height:auto;max-height:none;-webkit-line-clamp:unset;overflow:visible;}

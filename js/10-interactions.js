@@ -87,6 +87,8 @@ function logEntry(){
       const speedEl = document.getElementById("f-speed");
       if(speedEl && speedEl.value) entry.speed = Number(speedEl.value);
     }
+    const tempEl = document.getElementById("f-temp");
+    if(tempEl && tempEl.value) entry.tempF = Number(tempEl.value);
     if(ex.trackIncline){
       const inclineEl = document.getElementById("f-incline");
       if(inclineEl && inclineEl.value) entry.incline = Number(inclineEl.value);

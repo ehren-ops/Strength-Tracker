@@ -378,6 +378,17 @@ function loadText(name, ex, sug){
   return sidesOf(name).weight === "hand" ? `Load: ${w} lb in each hand` : `Load: ${w} lb total`;
 }
 
+// Recovery tile, same shape as the Next tile: the last 7 days, the usual dose, the last session.
+function renderRecoveryTile(name, ex){
+  const since = shiftISO(todayISO(), -6);
+  const week = ex.entries.filter(e => e.date >= since);
+  const mins = week.reduce((s, e) => s + (Number(e.minutes) || 0), 0);
+  const last = ex.entries[ex.entries.length - 1];
+  const headline = week.length ? `Last 7 days: ${week.length}× · ${mins} min` : "Last 7 days: none";
+  const load = last ? `Last: ${fmtDate(last.date)}, ${last.minutes} min${last.tempF != null ? ` at ${last.tempF}°F` : ""}` : "Logged for the coach's analysis";
+  return renderNextTile(headline, ex, RECOVERY[name].guide, load);
+}
+
 // One line of form, one line of swap, under the chart.
 function renderTips(name){
   const t = EXERCISE_TIPS[name];
@@ -398,6 +409,7 @@ function renderExerciseCard(name, ex){
   const backActive = modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name);
   const preseasonActive = modes.preseason && !!ex.preseason;
   const deloadActive = modes.deload && ex.trackBy !== "duration";
+  const recovery = isRecovery(name);
   const shoulderPaused = isShoulderPaused(name), shoulderActive = isShoulderModified(name);
 
   const isCustom = !allDayNames().includes(name);
@@ -407,7 +419,7 @@ function renderExerciseCard(name, ex){
     ? (ex.trackBy==="weight" ? work.weight-first.weight : ex.trackBy==="duration" ? work.minutes-first.minutes : work.reps-first.reps)
     : 0;
   const deltaColor = delta>0 ? "color:var(--emerald)" : delta<0 ? "color:var(--amber)" : "color:var(--slate)";
-  const deltaHtml = ex.entries.length > 1 ? `<span class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</span>` : "";
+  const deltaHtml = ex.entries.length > 1 && !recovery ? `<span class="delta-line" style="${deltaColor}">${delta>0?'+':''}${delta} since first</span>` : "";
 
   // Active modifiers: badges, then their notes, under the current weight rather than above it.
   const badges = [skiActive && '<span class="ski-badge">🎿 Ski</span>', kneeActive && '<span class="knee-badge">🦵 Knee Care</span>',
@@ -452,12 +464,12 @@ function renderExerciseCard(name, ex){
   if(!hasEntries){
     html += modHtml;
     // Same tile as every other lift, so the card never changes shape.
-    html += renderNextTile("Next: first session", ex, firstSessionGuidance(name, ex), loadText(name, ex, null));
+    html += recovery ? renderRecoveryTile(name, ex) : renderNextTile("Next: first session", ex, firstSessionGuidance(name, ex), loadText(name, ex, null));
     html += renderTips(name);
   } else {
     const sideTag = s => s ? `<span class="side-tag">${s}</span>` : "";
     const bigVal = ex.trackBy==="weight" ? work.weight+" lbs" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
-      : ex.trackBy==="duration" ? work.minutes+" min" : work.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
+      : ex.trackBy==="duration" ? work.minutes+" min" + (work.tempF != null ? sideTag(` ${work.tempF}°F`) : "") : work.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
 
     html += `<div class="weight-row">
       <div class="weight-main">
@@ -567,9 +579,8 @@ function renderExerciseCard(name, ex){
       recHtml = renderNextTile(`Next: ${nextLabel}`, ex, composeGuidance(msg, name, ex, last, work), suggestion.shoulderPaused ? "Load: none today" : loadText(name, ex, suggestion));
     }
 
-    html += recHtml;
-    html += renderChart(ex, suggestion, true, name);
-    html += renderTips(name);
+    // Recovery: this week's total and the last session instead of a plan and a graph.
+    html += recovery ? renderRecoveryTile(name, ex) : recHtml + renderChart(ex, suggestion, true, name) + renderTips(name);
   }
 
   html += renderForm(name, ex);
@@ -584,7 +595,7 @@ function renderExerciseCard(name, ex){
 
     html += `<div style="margin-top:0.9rem;">`;
     html += `<h3 class="section" style="margin-bottom:0.4rem;">Recent History</h3>`;
-    const histColLabel = ex.trackBy==="duration" ? "Cardio" : ex.trackBy==="weight" ? "Load" + (sidesOf(name).weight === "total" ? "" : "/" + sidesOf(name).weight) : "Sets" + repsSuffix(name);
+    const histColLabel = recovery ? "Session" : ex.trackBy==="duration" ? "Cardio" : ex.trackBy==="weight" ? "Load" + (sidesOf(name).weight === "total" ? "" : "/" + sidesOf(name).weight) : "Sets" + repsSuffix(name);
     const cardioCls = ex.trackBy==="duration" ? " cardio" : "";
     html += `<div class="hist-row header${cardioCls}"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;
     recent.forEach((r, idx) => { html += renderHistRow(r.e, r.i, idx === 0, ex, name); });
@@ -610,7 +621,7 @@ function renderExerciseCard(name, ex){
 // Right end of the history footer: skip this lift today, for injury or another reason. Hidden once
 // the lift is logged today; while skipped, shows the reason and an undo.
 function renderSkipControl(name){
-  if(isLoggedToday(name) || isShoulderPaused(name)) return "";
+  if(isLoggedToday(name) || isShoulderPaused(name) || isRecovery(name)) return "";
   const q = name.replace(/'/g, "\\'");
   const reason = skipReason(name);
   if(reason){
@@ -635,6 +646,7 @@ function renderHistRow(e, idx, isLatest, ex, name){
             + (ex.trackDistance ? `<div class="field"><label>Miles</label><input type="number" inputmode="decimal" step="0.1" id="edit-distance" value="${e.distance ?? ''}"></div>` : "")
             + (ex.trackSpeed ? `<div class="field"><label>MPH</label><input type="number" inputmode="decimal" step="0.1" id="edit-speed" value="${e.speed ?? ''}"></div>` : "")
             + (ex.trackIncline ? `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="edit-incline" value="${e.incline ?? ''}"></div>` : "")
+            + (isRecovery(name) ? `<div class="field"><label>°F</label><input type="number" inputmode="numeric" id="edit-temp" value="${e.tempF ?? ''}"></div>` : "")
           : `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="edit-sets" value="${e.sets}"></div>
              <div class="field"><label>${repsFieldLabel(name, ex.unit)}</label><input type="number" inputmode="numeric" id="edit-reps" value="${e.reps}"></div>`
         }
@@ -736,6 +748,8 @@ function saveEditEntry(name, idx){
   if(ex.trackBy === "duration"){
     const minutesEl = document.getElementById("edit-minutes");
     if(minutesEl) entry.minutes = Number(minutesEl.value) || entry.minutes;
+    const tempEl = document.getElementById("edit-temp");
+    if(tempEl) entry.tempF = tempEl.value ? Number(tempEl.value) : null;
     if(ex.trackDistance){
       const distEl = document.getElementById("edit-distance");
       entry.distance = distEl && distEl.value ? Number(distEl.value) : null;
@@ -785,7 +799,7 @@ function renderForm(name, ex){
   let html = "";
   if(ex.entries.length){
     html += `<div class="action-row">`;
-    html += `<button type="button" class="tool-btn" onclick="repeatLast('${name.replace(/'/g,"\\'")}')">↻ Repeat set</button>`;
+    html += `<button type="button" class="tool-btn" onclick="repeatLast('${name.replace(/'/g,"\\'")}')">↻ ${isRecovery(name) ? "Repeat last" : "Repeat set"}</button>`;
     html += renderProgressionToggle(name, ex);
     if(ex.trackBy !== "duration"){
       html += `<button type="button" class="rest-action-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start rest timer, ${restTimeFor(ex)}">${STOPWATCH_ICON}${restTimeFor(ex)}</button>`;
@@ -805,6 +819,10 @@ function renderForm(name, ex){
   let setsDefault = 3;
   let weightDefault = "";
   let minutesDefault = "";
+  // Recovery starts on the last session's minutes and temperature, or the usual dose.
+  const recovery = isRecovery(name);
+  const lastLog = ex.entries[ex.entries.length - 1];
+  if(recovery) minutesDefault = lastLog ? lastLog.minutes : RECOVERY[name].minutes;
   if(plan){
     if(plan.sets != null) setsDefault = plan.sets;
     if(plan.reps != null && (mods.length || !ex.autoloadLastReps)) repsDefault = plan.reps;
@@ -822,6 +840,7 @@ function renderForm(name, ex){
     if(ex.trackDistance) html += `<div class="field"><label>Miles</label><input type="number" inputmode="decimal" step="0.1" id="f-distance"></div>`;
     if(ex.trackSpeed) html += `<div class="field"><label>MPH</label><input type="number" inputmode="decimal" step="0.1" id="f-speed"></div>`;
     if(ex.trackIncline) html += `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="f-incline"></div>`;
+    if(recovery) html += `<div class="field"><label>Temp °F</label><input type="number" inputmode="numeric" id="f-temp" value="${lastLog && lastLog.tempF != null ? lastLog.tempF : RECOVERY[name].temp}"></div>`;
   } else {
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
     html += `<div class="field"><label>${repsFieldLabel(name, ex.unit)}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
@@ -831,11 +850,11 @@ function renderForm(name, ex){
   html += `</div>`;
   if(plan) html += `<p class="prefill-note">${mods.length ? `Pre-filled: ${mods.join(", ")} plan` : "Pre-filled: next progression"}</p>`;
   html += `<div class="form-row">
-    ${ex.trackBy === "duration" ? rpeField : ""}<div class="field field-note"><input type="text" id="f-note" aria-label="Note" value="${[modes.deload && ex.trackBy !== "duration" && DELOAD_NOTE, isShoulderModified(name) && REHAB_NOTE].filter(Boolean).join(", ")}" placeholder="${ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
+    ${ex.trackBy === "duration" && !recovery ? rpeField : ""}<div class="field field-note"><input type="text" id="f-note" aria-label="Note" value="${[modes.deload && ex.trackBy !== "duration" && DELOAD_NOTE, isShoulderModified(name) && REHAB_NOTE].filter(Boolean).join(", ")}" placeholder="${recovery ? 'Note, e.g. after lifting' : ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
   </div>`;
   html += `<div class="date-log-row">
     <div class="field"><input type="date" id="f-date" aria-label="Date" value="${todayISO()}"></div>
-    <button class="log" onclick="logEntry()">Log set</button>
+    <button class="log" onclick="logEntry()">${recovery ? "Log session" : "Log set"}</button>
   </div>`;
   return html;
 }
@@ -853,6 +872,8 @@ function repeatLast(name){
     if(spd && last.speed != null) spd.value = last.speed;
     const incl = document.getElementById("f-incline");
     if(incl && last.incline != null) incl.value = last.incline;
+    const temp = document.getElementById("f-temp");
+    if(temp && last.tempF != null) temp.value = last.tempF;
   } else {
     const w = document.getElementById("f-weight");
     const s = document.getElementById("f-sets");

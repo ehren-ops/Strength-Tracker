@@ -181,6 +181,7 @@ function formatEntryValue(e, ex){
     }
     if(speed != null) s += ` @ ${speedIsCalculated ? "~" : ""}${speed} mph`;
     if(e.incline != null && e.incline !== "") s += ` @ ${e.incline}% incline`;
+    if(e.tempF != null && e.tempF !== "") s += ` at ${e.tempF}°F`;
     return s;
   }
   return repLabel(e.sets, e.reps, ex.unit);
