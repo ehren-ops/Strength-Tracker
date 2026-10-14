@@ -377,10 +377,17 @@ function applyReturn(core, ex, name, baseline){
       if(ramp > core.weight) return { ...core, weight: ramp, readyToProgress: true, reentry: { step, fullWeight: pre.weight } };
     }
   }
-  // First session back from a deload on a pressing lift: hold the pre-deload weight.
-  if(last.deload && !modes.deload && LIFT_PATTERNS[name] === "push" && core.noteTarget == null){
+  // First session back from a deload: back to the pre-deload weight, and the next step up only when
+  // that last full session was clean (every rep, RPE 7 or easier, no concern in its note). Pressing
+  // lifts always repeat it once, for the shoulders. A weight set in that note still wins.
+  if(last.deload && !modes.deload && core.noteTarget == null){
     const pre = baseline[baseline.length - 1];
-    if(core.weight > pre.weight) return { ...core, weight: pre.weight, readyToProgress: false, postDeloadHold: true };
+    const flagged = CONCERN_WORDS.find(w => (pre.note || "").toLowerCase().includes(w));
+    const why = LIFT_PATTERNS[name] === "push" ? "pressing repeats it once"
+      : pre.reps < effectiveTargetReps(ex) ? "missed reps last full session"
+      : pre.difficulty >= 8 ? `last full session was RPE ${pre.difficulty}`
+      : flagged ? `last note flagged ${flagged}` : null;
+    if(why && core.weight > pre.weight) return { ...core, weight: pre.weight, readyToProgress: false, postDeloadHold: { why } };
   }
   return core;
 }

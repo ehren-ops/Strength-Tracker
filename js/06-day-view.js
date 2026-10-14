@@ -587,7 +587,7 @@ function renderExerciseCard(name, ex){
             : left ? `Rebuilding after time off: ${Math.round(REENTRY_STEPS[r.step - 1] * 100)}% today, full ${r.fullWeight} lb next.`
             : `Back to your full ${r.fullWeight} lb after the time off.`;
         } else if(suggestion.postDeloadHold){
-          msg = `First session back from the deload: hold ${suggestion.weight} lb before adding.`;
+          msg = `First session back from the deload: ${suggestion.weight} lb again (${suggestion.postDeloadHold.why}), then add.`;
         } else if(suggestion.deloadWeek){
           msg = suggestion.deloadKeptReduction
             ? `Deload: already reduced, so same weight, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`

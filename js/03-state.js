@@ -100,20 +100,56 @@ function saveShoulderRehab(){
   try{ window.localStorage.setItem(SHOULDER_REHAB_KEY, JSON.stringify(shoulderRehab)); }catch(e){}
 }
 
+// The deload record follows what was actually logged. With Deload Week off, a recorded window
+// holding no deload sessions (a quick on/off, or an older bad record) is replaced: by the record it
+// overwrote when that one is still backed by sessions, or else by the latest run of deload-tagged
+// sessions in the log (sessions within a week of each other), or cleared when there are none.
+// Runs on switching it off, at startup and after each sign-in pull.
+function repairDeloadDates(){
+  if(modes.deload || !deloadDates.startedOn) return false;
+  const deloadDays = [...new Set(Object.values(data).flatMap(ex => ex.entries.filter(e => e.deload).map(e => e.date)))].sort();
+  const backed = r => r && r.startedOn && deloadDays.some(d => d >= r.startedOn && d <= (r.endedOn || r.startedOn));
+  if(backed(deloadDates)) return false;
+  let fixed = null;
+  if(backed(deloadDates.prev)) fixed = deloadDates.prev;
+  else if(deloadDays.length){
+    let start = deloadDays[deloadDays.length - 1];
+    const end = start;
+    for(let i = deloadDays.length - 2; i >= 0 && daysBetween(deloadDays[i], start) <= 7; i--) start = deloadDays[i];
+    fixed = { startedOn: start, endedOn: end, plannedEndOn: shiftISO(start, DELOAD_LENGTH_DAYS) };
+  }
+  deloadDates = fixed ? { startedOn: fixed.startedOn, endedOn: fixed.endedOn || fixed.startedOn, plannedEndOn: fixed.plannedEndOn || null } : {};
+  saveDeloadDates();
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  return true;
+}
+
 function toggleMode(key){
   const def = MODE_DEFS.find(m => m.key === key);
   modes[key] = !modes[key];
   try{ window.localStorage.setItem(def.storageKey, modes[key] ? "1" : "0"); }catch(e){}
   if(key === "deload"){
-    if(modes.deload) deloadDates = { startedOn: todayISO(), endedOn: null, plannedEndOn: shiftISO(todayISO(), DELOAD_LENGTH_DAYS) };
-    else if(deloadDates.startedOn) deloadDates.endedOn = todayISO();
+    // The record it replaces rides along, so a quick on/off with nothing logged can put it back.
+    if(modes.deload){
+      const { prev: _p, ...last } = deloadDates;
+      deloadDates = { startedOn: todayISO(), endedOn: null, plannedEndOn: shiftISO(todayISO(), DELOAD_LENGTH_DAYS), prev: last.startedOn ? last : null };
+    } else if(deloadDates.startedOn) deloadDates.endedOn = todayISO();
     saveDeloadDates();
+    if(!modes.deload) repairDeloadDates();
   }
   if(key === "shoulder"){
     // Switched back on within a week (or by accident): pick up where it left off.
     if(modes.shoulder && shoulderRehab.startedOn && shoulderRehab.endedOn && daysBetween(shoulderRehab.endedOn, todayISO()) <= 7) shoulderRehab.endedOn = null;
-    else if(modes.shoulder) shoulderRehab = { startedOn: todayISO(), endedOn: null, phase3: false };
-    else shoulderRehab.endedOn = todayISO();
+    else if(modes.shoulder){
+      const { prev: _p, ...last } = shoulderRehab;
+      shoulderRehab = { startedOn: todayISO(), endedOn: null, phase3: false, prev: last.startedOn ? last : null };
+    } else {
+      shoulderRehab.endedOn = todayISO();
+      // On and straight off with nothing logged under it: not a real run, so the last real one stays.
+      const touched = [REHAB_NAME, ...SHOULDER_RETURN, ...Object.keys(SHOULDER_CARE_TIP), PUSHUP_NAME]
+        .some(n => data[n] && data[n].entries.some(e => e.date >= shoulderRehab.startedOn));
+      if(!touched) shoulderRehab = shoulderRehab.prev || {};
+    }
     saveShoulderRehab();
     if(modes.shoulder) ensureRehabNotes(); // lifts already logged today get the note too
   }

@@ -40,7 +40,7 @@ function describeSuggestion(ex, name){
     const why = s.shoulderPaused ? "paused for shoulder rehab" : s.shoulderHold ? (name === "Bicep Curl" ? "shoulder rehab: hammer curls only, held" : "shoulder rehab: held at about 85% of pre-rehab weight, close grip, short range")
       : s.shoulderBuild ? `shoulder rehab phase 3: full range, building back toward ${s.shoulderBuild.fullWeight} lb`
       : s.shoulderReturn ? `back from shoulder rehab, step ${s.shoulderReturn.step} of 3 back to ${s.shoulderReturn.fullWeight} lb`
-      : s.deloadWeek ? "deload week" : s.reentry ? `rebuilding after time off, step ${s.reentry.step} of 3 back to ${s.reentry.fullWeight} lb` : s.postDeloadHold ? "first session back from deload, holding pre-deload weight" : s.noteTarget != null ? "set by last note" : s.noteCue === "up" ? "add weight, note said so" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
+      : s.deloadWeek ? "deload week" : s.reentry ? `rebuilding after time off, step ${s.reentry.step} of 3 back to ${s.reentry.fullWeight} lb` : s.postDeloadHold ? `first session back from deload, repeating the pre-deload weight (${s.postDeloadHold.why})` : s.noteTarget != null ? "set by last note" : s.noteCue === "up" ? "add weight, note said so" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
       : s.noteConcern ? "hold, note flagged" : s.noteCue === "hold" ? "hold, note said so" : s.difficultyNote === "hard" ? "hold, last RPE high" : "hold";
     return `${s.weight} lb ${s.sets}x${s.reps} (${why})`;
   }
@@ -593,17 +593,33 @@ function renderDeloadModifier(){
     `<div class="deload-status" id="deload-status"><div>${last}</div><div>${next}</div></div>`);
 }
 
+// Change per lift from its first to its latest full session, over everything logged or a recent
+// window. Deload sessions are left out, so a planned light week never reads as a drop.
+const CHANGE_RANGES = [["1W", 7, "Past week"], ["1M", 30, "Past month"], ["3M", 91, "Past 3 months"], ["6M", 182, "Past 6 months"], ["1Y", 365, "Past year"], ["All", null, "Since first logged"]];
+const CHANGE_RANGE_KEY = "strength-tracker-change-range";
+let changeRange = (function(){ try{ const v = localStorage.getItem(CHANGE_RANGE_KEY); return CHANGE_RANGES.some(r => r[0] === v) ? v : "All"; }catch(e){ return "All"; } })();
+function setChangeRange(key){
+  changeRange = key;
+  try{ localStorage.setItem(CHANGE_RANGE_KEY, key); }catch(e){}
+  render();
+}
+function changeData(days){
+  const since = days ? shiftISO(todayISO(), -days) : "";
+  return Object.entries(data).map(([name, ex]) => {
+    if(ex.trackBy === "checklist" || ex.trackBy === "duration" || isRecovery(name)) return null;
+    const pts = ex.entries.filter(e => !e.deload && e.date >= since);
+    if(pts.length < 2) return null;
+    const f = pts[0], l = pts[pts.length - 1];
+    const firstVal = ex.trackBy === "weight" ? f.weight : f.reps;
+    const lastVal = ex.trackBy === "weight" ? l.weight : l.reps;
+    if(!firstVal) return null;
+    return { name, pct: ((lastVal - firstVal) / firstVal) * 100, firstVal, lastVal, trackBy: ex.trackBy, sessions: pts.length };
+  }).filter(Boolean).sort((a, b) => b.pct - a.pct);
+}
+
 function renderOverview(){
   const app = document.getElementById("app");
-  const overviewData = Object.entries(data).map(([name, ex]) => {
-    if(ex.entries.length < 2) return null;
-    const f = ex.entries[0], l = ex.entries[ex.entries.length-1];
-    const firstVal = ex.trackBy==="weight" ? f.weight : f.reps;
-    const lastVal = ex.trackBy==="weight" ? l.weight : l.reps;
-    if(!firstVal) return null;
-    const pct = ((lastVal-firstVal)/firstVal)*100;
-    return { name, pct, firstVal, lastVal, trackBy: ex.trackBy };
-  }).filter(Boolean).sort((a,b) => b.pct - a.pct);
+  const overviewData = changeData(null);
 
   const avgPct = overviewData.length ? overviewData.reduce((s,o)=>s+o.pct,0)/overviewData.length : 0;
   const totalSessions = Object.entries(data).reduce((s,[n,ex])=>n === REHAB_NAME || isRecovery(n) ? s : s+ex.entries.length,0);
@@ -697,15 +713,22 @@ function renderOverview(){
   }
   html += `</div>`;
 
-  const changeAvg = overviewData.length ? Math.round(overviewData.reduce((s, o) => s + o.pct, 0) / overviewData.length) : 0;
+  const range = CHANGE_RANGES.find(r => r[0] === changeRange);
+  const changeRows = changeData(range[1]);
+  const changeAvg = changeRows.length ? Math.round(changeRows.reduce((s, o) => s + o.pct, 0) / changeRows.length) : 0;
   html += `<div class="card">${collapsibleHead("change", "% Change Since First Logged",
-    overviewData.length ? `avg ${changeAvg > 0 ? "+" : ""}${changeAvg}%` : "")}`;
+    changeRows.length ? `avg ${changeAvg > 0 ? "+" : ""}${changeAvg}% · ${range[0]}` : range[0])}`;
+  if(!overviewCollapsed.change){
+    html += `<div class="range-row" role="group" aria-label="Range">${CHANGE_RANGES.map(([k, , label]) =>
+      `<button type="button" class="range-chip${k === changeRange ? " active" : ""}" onclick="setChangeRange('${k}')" aria-pressed="${k === changeRange}" title="${label}">${k}</button>`).join("")}</div>`;
+    html += `<p class="range-note">${range[2]}: first to latest full session${range[1] ? " in the range" : ""}. Deload weeks left out.</p>`;
+  }
   if(overviewCollapsed.change){
     // folded: the heading's summary is enough
-  } else if(!overviewData.length){
-    html += `<p style="font-size:0.85rem;color:var(--slate);font-style:italic;">Need at least 2 sessions on a lift to show change.</p>`;
+  } else if(!changeRows.length){
+    html += `<p style="font-size:0.85rem;color:var(--slate);font-style:italic;">${range[1] ? "No lift has 2 full sessions in this range yet." : "Need at least 2 sessions on a lift to show change."}</p>`;
   } else {
-    overviewData.forEach(o => {
+    changeRows.forEach(o => {
       const color = o.pct>0 ? "var(--emerald)" : o.pct<0 ? "var(--amber)" : "var(--slate)";
       const width = Math.min(Math.abs(o.pct),100);
       const freq = frequencyLabel(data[o.name]);

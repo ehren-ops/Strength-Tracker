@@ -1844,6 +1844,11 @@ async function main(){
     data['Cable Chest Fly'].targetReps = 12; data['Seated Calf Raise'].targetReps = 15;
     const fly = computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly'), calf = computeSuggestion(data['Seated Calf Raise'], 'Seated Calf Raise');
     out.fly = [fly.weight, !!fly.postDeloadHold]; out.calf = calf.weight;
+    // a non-press repeats its pre-deload weight when that session was hard or flagged
+    data['RDL'] = mk('RDL', [[-9, 235], [-2, 212.5, 2, 8, true]]); data['RDL'].entries[0].difficulty = 8;
+    data['Barbell Row'] = mk('Barbell Row', [[-9, 135], [-2, 117.5, 2, 8, true]]); data['Barbell Row'].entries[0].note = 'grip slipping';
+    const rdl = computeSuggestion(data['RDL'], 'RDL'), row = computeSuggestion(data['Barbell Row'], 'Barbell Row');
+    out.hard = [rdl.weight, rdl.postDeloadHold && rdl.postDeloadHold.why, row.weight, row.postDeloadHold && row.postDeloadHold.why];
     // 20 days with no training: 90%, then 95%, then the full weight
     data = { 'Squat': mk('Squat', [[-27, 170], [-20, 180]]) };
     const s1 = computeSuggestion(data['Squat'], 'Squat');
@@ -1860,7 +1865,7 @@ async function main(){
     data = savedData; Object.assign(modes, savedModes);
     return out;
   });
-  if(JSON.stringify(comeback) !== JSON.stringify({ fly: [60, true], calf: 100, ramp: [162.5, 1, 170, 180], skipped: false })) throw new Error('expected press hold after deload and a 90/95/100% ramp after time off, got: ' + JSON.stringify(comeback));
+  if(JSON.stringify(comeback) !== JSON.stringify({ fly: [60, true], calf: 100, hard: [235, 'last full session was RPE 8', 135, null], ramp: [162.5, 1, 170, 180], skipped: false })) throw new Error('expected press hold after deload and a 90/95/100% ramp after time off, got: ' + JSON.stringify(comeback));
   console.log('OK: after a deload pressing lifts hold (fly 60) while others add (calf 100); after 20 days off squat ramps 162.5, 170, 180; a skipped lift is not a break');
   await page.click('.tab:has-text("Overview")');
   await page.click('button:has-text("Deload Week: ON")');
@@ -2497,6 +2502,56 @@ async function main(){
     r81.coachSession.some(l => /Sauna 18 min at 185°F/.test(l)) && r81.coachWeekly.length === r81.coachSession.length;
   if(!ok81) throw new Error('expected recovery logging to work as designed, got: ' + JSON.stringify(r81));
   console.log('OK: Sauna starts at 15 min / 180°F, logs 18 min at 185°F with no RPE, shows the 7-day total, sends "' + r81.coachSession[r81.coachSession.length - 1] + '" to the coach, and stays out of lift logic');
+
+  console.log('=== 82: deload dates follow the logged deload sessions; a quick on/off leaves no record; % change has ranges ===');
+  const r82 = await page.evaluate(() => {
+    const saved = { data, deload: JSON.stringify(deloadDates), shoulder: JSON.stringify(shoulderRehab), modes: JSON.stringify(modes), range: changeRange };
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const d = n => shiftISO(todayISO(), n);
+    data = {
+      'Squat': Object.assign(newExerciseShell('Squat'), { entries: [
+        { clientId: 'q1', date: d(-12), weight: 175, sets: 3, reps: 8, difficulty: 7 },
+        { clientId: 'q2', date: d(-9), weight: 157.5, sets: 2, reps: 8, deload: true, note: 'Deload' },
+        { clientId: 'q3', date: d(-7), weight: 157.5, sets: 2, reps: 5, deload: true, note: 'Deload' },
+        { clientId: 'q4', date: d(-2), weight: 157.5, sets: 2, reps: 5, deload: true, note: 'Deload' },
+      ] }),
+      'Bench Press': Object.assign(newExerciseShell('Bench Press'), { entries: [
+        { clientId: 'b1', date: d(-40), weight: 150, sets: 3, reps: 8 },
+        { clientId: 'b2', date: d(-20), weight: 160, sets: 3, reps: 8 },
+        { clientId: 'b3', date: d(-3), weight: 170, sets: 3, reps: 8 },
+      ] }),
+    };
+    const out = {};
+    deloadDates = { startedOn: d(-1), endedOn: d(-1), plannedEndOn: d(6) }; // on and off yesterday, nothing logged
+    out.repaired = repairDeloadDates();
+    out.fixed = [deloadDates.startedOn, deloadDates.endedOn, deloadStatus().nextDue];
+    toggleMode('deload'); toggleMode('deload');
+    out.afterQuick = [deloadDates.startedOn, deloadDates.endedOn];
+    shoulderRehab = { startedOn: d(-30), endedOn: d(-10), phase3: false };
+    toggleMode('shoulder'); toggleMode('shoulder');
+    out.shoulder = [shoulderRehab.startedOn, shoulderRehab.endedOn];
+    const pct = rows => rows.map(r => r.name + ' ' + Math.round(r.pct * 10) / 10);
+    out.ranges = { all: pct(changeData(null)), month: pct(changeData(30)), week: pct(changeData(7)) };
+    view = 'overview'; render();
+    out.chips = [...document.querySelectorAll('.range-chip')].map(b => b.textContent);
+    setChangeRange('1M');
+    out.active = document.querySelector('.range-chip.active').textContent;
+    out.bars = [...document.querySelectorAll('.bar-row .top')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+    out.savedRange = localStorage.getItem('strength-tracker-change-range');
+    data = saved.data; deloadDates = JSON.parse(saved.deload); shoulderRehab = JSON.parse(saved.shoulder);
+    Object.assign(modes, JSON.parse(saved.modes)); saveDeloadDates(); saveShoulderRehab();
+    MODE_DEFS.forEach(m => { try{ localStorage.setItem(m.storageKey, modes[m.key] ? '1' : '0'); }catch(e){} });
+    setChangeRange(saved.range);
+    return out;
+  });
+  const d82 = await page.evaluate(() => [-9, -2, 33].map(n => shiftISO(todayISO(), n)));
+  const ok82 = r82.repaired && JSON.stringify(r82.fixed) === JSON.stringify([d82[0], d82[1], d82[2]]) &&
+    JSON.stringify(r82.afterQuick) === JSON.stringify([d82[0], d82[1]]) &&
+    r82.shoulder[0] === (await page.evaluate(() => shiftISO(todayISO(), -30))) &&
+    JSON.stringify(r82.ranges) === JSON.stringify({ all: ['Bench Press 13.3'], month: ['Bench Press 6.3'], week: [] }) &&
+    r82.chips.join(',') === '1W,1M,3M,6M,1Y,All' && r82.active === '1M' && r82.savedRange === '1M' && /Bench Press.*\+6% · 160→170/.test(r82.bars[0] || '');
+  if(!ok82) throw new Error('expected deload repair, quick-toggle cleanup and % change ranges, got: ' + JSON.stringify(r82));
+  console.log('OK: a bad Oct-13-style record becomes the logged deload run (' + r82.fixed.slice(0, 2).join(' to ') + '); quick on/off of Deload or Shoulder Rehab leaves the real record; ranges give All +13.3%, 1M +6.3%, 1W none');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
