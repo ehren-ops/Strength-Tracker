@@ -2535,7 +2535,7 @@ async function main(){
     toggleMode('shoulder'); toggleMode('shoulder');
     out.shoulder = [shoulderRehab.startedOn, shoulderRehab.endedOn];
     const pct = rows => rows.map(r => r.name + ' ' + Math.round(r.pct * 10) / 10);
-    out.ranges = { all: pct(changeData(null)), month: pct(changeData(30)), week: pct(changeData(7)) };
+    out.ranges = { all: pct(changeData(null)), month: pct(changeData(30)), week: pct(changeData(14)) };
     view = 'overview'; render();
     out.chips = [...document.querySelectorAll('.range-chip')].map(b => b.textContent);
     setChangeRange('1M');
@@ -2553,9 +2553,9 @@ async function main(){
     JSON.stringify(r82.afterQuick) === JSON.stringify([d82[0], d82[1]]) &&
     r82.shoulder[0] === (await page.evaluate(() => shiftISO(todayISO(), -30))) &&
     JSON.stringify(r82.ranges) === JSON.stringify({ all: ['Bench Press 13.3'], month: ['Bench Press 6.3'], week: [] }) &&
-    r82.chips.join(',') === '1W,1M,3M,6M,1Y,All' && r82.active === '1M' && r82.savedRange === '1M' && /Bench Press.*\+6% · 160→170/.test(r82.bars[0] || '');
+    r82.chips.join(',') === '2W,1M,3M,6M,1Y,All' && r82.active === '1M' && r82.savedRange === '1M' && /Bench Press.*\+6% · 160→170/.test(r82.bars[0] || '');
   if(!ok82) throw new Error('expected deload repair, quick-toggle cleanup and % change ranges, got: ' + JSON.stringify(r82));
-  console.log('OK: a bad Oct-13-style record becomes the logged deload run (' + r82.fixed.slice(0, 2).join(' to ') + '); quick on/off of Deload or Shoulder Rehab leaves the real record; ranges give All +13.3%, 1M +6.3%, 1W none');
+  console.log('OK: a bad Oct-13-style record becomes the logged deload run (' + r82.fixed.slice(0, 2).join(' to ') + '); quick on/off of Deload or Shoulder Rehab leaves the real record; ranges give All +13.3%, 1M +6.3%, 2W none');
 
   console.log('=== 83: a squat logged with Preseason Prep at 5 reps charts in the Preseason color, not as missed reps ===');
   const r83 = await page.evaluate(() => {

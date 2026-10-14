@@ -595,7 +595,7 @@ function renderDeloadModifier(){
 
 // Change per lift from its first to its latest full session, over everything logged or a recent
 // window. Deload sessions are left out, so a planned light week never reads as a drop.
-const CHANGE_RANGES = [["1W", 7, "Past week"], ["1M", 30, "Past month"], ["3M", 91, "Past 3 months"], ["6M", 182, "Past 6 months"], ["1Y", 365, "Past year"], ["All", null, "Since first logged"]];
+const CHANGE_RANGES = [["2W", 14, "Past 2 weeks"], ["1M", 30, "Past month"], ["3M", 91, "Past 3 months"], ["6M", 182, "Past 6 months"], ["1Y", 365, "Past year"], ["All", null, "Since first logged"]];
 const CHANGE_RANGE_KEY = "strength-tracker-change-range";
 let changeRange = (function(){ try{ const v = localStorage.getItem(CHANGE_RANGE_KEY); return CHANGE_RANGES.some(r => r[0] === v) ? v : "All"; }catch(e){ return "All"; } })();
 function setChangeRange(key){
