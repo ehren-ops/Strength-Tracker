@@ -2280,6 +2280,20 @@ async function main(){
   await page.evaluate(() => { data['Face Pulls'].entries = data['Face Pulls'].entries.filter(e => e.clientId !== 'skip-hist').concat(window.__todayFacePulls || []); render(); });
   console.log('OK: skip for injury marks the pill, moves on, syncs (' + JSON.stringify(skipRow) + ') and reaches the coach; Undo clears it; ✕ deletes on the second tap; edit/delete gap ' + gap);
 
+  console.log('=== 78: tapping the date range collapses and restores the graph on every card ===');
+  await page.evaluate(() => { view = 'lower'; selected = 'Squat'; render(); });
+  const chartsBefore = await page.locator('.card svg.chart').count();
+  await page.click('.chart-toggle');
+  await sleep(100);
+  const collapsed = { charts: await page.locator('.card svg.chart').count(), saved: await page.evaluate(() => localStorage.getItem('strength-tracker-charts-collapsed')) };
+  await page.evaluate(() => { selected = 'RDL'; render(); });
+  const otherCard = await page.locator('.card svg.chart').count();
+  await page.click('.chart-toggle');
+  await sleep(100);
+  const restored = await page.locator('.card svg.chart').count();
+  if(chartsBefore !== 1 || collapsed.charts !== 0 || collapsed.saved !== '1' || otherCard !== 0 || restored !== 1) throw new Error('expected the date range to hide the graph on every card and bring it back, got: ' + JSON.stringify({ chartsBefore, collapsed, otherCard, restored }));
+  console.log('OK: the date range hides the graph (and keeps it hidden on other cards), and a second tap brings it back');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

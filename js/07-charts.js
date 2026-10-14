@@ -37,6 +37,16 @@ function shiftChartQuarter(chartKey, delta){
   render();
 }
 
+// Tapping the date range shows or hides the graph. One setting for every card, remembered, so a
+// collapsed layout stays collapsed from lift to lift.
+const CHARTS_COLLAPSED_KEY = "strength-tracker-charts-collapsed";
+let chartsCollapsed = (function(){ try{ return localStorage.getItem(CHARTS_COLLAPSED_KEY) === "1"; }catch(e){ return false; } })();
+function toggleCharts(){
+  chartsCollapsed = !chartsCollapsed;
+  try{ localStorage.setItem(CHARTS_COLLAPSED_KEY, chartsCollapsed ? "1" : "0"); }catch(e){}
+  render();
+}
+
 // ---------- chart (pure inline SVG, no external library) ----------
 function renderChart(ex, suggestion, isRealExercise, chartKey){
   const W = 320, H = 130, padR = 14, padT = 10, padB = 20;
@@ -50,9 +60,12 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     .filter(p => dateInQuarter(p.entry.date, qIndex));
   const deloadFlags = points.map(p => p.deload);
 
+  const toggle = `<button type="button" class="chart-quarter-label chart-toggle" onclick="toggleCharts()" aria-expanded="${!chartsCollapsed}" aria-label="${chartsCollapsed ? "Show" : "Hide"} graph">${fmtQuarterRange(qIndex)}</button>`;
+  // Collapsed: just the date range, which brings the graph back.
+  if(chartsCollapsed) return `<div class="chart-quarter-nav collapsed">${toggle}</div>`;
   let nav = `<div class="chart-quarter-nav">
     <button class="tool-btn" onclick="shiftChartQuarter('${chartKey.replace(/'/g,"\\'")}', -1)">‹ Prev</button>
-    <span class="chart-quarter-label">${fmtQuarterRange(qIndex)}</span>
+    ${toggle}
     <button class="tool-btn" ${offset >= 0 ? "disabled" : ""} onclick="shiftChartQuarter('${chartKey.replace(/'/g,"\\'")}', 1)">Next ›</button>
   </div>`;
   if(!points.length){

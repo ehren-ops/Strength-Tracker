@@ -80,6 +80,10 @@
   .tool-btn.sync-btn-err{background:var(--danger);border-color:var(--danger);color:#fff;}
   .chart-quarter-nav{display:flex;align-items:center;justify-content:space-between;gap:0.4rem;margin-top:0.6rem;}
   .chart-quarter-label{font-size:0.7rem;color:var(--slate);font-weight:600;text-align:center;flex:1;}
+  .chart-toggle{background:none;border:none;font-family:inherit;cursor:pointer;padding:0.35rem 0.2rem;}
+  .chart-toggle::after{content:"▾";font-size:0.65rem;margin-left:0.3rem;}
+  .chart-quarter-nav.collapsed .chart-toggle::after{content:"▸";}
+  .chart-quarter-nav.collapsed{justify-content:center;}
   main{max-width:640px;margin:0 auto;padding:1rem 1rem 3rem;}
   .day-banner{background:var(--surface) !important;border:2px solid var(--accent-2) !important;border-radius:8px;padding:0.55rem 0.75rem;margin-bottom:0.8rem;font-size:0.76rem;color:var(--accent-2) !important;font-weight:600;}
   .pill-row{display:flex;gap:0.35rem;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:0.7rem;padding-bottom:0.15rem;}
