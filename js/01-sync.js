@@ -165,6 +165,7 @@ function entryToRow(entry, exerciseId, userId){
     completed_indices: entry.completedIndices ?? null,
     temp_f: entry.tempF ?? null,
     deload: !!entry.deload,
+    preseason: !!entry.preseason,
     // undefined (dropped from the request) rather than null for entries logged before this
     // existed, so an edit never wipes the time the server backfilled.
     logged_at: entry.loggedAt || undefined,
@@ -187,6 +188,7 @@ function rowToEntry(row){
     completedIndices: row.completed_indices || undefined,
     tempF: row.temp_f ?? undefined,
     deload: row.deload || undefined,
+    preseason: row.preseason || undefined,
     loggedAt: row.logged_at || undefined,
   };
 }

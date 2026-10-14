@@ -115,12 +115,15 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     // and fewer sets would otherwise earn.
     const isPlanned = isRealExercise && !!p.entry.deload;
     const isDeload = !isPlanned && deloadFlags[i];
-    const targetReps = ex.targetReps || 8;
+    // A set logged with Preseason Prep on is judged against the preseason target (Squat: 5 reps,
+    // 4 sec lowering): fewer reps on purpose, drawn in the Preseason badge color, not as a miss.
+    const targetReps = entryTargetReps(ex, p.entry);
     const isUnder = isRealExercise && !isPlanned && !isDeload && ex.trackBy !== "duration" && p.entry.sets < 3;
     const isMissed = isRealExercise && !isPlanned && !isDeload && !isUnder && ex.trackBy !== "duration" && p.entry.reps < targetReps;
-    const isExtra = isRealExercise && !isPlanned && !isDeload && !isUnder && !isMissed && ex.trackBy !== "duration" &&
+    const isPreseason = isRealExercise && !isPlanned && !isDeload && !isUnder && !isMissed && !!p.entry.preseason && !!ex.targetRepsPreseason;
+    const isExtra = isRealExercise && !isPlanned && !isDeload && !isUnder && !isMissed && !isPreseason && ex.trackBy !== "duration" &&
       (p.entry.reps > targetReps || p.entry.sets > 3);
-    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" - "+p.entry.note:""}${isPlanned?" - Deload Week (planned)":""}${isDeload?" - dropped after missed sessions":""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
+    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" - "+p.entry.note:""}${isPlanned?" - Deload Week (planned)":""}${isDeload?" - dropped after missed sessions":""}${isPreseason?" - Preseason target "+targetReps+" reps":""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
 
     function labelWithHalo(text, color){
       // Above the point when there's room, otherwise just below it so it never covers the dot.
@@ -143,6 +146,9 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     } else if(isMissed){
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="var(--chart-missed)"><title>${titleText}</title></circle>`;
       labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "var(--chart-missed)");
+    } else if(isPreseason){
+      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="var(--preseason)" class="preseason-mark"><title>${titleText}</title></circle>`;
+      labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "var(--preseason)");
     } else if(isExtra){
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="var(--chart-extra)"><title>${titleText}</title></circle>`;
       labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "var(--chart-extra)");

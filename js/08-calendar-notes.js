@@ -190,7 +190,7 @@ function generateCoachNotes(){
           if(ex.trackBy === "weight") trend = entry.weight > prev.weight ? "increased" : entry.weight < prev.weight ? "decreased" : "held";
           else trend = entry.reps > prev.reps ? "increased" : entry.reps < prev.reps ? "decreased" : "held";
         }
-        const targetReps = ex.targetReps || 8;
+        const targetReps = entryTargetReps(ex, entry);
         const hit = ex.trackBy === "weight" ? entry.reps >= targetReps : true;
         items.push({ name, entry, trend, hit, ex });
         break;

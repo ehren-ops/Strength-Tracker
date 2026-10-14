@@ -157,6 +157,12 @@ function toggleMode(key){
   render();
 }
 
+// The target a logged set was meant to hit: the preseason target when it was logged with Preseason
+// Prep on, otherwise the normal one. Charts and notes judge history with this, not the current mode.
+function entryTargetReps(ex, entry){
+  if(entry && entry.preseason && ex.targetRepsPreseason) return ex.targetRepsPreseason;
+  return ex.targetReps || 8;
+}
 function effectiveTargetReps(ex){
   if(modes.preseason && ex.targetRepsPreseason) return ex.targetRepsPreseason;
   return (modes.ski && ex.targetRepsSki) ? ex.targetRepsSki : (ex.targetReps || 8);

@@ -116,6 +116,8 @@ function logEntry(){
     };
   }
   if(modes.deload && ex.trackBy !== "duration"){ entry.deload = true; entry.note = withDeloadNote(entry.note); }
+  // Logged at the preseason target (Squat: 5 reps, 4 sec lowering), so charts judge it against that.
+  if(modes.preseason && ex.targetRepsPreseason && ex.trackBy !== "duration") entry.preseason = true;
   if(isShoulderModified(selected) && entry.date >= (shoulderRehab.startedOn || entry.date)) entry.note = withRehabNote(entry.note);
   // When it was logged, so a session's actual exercise order can be compared with the planned one.
   entry.loggedAt = new Date().toISOString();

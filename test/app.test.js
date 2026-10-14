@@ -2557,6 +2557,26 @@ async function main(){
   if(!ok82) throw new Error('expected deload repair, quick-toggle cleanup and % change ranges, got: ' + JSON.stringify(r82));
   console.log('OK: a bad Oct-13-style record becomes the logged deload run (' + r82.fixed.slice(0, 2).join(' to ') + '); quick on/off of Deload or Shoulder Rehab leaves the real record; ranges give All +13.3%, 1M +6.3%, 1W none');
 
+  console.log('=== 83: a squat logged with Preseason Prep at 5 reps charts in the Preseason color, not as missed reps ===');
+  const r83 = await page.evaluate(() => {
+    const d = n => shiftISO(todayISO(), n);
+    const ex = Object.assign(newExerciseShell('Squat'), EXERCISE_DEFAULTS['Squat'], { entries: [
+      { date: d(-9), weight: 175, sets: 3, reps: 8, difficulty: 7, label: 'a' },
+      { date: d(-5), weight: 180, sets: 3, reps: 5, difficulty: 7, preseason: true, label: 'b' },
+      { date: d(-1), weight: 180, sets: 3, reps: 4, difficulty: 8, preseason: true, label: 'c' },
+      { date: d(0), weight: 180, sets: 3, reps: 5, difficulty: 7, label: 'd' },
+    ] });
+    const div = document.createElement('div');
+    div.innerHTML = renderChart(ex, null, true, 'preseason-check');
+    const titles = [...div.querySelectorAll('title')].map(t => t.textContent);
+    return { preseason: div.querySelectorAll('.preseason-mark').length, missed: div.querySelectorAll('circle[fill="var(--chart-missed)"]').length,
+      title: titles.find(t => /Preseason target 5 reps/.test(t)) || null,
+      back: rowToEntry({ client_id: 'x', entry_date: d(0), reps: 5, preseason: true }).preseason === true,
+      target: entryTargetReps(ex, ex.entries[1]) + '/' + entryTargetReps(ex, ex.entries[3]) };
+  });
+  if(r83.preseason !== 1 || r83.missed !== 2 || !r83.title || !r83.back || r83.target !== '5/8') throw new Error('expected one preseason point (5 reps at the 5-rep preseason target), the 4-rep preseason set and the untagged 5-rep set as misses, got: ' + JSON.stringify(r83));
+  console.log('OK: a preseason 3x5 squat is drawn in the Preseason color; short of the preseason target or logged without the modifier it is still a miss');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
