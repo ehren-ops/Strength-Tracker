@@ -52,13 +52,18 @@ function toggleCharts(){
 // a modifier's name in its note ("Rehab", "Knee Care", "Preseason"...). The graph marks these
 // with a diamond in the modifier's color instead of a short-set or missed-rep flag. Plain words
 // like "knee" or "back" stay concerns, not tags, so only the modifier names count.
+// The marker follows what the modifier does, and any new modifier picks one of the two kinds:
+//   "light": lighter on purpose (deload, rehab, injury care). A diamond in its color, named, and
+//            never a missed-rep or short-set flag.
+//   "block": a training block that changes the target (preseason, ski). A circle in its color with
+//            the sets x reps, judged against the block's own target, so a real miss is still red.
 const MODIFIER_TAGS = [
-  { key: "deload", re: /\bdeload\b/i, label: "Deload", title: "Deload Week", color: "var(--deload)" },
-  { key: "shoulder", re: /\b(shoulder )?rehab\b/i, label: "Rehab", color: "var(--shoulder)" },
-  { key: "knee", re: /\bknee care\b/i, label: "Knee Care", color: "var(--knee)" },
-  { key: "back", re: /\b(low )?back care\b/i, label: "Back Care", color: "var(--back)" },
-  { key: "preseason", re: /\bpreseason\b/i, label: "Preseason", color: "var(--preseason)" },
-  { key: "ski", re: /\bski( season)?\b/i, label: "Ski", color: "var(--ski)" },
+  { key: "deload", kind: "light", re: /\bdeload\b/i, label: "Deload", title: "Deload Week", color: "var(--deload)" },
+  { key: "shoulder", kind: "light", re: /\b(shoulder )?rehab\b/i, label: "Rehab", color: "var(--shoulder)" },
+  { key: "knee", kind: "light", re: /\bknee care\b/i, label: "Knee Care", color: "var(--knee)" },
+  { key: "back", kind: "light", re: /\b(low )?back care\b/i, label: "Back Care", color: "var(--back)" },
+  { key: "preseason", kind: "block", re: /\bpreseason\b/i, label: "Preseason", color: "var(--preseason)" },
+  { key: "ski", kind: "block", re: /\bski( season)?\b/i, label: "Ski", color: "var(--ski)" },
 ];
 // The tags a lift's sessions carry while a modifier is on and changes or notes that lift (the same
 // lifts that show its badge), in a fixed order: "Deload, Rehab, Knee Care". Pre-filled in the
@@ -83,7 +88,10 @@ function withModifierTags(note, tags){
 function modifierTag(entry){
   if(entry.deload) return MODIFIER_TAGS[0];
   const note = entry.note || "";
-  return MODIFIER_TAGS.find(t => t.re.test(note)) || null;
+  // Light tags first, so a deload or rehab session in a preseason block still reads as lighter.
+  return MODIFIER_TAGS.find(t => t.kind === "light" && t.re.test(note))
+    || (entry.preseason ? MODIFIER_TAGS.find(t => t.key === "preseason") : null)
+    || MODIFIER_TAGS.find(t => t.re.test(note)) || null;
 }
 
 function renderChart(ex, suggestion, isRealExercise, chartKey){
@@ -152,22 +160,20 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     // diamond in the Deload badge color instead of the short-set or missed-rep flag its lighter load
     // and fewer sets would otherwise earn.
     const tagged = isRealExercise ? modifierTag(p.entry) : null;
-    // Preseason and Ski change the target reps rather than the load, so their sessions are judged
-    // against that target: hit it and it's their diamond, fall short and it's still a miss.
+    // A block modifier's session is judged against that block's target reps (Squat in preseason:
+    // 5 reps, 4 sec lowering): hit it and it's the block's circle, fall short and it's still a miss.
     const modTarget = tagged && tagged.key === "preseason" && ex.targetRepsPreseason ? ex.targetRepsPreseason
       : tagged && tagged.key === "ski" && ex.targetRepsSki ? ex.targetRepsSki : null;
-    const tag = tagged && !(modTarget && p.entry.reps < modTarget) ? tagged : null;
-    const isPlanned = !!tag;
-    const isDeload = !isPlanned && deloadFlags[i];
-    // A set logged with Preseason Prep on is judged against the preseason target (Squat: 5 reps,
-    // 4 sec lowering): fewer reps on purpose, drawn in the Preseason badge color, not as a miss.
+    const tag = tagged && !(tagged.kind === "block" && p.entry.reps < (modTarget || entryTargetReps(ex, p.entry))) ? tagged : null;
+    const isPlanned = !!tag && tag.kind === "light";
+    const isBlock = !!tag && tag.kind === "block";
+    const isDeload = !tag && deloadFlags[i];
     const targetReps = modTarget || entryTargetReps(ex, p.entry);
     const isUnder = isRealExercise && !isPlanned && !isDeload && ex.trackBy !== "duration" && p.entry.sets < 3;
     const isMissed = isRealExercise && !isPlanned && !isDeload && !isUnder && ex.trackBy !== "duration" && p.entry.reps < targetReps;
-    const isPreseason = isRealExercise && !isPlanned && !isDeload && !isUnder && !isMissed && !!p.entry.preseason && !!ex.targetRepsPreseason;
-    const isExtra = isRealExercise && !isPlanned && !isDeload && !isUnder && !isMissed && !isPreseason && ex.trackBy !== "duration" &&
+    const isExtra = isRealExercise && !tag && !isDeload && !isUnder && !isMissed && ex.trackBy !== "duration" &&
       (p.entry.reps > targetReps || p.entry.sets > 3);
-    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" - "+p.entry.note:""}${isPlanned?` - ${tag.title || tag.label} (planned)`:""}${isDeload?" - dropped after missed sessions":""}${isPreseason?" - Preseason target "+targetReps+" reps":""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
+    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" - "+p.entry.note:""}${isPlanned?` - ${tag.title || tag.label} (planned)`:""}${isDeload?" - dropped after missed sessions":""}${isBlock?` - ${tag.label} target ${targetReps} reps`:""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
 
     function labelWithHalo(text, color){
       // Above the point when there's room, otherwise just below it so it never covers the dot.
@@ -190,16 +196,16 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     } else if(isMissed){
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="var(--chart-missed)"><title>${titleText}</title></circle>`;
       labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "var(--chart-missed)");
-    } else if(isPreseason){
-      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="var(--preseason)" class="preseason-mark"><title>${titleText}</title></circle>`;
-      labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "var(--preseason)");
+    } else if(isBlock){
+      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="${tag.color}" class="mod-mark block-mark ${tag.key}-mark" data-tag="${tag.key}"><title>${titleText}</title></circle>`;
+      labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, tag.color);
     } else if(isExtra){
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4.5" fill="var(--chart-extra)"><title>${titleText}</title></circle>`;
       labelWithHalo(`${p.entry.sets}×${p.entry.reps}`, "var(--chart-extra)");
     } else {
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="var(--chart-line)"><title>${titleText}</title></circle>`;
     }
-    svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'var(--danger)':isPlanned?tag.color:'var(--chart-axis)'}" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${isDeload?'D':p.entry.label}</text>`;
+    svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'var(--danger)':tag?tag.color:'var(--chart-axis)'}" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${isDeload?'D':p.entry.label}</text>`;
   });
 
   // dashed projection segment
