@@ -5,21 +5,22 @@
 
 const REHAB_NAME = "Shoulder Rehab";
 // Paused outright: flies, incline pressing, lateral raises and overhead slams load the irritated
-// tendon at the end of its range. Rows, face pulls, pushdowns, legs and riding stay as they are.
+// tendon at the end of its range. Face pulls, pushdowns, legs and riding stay as they are.
 const SHOULDER_PAUSED = new Set(["Cable Chest Fly", "Incline DB Press", "Lateral Raise", "Med Ball Slam"]);
-// Paused while rehab is on, then ramped back once it is off. Bicep Curl joins here because it is
-// paused until week 3, then hammer curls only.
-const SHOULDER_RETURN = new Set([...SHOULDER_PAUSED, "Bicep Curl"]);
+// Ramped back once rehab is off. Bicep Curl joins because it is paused until week 3, then hammer
+// curls only; Barbell Row because it is held at 85% the whole time.
+const SHOULDER_RETURN = new Set([...SHOULDER_PAUSED, "Bicep Curl", "Barbell Row"]);
 const SHOULDER_RETURN_STEPS = [0.85, 0.925, 1];
 const SHOULDER_RETURN_WINDOW_DAYS = 56; // after 8 weeks off rehab the ramp no longer applies
 const HAMMER_FROM_WEEK = 3;
 // The rehab is for the left shoulder; the right is trained alongside it (see REHAB_RIGHT_SIDE).
 const RIGHT_PRESS_TIP = "Right arm: single-arm DB floor press or landmine press keeps pressing trained.";
 // Held lifts start at a share of the last working weight from before rehab and stay there.
-const SHOULDER_HOLD_PCT = { "Bench Press": 0.85, "Bicep Curl": 0.7 };
+const SHOULDER_HOLD_PCT = { "Bench Press": 0.85, "Bicep Curl": 0.7, "Barbell Row": 0.85 };
 const SHOULDER_CARE_TIP = {
   "Bench Press": "85% of pre-rehab weight, medium grip (forearms vertical), elbows ~45°, stop 2-3 in above the chest. Over 3 of 10: drop 10 lb. Incline push-ups or a right-arm DB floor press also work.",
   "Bicep Curl": "Hammer curls only, both arms, light, lower over 3 seconds. Skip if the front of the left shoulder aches.",
+  "Barbell Row": "85% of pre-rehab weight, palms-in grip (neutral handle, or single-arm DB rows), elbows ~45°, pull to the lower ribs, no shrug. Over 3 of 10: drop 10 lb.",
 };
 const SHOULDER_PAUSED_TIP = "Paused for Shoulder Rehab. Back once the side-raise press is pain-free.";
 const SHOULDER_PAUSED_TIPS = {
@@ -37,7 +38,6 @@ const PUSHUP_TIP = {
 };
 // Lifts the modifier leaves alone but has a word on, shown while it is on.
 const SHOULDER_KEEP_TIP = {
-  "Barbell Row": "Shoulder Rehab: keep as is. Single-arm DB rows let each side work at its own load.",
   "Face Pulls": "Shoulder Rehab: keep as is. More pulling evens out the pressing, which protects both shoulders.",
 };
 // Logged sessions of a paused or held lift say so in their note, like Deload.
@@ -306,12 +306,9 @@ function rehabCoachBlock(){
     block.phase = rehabPhase();
     block.pausedLifts = [...SHOULDER_PAUSED, "Bicep Curl"].filter(n => isShoulderPaused(n) && (data[n] || allDayNames().includes(n)));
     block.heldLifts = Object.keys(SHOULDER_CARE_TIP).filter(isShoulderHeld);
-    block.bench = rehabPhase() === 3
-      ? "Phase 3: full-range bench building back 5 lb a session toward the pre-rehab weight."
-      : "Held at 85% of the last pre-rehab working weight, medium grip (forearms vertical) with elbows about 45° after a close grip hurt the left shoulder more, stopping short of the chest; drop 10 lb if over 3 of 10.";
-    block.pushUps = "Push-Ups are the pressing bridge: incline in phases 1-2, floor to full depth in phase 3.";
-    block.rightSide = "Rehab is for the left shoulder. The right is trained too: rotation work both sides with the right about 50% heavier, right-arm hammer curls from week 1, single-arm right pressing (DB floor press, landmine) allowed. No pain cap on the right, but the same ache there means treat it like the left.";
-    block.notes = "Sessions of paused or held lifts logged during rehab carry \"Rehab\" in the note.";
+    // What bench, push-ups and the right side do in rehab is fixed text in the coach prompt (cached);
+    // only the facts that change ride here.
+    if(rehabPhase() === 3) block.benchPhase3 = true;
     block.last14Days = { daysOn: recent.daysOn, daysWithRehabDone: recent.daysDone, painScores0to10: recent.pain };
   }
   return block;

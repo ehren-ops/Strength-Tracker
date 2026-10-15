@@ -39,7 +39,7 @@ function describeSuggestion(ex, name){
   const s = computeSuggestion(ex, name);
   if(!s) return null;
   if(ex.trackBy === "weight"){
-    const why = s.shoulderPaused ? "paused for shoulder rehab" : s.shoulderHold ? (name === "Bicep Curl" ? "shoulder rehab: hammer curls only, held" : "shoulder rehab: held at about 85% of pre-rehab weight, medium grip, short range")
+    const why = s.shoulderPaused ? "paused for shoulder rehab" : s.shoulderHold ? (name === "Bicep Curl" ? "shoulder rehab: hammer curls only, held" : name === "Barbell Row" ? "shoulder rehab: held at about 85% of pre-rehab weight, palms-in grip" : "shoulder rehab: held at about 85% of pre-rehab weight, medium grip, short range")
       : s.shoulderBuild ? `shoulder rehab phase 3: full range, building back toward ${s.shoulderBuild.fullWeight} lb`
       : s.shoulderReturn ? `back from shoulder rehab, step ${s.shoulderReturn.step} of 3 back to ${s.shoulderReturn.fullWeight} lb`
       : s.deloadWeek ? "deload week" : s.reentry ? `rebuilding after time off, step ${s.reentry.step} of 3 back to ${s.reentry.fullWeight} lb` : s.postDeloadHold ? `first session back from deload, repeating the pre-deload weight (${s.postDeloadHold.why})` : s.noteTarget != null ? "set by last note" : s.noteCue === "up" ? "add weight, note said so" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
@@ -96,11 +96,32 @@ function liftTrend(name, ex, asOf){
   };
 }
 
-function patternSummary(asOf){
+// The trend as one short line for the coach payload: same facts, a fraction of the JSON.
+// "squat; e1RM +3.2% in 4 wk; 3 sessions at this load, RPE 7 7 8; 6 sessions in 4 wk"
+function trendText(t){
+  if(!t) return null;
+  const bits = [t.pattern];
+  if(t.e1rmChange4WeeksPct) bits.push(`e1RM ${t.e1rmChange4WeeksPct > 0 ? "+" : ""}${t.e1rmChange4WeeksPct}% in 4 wk`);
+  if(t.repsChange4Weeks) bits.push(`reps ${t.repsChange4Weeks > 0 ? "+" : ""}${t.repsChange4Weeks} in 4 wk`);
+  if(t.secondsChange4Weeks) bits.push(`hold ${t.secondsChange4Weeks > 0 ? "+" : ""}${t.secondsChange4Weeks} sec in 4 wk`);
+  if(t.sessionsAtCurrentLoad > 1) bits.push(`${t.sessionsAtCurrentLoad} sessions at this load${t.rpeAtCurrentLoad.length ? ", RPE " + t.rpeAtCurrentLoad.join(" ") : ""}`);
+  bits.push(`${t.sessionsLast4Weeks} sessions in 4 wk`);
+  return bits.join("; ");
+}
+// Units only when they aren't plain totals, which the coach assumes.
+function unitsFor(name){
+  const u = sidesText(name);
+  return u === "weight total, reps total" ? undefined : u;
+}
+// Coach payload windows: enough to read a trend and a block, no more.
+const COACH_SESSION_HISTORY = 5;   // prior results per lift in the session note
+const COACH_WEEKLY_DAYS = 28;      // history per lift in the weekly check-in
+
+function patternSummary(asOf, only){
   const by = {};
   Object.entries(data).forEach(([name, ex]) => {
     const t = liftTrend(name, ex, asOf);
-    if(!t || t.e1rmChange4WeeksPct == null) return;
+    if(!t || t.e1rmChange4WeeksPct == null || (only && !only.has(t.pattern))) return;
     (by[t.pattern] ||= []).push(`${name} ${t.e1rmChange4WeeksPct > 0 ? "+" : ""}${t.e1rmChange4WeeksPct}%`);
   });
   return Object.fromEntries(Object.entries(by).map(([p, lifts]) => {
@@ -271,10 +292,10 @@ function balanceForCoach(){
 function liftsDueForCoach(){
   const due = dueLifts();
   const lifts = Object.entries(due).map(([name, d]) => ({ name, missedSessions: d.missedSessions, lastDone: d.lastDone }));
-  return lifts.length ? { note: "Program lifts missed on their last 2+ sessions of their day. Intentional skips (injury, equipment, time, other), deload weeks and Shoulder Rehab pauses are already excluded. If the same lifts keep dropping off the end of a day, suggest doing them earlier.", lifts } : null;
+  return lifts.length ? lifts : null;
 }
 
-// One session plus the last 8 results per lift, so the note can see trends, not just today.
+// One session plus the last few results per lift, so the note can see trends, not just today.
 function buildSessionCoachPayload(date){
   const exercises = [];
   let prevDate = null;
@@ -289,21 +310,22 @@ function buildSessionCoachPayload(date){
       today: compactEntry(ex.entries[idx], ex),
       targetReps: ex.trackBy === "weight" ? effectiveTargetReps(ex) : null,
       repRange: activeRepRange(ex) ? ex.repRange : undefined,
-      history: ex.entries.slice(Math.max(0, idx - 8), idx).map(e => compactEntry(e, ex)),
+      history: ex.entries.slice(Math.max(0, idx - COACH_SESSION_HISTORY), idx).map(e => compactEntry(e, ex)),
       appSuggestion: describeSuggestion(ex, name),
-      trend: liftTrend(name, ex, date),
-      units: sidesText(name),
+      trend: trendText(liftTrend(name, ex, date)),
+      units: unitsFor(name),
     });
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
   const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
-  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date), skipped: skippedOn(date), rehab: rehabCoachBlock(), recovery: recoveryLog(shiftISO(date, -6), date), liftsDue: liftsDueForCoach() };
+  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date, new Set(exercises.map(e => LIFT_PATTERNS[e.name] || "other"))), skipped: skippedOn(date), rehab: rehabCoachBlock(), recovery: recoveryLog(shiftISO(date, -6), date), liftsDue: liftsDueForCoach() };
 }
 
-// The past week plus 6 weeks of history per lift, enough to judge loading blocks and deloads.
+// The past week plus 4 weeks of history per lift: the trend window. The deload status carries the
+// block length, so older sessions add tokens without adding a decision.
 function buildWeeklyCoachPayload(){
   const weekEnd = todayISO();
-  const since = shiftISO(weekEnd, -41);
+  const since = shiftISO(weekEnd, -(COACH_WEEKLY_DAYS - 1));
   const sessionDates = new Set();
   const exercises = [];
   Object.entries(data).forEach(([name, ex]) => {
@@ -311,9 +333,9 @@ function buildWeeklyCoachPayload(){
     const recent = ex.entries.filter(e => e.date >= since && e.date <= weekEnd);
     if(!recent.length) return;
     recent.forEach(e => sessionDates.add(e.date));
-    exercises.push({ name, units: sidesText(name), entries: recent.map(e => compactEntry(e, ex)), appSuggestion: describeSuggestion(ex, name), trend: liftTrend(name, ex, weekEnd) });
+    exercises.push({ name, units: unitsFor(name), entries: recent.map(e => compactEntry(e, ex)), appSuggestion: describeSuggestion(ex, name), trend: trendText(liftTrend(name, ex, weekEnd)) });
   });
-  const orderSince = shiftISO(weekEnd, -13);
+  const orderSince = shiftISO(weekEnd, -6);
   const sessionOrders = Object.fromEntries([...sessionDates].filter(d => d >= orderSince).sort()
     .map(d => [d, sessionOrder(d)]).filter(([, o]) => o));
   const weekLogTimes = Object.fromEntries([...sessionDates].filter(d => d >= shiftISO(weekEnd, -6)).sort()

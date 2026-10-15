@@ -629,9 +629,11 @@ function renderExerciseCard(name, ex){
           msg = painMessage(suggestion, `${suggestion.weight} lb`);
         } else if(suggestion.shoulderHold){
           const h = suggestion.shoulderHold;
+          const share = h.fullWeight ? ` (${Math.round(h.pct * 100)}% of ${h.fullWeight})` : "";
           msg = name === "Bicep Curl"
             ? `Shoulder Rehab: hammer curls only at ${suggestion.weight} lb, lower over 3 sec. No adding weight yet.`
-            : `Rehab: ${suggestion.weight} lb${h.fullWeight ? ` (${Math.round(h.pct * 100)}% of ${h.fullWeight})` : ""}, medium grip, short of the chest. Hold until phase 3.`;
+            : name === "Barbell Row" ? `Rehab: ${suggestion.weight} lb${share}, palms-in grip, no shrug. Held until rehab is off.`
+            : `Rehab: ${suggestion.weight} lb${share}, medium grip, short of the chest. Hold until phase 3.`;
         } else if(suggestion.shoulderBuild && !suggestion.deloadWeek){
           msg = `Shoulder Rehab phase 3: full range, ${suggestion.weight} lb. Add 5 lb a session at 3 of 10 or less, up to ${suggestion.shoulderBuild.fullWeight} lb.`;
         } else if(suggestion.shoulderReturn && !suggestion.deloadWeek){

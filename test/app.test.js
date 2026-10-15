@@ -1548,8 +1548,8 @@ async function main(){
   const sessionReq = coachRequests[coachRequests.length - 1];
   if(sessionReq.mode !== 'session' || !sessionReq.payload.date || !sessionReq.payload.tz) throw new Error('expected a session-mode request with the session date and time zone, got: ' + JSON.stringify(sessionReq).slice(0, 300));
   const squatPayload = sessionReq.payload.exercises.find(e => e.name === 'Squat');
-  if(!squatPayload || !Array.isArray(squatPayload.history) || squatPayload.history.length > 8 || !squatPayload.appSuggestion) throw new Error('expected each lift to carry up to 8 prior results and the app suggestion, got: ' + JSON.stringify(squatPayload));
-  if(!squatPayload.trend || squatPayload.trend.pattern !== 'squat' || typeof squatPayload.trend.sessionsAtCurrentLoad !== 'number') throw new Error('expected a pre-computed trend with the movement pattern per lift, got: ' + JSON.stringify(squatPayload.trend));
+  if(!squatPayload || !Array.isArray(squatPayload.history) || squatPayload.history.length > 5 || !squatPayload.appSuggestion) throw new Error('expected each lift to carry up to 5 prior results and the app suggestion, got: ' + JSON.stringify(squatPayload));
+  if(typeof squatPayload.trend !== 'string' || !/^squat; .*sessions in 4 wk$/.test(squatPayload.trend) || 'units' in squatPayload && squatPayload.units !== undefined) throw new Error('expected a pre-computed trend with the movement pattern per lift, got: ' + JSON.stringify(squatPayload.trend));
   if(!sessionReq.payload.patterns || typeof sessionReq.payload.patterns !== 'object') throw new Error('expected a movement-pattern summary in the session payload');
   const lt = sessionReq.payload.logTimes;
   if(!Array.isArray(lt) || !lt.length || !lt.every(l => l.name && !isNaN(Date.parse(l.at))) || lt.some((l, i) => i && l.at < lt[i-1].at)) throw new Error('expected the session payload to carry each lift\'s log time, oldest first, for the heart-rate split, got: ' + JSON.stringify(lt));
@@ -2457,7 +2457,7 @@ async function main(){
     /incline/.test(r79.pushupCard.tip || '') && r79.pushupCard.note === 'Rehab' && r79.pushupCard.exists &&
     r79.benchP3.first === 157.5 && r79.benchP3.build && r79.benchP3.next === 155 &&
     r79.fly && r79.curlWeek1 && /paused/i.test(r79.flyCard.next) && !r79.flyCard.skip && /Right arm/.test(r79.flyCard.tip) &&
-    r79.benchNote === 'Rehab' && r79.benchLogged === 'Rehab, felt fine' && /keep as is/.test(r79.row.tip || '') && !r79.row.badge && r79.row.note === '' &&
+    r79.benchNote === 'Rehab' && r79.benchLogged === 'Rehab, felt fine' && /85% of pre-rehab weight, palms-in grip/.test(r79.row.tip || '') && r79.row.badge && r79.row.note === 'Rehab' &&
     /right arm/.test(r79.week2Hammer || '') &&
     r79.p1.items === 3 && r79.p1.week === 'Week 1 · Phase 1' && r79.p1.done && r79.p1.pain === 2 && r79.p1.painOn === '2' && r79.p1.notTraining &&
     r79.p2.items === 9 && r79.p2.week === 'Week 3 · Phase 2' && r79.p2.curl.weight === 20 && r79.p2.curl.hold &&
@@ -2703,7 +2703,7 @@ async function main(){
   const ok86 = JSON.stringify(due86) === JSON.stringify(['Cable Chest Fly', 'Cable Lat Pulldown', 'Face Pulls']) &&
     r86.due['Cable Lat Pulldown'].missedSessions === 2 && !r86.dueRehab.includes('Cable Chest Fly') &&
     /Cable Lat Pulldown/.test(r86.pill || '') && /missed its last 2 sessions/.test(r86.pillTitle || '') && /^Due: missed its last 2 sessions/.test(r86.guide || '') &&
-    /Due: .*Cable Lat Pulldown/.test(r86.notes) && r86.coach && r86.coach.lifts.some(l => l.name === 'Cable Lat Pulldown') && /Intentional skips/.test(r86.coach.note);
+    /Due: .*Cable Lat Pulldown/.test(r86.notes) && Array.isArray(r86.coach) && r86.coach.some(l => l.name === 'Cable Lat Pulldown');
   if(!ok86) throw new Error('expected due lifts with intentional skips, deload weeks and rehab pauses excluded, got: ' + JSON.stringify(r86));
   console.log('OK: Lat Pulldown, Face Pulls and Fly are due; Bicep Curl (skipped for injury and equipment) is not; Fly is not due while Shoulder Rehab pauses it; dot, Next line, Coach\'s Notes and the coach payload all agree');
 

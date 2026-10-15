@@ -56,7 +56,7 @@ const MODE_DEFS = [
     tag: { kind: "light", re: /\b(shoulder )?rehab\b/i, label: "Rehab" },
     applies: n => isShoulderModified(n),
     changesNumbers: n => isShoulderPaused(n) || isShoulderHeld(n),
-    desc: "Adds a daily rehab card to every day and push-ups to Upper and Full Body. Pauses flies, incline press, lateral raises and slams; bench drops to 85%, medium grip, short of the chest; curls come back as hammer curls in week 3. Rows, pushdowns, legs and riding carry on." },
+    desc: "Adds a daily rehab card to every day and push-ups to Upper and Full Body. Pauses flies, incline press, lateral raises and slams; bench drops to 85%, medium grip, short of the chest; curls come back as hammer curls in week 3; rows drop to 85% with a palms-in grip. Pushdowns, legs and riding carry on." },
   { key: "knee", storageKey: "strength-tracker-knee-mode", column: "knee_care_mode",
     name: "Knee Care", short: "Knee Care", emoji: "🦵", badge: "Knee Care",
     tag: { kind: "light", re: /\bknee care\b/i, label: "Knee Care" },
