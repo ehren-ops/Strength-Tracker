@@ -17,7 +17,7 @@ table (`kind` = `session` or `weekly`) when signed in. Model: Claude Sonnet 5.5.
 ## What it reads
 
 - **Always:** the training summary the app sends (`buildSessionCoachPayload` /
-  `buildWeeklyCoachPayload` in `js/09-coach-overview.js`): recent results per lift with RPE and notes, plus the
+  `buildWeeklyCoachPayload` in `js/09-coach.js`): recent results per lift with RPE and notes, plus the
   app's own next-session suggestion.
 - **Optionally, from an Outlive project:** when the caller is signed in and
   `OUTLIVE_SUPABASE_SECRET_KEY` is set, the function finds the Outlive account with the same email

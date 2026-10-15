@@ -3,14 +3,8 @@
 
 // ---------- overview ----------
 const DAY_GROUP_KEYS = ["full","upper","lower","extra"];
-// How much a logged exercise should count as evidence for a given day
-// type. An exercise that lives on only one day list (e.g. Walking Lunge,
-// Lower Body only, or Farmer's Carry, Extra only) is strong, distinctive
-// evidence; one shared across several lists (e.g. Squat/RDL, on both Full
-// Body and Lower Body) doesn't discriminate between them and should count
-// for proportionally less. Raw overlap counts previously let Full Body's
-// broad roster (which overlaps with almost everything) win ties it
-// shouldn't.
+// How strongly a logged lift points at a day type: one on a single day list is strong evidence,
+// one shared across lists (Squat on Full and Lower) counts proportionally less.
 function daySpecificityWeight(name){
   const memberships = DAY_GROUP_KEYS.filter(d => DAY_ORDER[d].includes(name)).length;
   return memberships > 0 ? 1 / memberships : 0;

@@ -52,14 +52,8 @@ function spawnConfetti(container, count){
   container.appendChild(frag);
 }
 
-// Full-screen takeover rather than a thin top banner: this is a "you're
-// done for the day" moment, not a routine status toast, so it earns
-// briefly blocking the whole screen. Confetti pieces are plain divs with a
-// CSS fall animation rather than a canvas - cheap enough for ~60 pieces and
-// needs no library. Held fully visible for 3s, then fades out over 0.6s to
-// match the CSS transition, and the DOM is cleared after so old confetti
-// can't linger under the next celebration.
-// Held long enough to actually see between sets; a tap anywhere closes it early.
+// Workout-complete celebration: a full-screen moment with CSS confetti (plain divs, no library).
+// Held long enough to see between sets; a tap anywhere closes it early.
 const CELEBRATION_HOLD_MS = 7000;
 function dismissCelebration(){
   const el = document.getElementById("celebration-banner");
@@ -284,3 +278,8 @@ function restTimeFor(ex){
   return restBucketFor(ex).label;
 }
 
+function shiftISO(iso, days){
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+}

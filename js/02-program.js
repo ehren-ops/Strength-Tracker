@@ -6,35 +6,11 @@ const SEED = {
 
 };
 
-// Preseason additions (exercises with preseason:true in EXERCISE_DEFAULTS)
-// sit permanently at the end of these lists rather than being conditionally
-// shown/hidden by modes.preseason - only their badges/notes/target reps react
-// to the toggle. Position 0 of each list is also the exercise shown by
-// default when you open that tab, so power work is deliberately NOT placed
-// first here even though it's meant to happen first in the session and
-// visually moves to the front of the pill row when modes.preseason is on
-// (see getDisplayOrder) - opening a tab should still land on the main lift.
-// Preseason day mapping: Lower Body = squat day, Upper Body = upper day,
-// Full Body = hinge day (RDL already lives there). Each addition is
-// grouped by movement pattern with that day's main lift, not just spread
-// evenly across days: Box Jumps/Trap Bar Jump/Skater Bound/Spanish Squat
-// (all quad-dominant/squat-pattern) and Lateral Lunge (frontal-plane) go
-// with Lower Body; Kettlebell Swings (hip-hinge, mirrors RDL) and Seated
-// Calf Raise go with Full Body; Med Ball Slam goes with Upper Body.
-// Copenhagen Plank (hip adductor) has no upper-body connection, so it
-// lives on Extra instead of a lift day. Farmer's Carry originally lived on
-// both Upper Body and Extra - every name in a day's list is a required,
-// always-numbered "main lift" for that day's completion banner (see
-// checkCoreWorkoutComplete), so being on two lists made it silently
-// required on Upper Body while reading, visually, like an Extra accessory.
-// Dropped from Upper Body for that reason; it still lives on Extra.
-// Kettlebell Swings started on Lower Body (Sep 1) and is back there as the
-// second hinge next to RDL, on Lower only for the same one-list reason.
-// The preseason-only additions below (PRESEASON_ONLY) are hidden from the
-// pill rows, numbering and completion banner whenever Preseason Prep is off
-// - see activeDayOrder. Squat, Kettlebell Swings, Standing Calf Raise and
-// Farmer's Carry predate preseason and only carry preseason notes, so they
-// always show.
+// Each day's list, in planned order. Position 0 is the lift a tab opens on, so it stays the main
+// lift even though preseason power work moves to the front of the pill row (getDisplayOrder).
+// Every name in a day's list counts toward that day's completion banner, so a lift lives on one
+// day only (Farmer's Carry is on Extra, Kettlebell Swings on Lower). PRESEASON_ONLY lifts are
+// hidden while Preseason Prep is off (activeDayOrder).
 const DAY_ORDER = {
   full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Seated Calf Raise"],
   upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
@@ -176,24 +152,9 @@ const EXERCISE_SIDES = {
   "Copenhagen Plank": { reps: "side" },
 };
 
-// Every value ex.trackBy can ever hold. This list MUST stay in sync by hand
-// with the Postgres check constraint exercises_track_by_check on the
-// "exercises" table (Supabase project eixbpujqsectkstkqllz) - the two are
-// not connected by any code, only by a person (or Claude) remembering to
-// update both. Adding a new trackBy value below without also migrating
-// that constraint doesn't fail loudly: the app queues the sync op fine,
-// but the database rejects every attempt forever, and the only symptom is
-// a growing "pending" count with no error visible anywhere in the UI. This
-// exact bug shipped once already (the "checklist" type for stretch/core
-// routines) and took real user data getting stuck to catch. The
-// VALID_TRACK_BY_VALUES check in the Playwright suite (test2.js) asserts
-// every trackBy actually used in EXERCISE_DEFAULTS/SEED appears in this
-// list, so a typo or a forgotten entry here fails the regression run - but
-// nothing catches a value that's in this list while the database migration
-// was simply never written. Always pair a new entry here with:
-//   alter table public.exercises drop constraint exercises_track_by_check;
-//   alter table public.exercises add constraint exercises_track_by_check
-//     check (track_by = any (array[...ALL values here...]));
+// Every value ex.trackBy can hold. Must match the exercises_track_by_check constraint in the
+// database: a value missing there makes every sync of that exercise fail quietly (a growing
+// "pending" count). Pair a new value here with a migration that rewrites the constraint.
 const VALID_TRACK_BY_VALUES = ["weight", "duration", "reps", "checklist"];
 
 // Built-in exercises that shouldn't default to weight/sets/reps when first
@@ -299,29 +260,17 @@ const CHECKLIST_ROUTINES = {
     ],
   },
 };
-// One-time startup guard: if a new trackBy value ever gets added to
-// EXERCISE_DEFAULTS without updating VALID_TRACK_BY_VALUES (and the
-// matching database constraint), fail loudly in the console the moment the
-// app loads instead of surfacing only as a silently stuck sync queue days
-// later. Whoever is testing a new exercise type would see this immediately.
+// Fails loudly at startup if a default uses a trackBy missing from the list above.
 Object.entries(EXERCISE_DEFAULTS).forEach(([exName, preset]) => {
   if(preset.trackBy && !VALID_TRACK_BY_VALUES.includes(preset.trackBy)){
     console.error(`"${exName}" uses trackBy "${preset.trackBy}", which is not in VALID_TRACK_BY_VALUES and almost certainly is not allowed by the exercises_track_by_check database constraint either - cloud sync for this exercise will fail silently. Add it to both VALID_TRACK_BY_VALUES and the database constraint.`);
   }
 });
-// Fields that are safe to backfill onto an exercise that already existed
-// locally before this default existed: purely additive metadata that never
-// reinterprets anything already logged (unlike trackBy/trackDistance, which
-// would misrepresent already-logged weight/sets/reps entries if changed).
+// Defaults filled onto an exercise saved before they existed: additive metadata only, never
+// fields that would reinterpret logged sessions.
 const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange"];
-// These preseason fields are pure app-authored copy: never synced to
-// Supabase (see exerciseToRow, which has no preseason_* columns) and
-// never user-editable through any UI. Unlike the rest of BACKFILL_KEYS,
-// which protect real logged/synced state by only filling in a value the
-// first time it's missing, these should always mirror EXERCISE_DEFAULTS -
-// otherwise a later wording or number edit (e.g. dropping a knee-specific
-// load reduction once the knee wasn't an issue anymore) would silently
-// never reach anyone who already had the exercise locally.
+// App-authored copy and targets (never synced, never edited in the UI): always refreshed from
+// EXERCISE_DEFAULTS, so a wording or number change reaches devices that already have the lift.
 const ALWAYS_SYNC_KEYS = ["preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
@@ -348,12 +297,7 @@ function backfillExerciseDefaults(){
 
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
-// Both bumped BY HAND with every shipped change - neither is derived from
-// git, so nothing enforces it and both have drifted before (APP_UPDATED
-// sat on "Sep 17, 2026" across several version bumps because only
-// APP_VERSION was part of the habit). v23 picked up its count from this
-// file's git history (22 prior commits touching index.html at the time),
-// so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v101";
+// Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
+const APP_VERSION = "v102";
 const APP_UPDATED = "Oct 15, 2026";
 

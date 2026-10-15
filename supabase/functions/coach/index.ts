@@ -8,7 +8,7 @@
 //                   for the app to show per-lift heart rate once Whoop has synced to Strava.
 //
 // payload is built client-side from the app's own log (buildSessionCoachPayload and
-// buildWeeklyCoachPayload in js/09-coach-overview.js). When the caller is signed in and this project has
+// buildWeeklyCoachPayload in js/09-coach.js). When the caller is signed in and this project has
 // OUTLIVE_SUPABASE_SECRET_KEY set, the function also reads that person's goals and phases, recent
 // recovery and rides (used only to explain a lift result), and the bodyweight trend (weekly only)
 // from the Outlive project, matched by email (the mirror image of Outlive's strength-sync). Outlive

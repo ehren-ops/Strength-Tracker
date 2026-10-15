@@ -20,13 +20,16 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 | `js/01-sync.js` | Supabase client, offline op queue (`enqueueOp`/`runOp`/`flushQueue`), row mapping (`entryToRow`/`rowToEntry`), `pullRemoteAndMerge` (paged fetch; newest `updatedAt` wins per entry, pending local ops always win, synced entries missing from the cloud are removed only for the same account) |
 | `js/02-program.js` | Program data: `DAY_ORDER`, `EXERCISE_DEFAULTS`, tips, sides, checklists, Extra groups, `RECOVERY`, `APP_VERSION` |
 | `js/03-state.js` | Loaded state, `MODE_DEFS` (modifiers synced to `user_settings`), `toggleMode`, deload and rehab date records |
-| `js/04-helpers.js` | Dates, formatting, plate math, `isLoggedToday`, `skipReason`, workout-complete check |
+| `js/04-helpers.js` | Dates (`shiftISO`), formatting, plate math, `isLoggedToday`, `skipReason`, workout-complete check |
 | `js/05-rest-timer-progression.js` | Rest timer, readiness, progression engine: `computeSuggestion` = core, note target, max weight cap, `applyReturn` (breaks, post-deload), `applyShoulder`, deload overlay |
 | `js/05b-shoulder-rehab.js` | Shoulder Rehab modifier: rehab card, paused/held lifts, return ramp, coach block |
-| `js/06-day-view.js` | Render: tabs, pill rows, exercise card, Next tile, history, log form, Mobility card |
+| `js/06-day-view.js` | Render: tabs, pill rows, Mobility and checklist cards, the exercise card (top, badges, Next tile, chart) |
+| `js/06b-next-tile.js` | The Next tile's words: `planModifiers`, the call, and the guidance sentence pool |
+| `js/06c-history-form.js` | Recent History rows, edit/delete/skip, the log form (per-set reps, joint check) |
 | `js/07-charts.js` | SVG chart, `MODIFIER_TAGS` (light = diamond, block = circle), note tag helpers |
 | `js/08-calendar-notes.js` | Calendar, `guessDayForNames`, due lifts (`dueLifts`), rule-based Coach's Notes |
-| `js/09-coach-overview.js` | AI coach payloads and panels, heart rate, Overview page, modifier rows, % change |
+| `js/09-coach.js` | AI coach: cached analyses, payloads (`buildSessionCoachPayload`/`buildWeeklyCoachPayload`), trends, heart rate, panels |
+| `js/09b-overview.js` | Overview page: deload status and popup, modifier rows, Weekly Balance, % change, backup card |
 | `js/10-interactions.js` | Selecting, adding exercises, `logEntry` |
 | `js/11-init.js` | Startup and event wiring |
 | `supabase/functions/coach/index.ts` | Edge function: session/weekly AI notes (Claude), `hr` mode, prompts in `PRINCIPLES` |

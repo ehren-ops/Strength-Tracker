@@ -2,23 +2,9 @@
 // Classic script sharing one global scope with the other js/NN-*.js files, run in order.
 
 // ---------- rest timer ----------
-// Ephemeral, in-memory only (not persisted across reload) - a countdown
-// that survived a refresh would show a stale number with no way to know
-// how much real time had actually passed.
-//
-// Tracked by an absolute endAt timestamp rather than a per-second
-// decrementing counter, on purpose: browsers throttle or fully suspend
-// setInterval in a backgrounded tab (locked screen, another app in
-// front), so a counter that only ever decrements when a tick actually
-// fires drifts behind or freezes outright while the app isn't open. Wall-
-// clock math doesn't have that problem - Date.now() keeps moving whether
-// or not any JS ran in between, so remaining time is always computed
-// fresh from endAt instead of trusted from the last tick. The interval
-// still drives the visible countdown while the tab is open; the
-// visibilitychange listener below (see checkRestTimerCompletion) is what
-// catches the "the whole rest already elapsed while you were away"
-// case the instant you come back, rather than waiting on a tick that may
-// have been suspended the entire time you were gone.
+// In memory only (a countdown restored after a reload would be stale). Tracked by an absolute
+// endAt, not a decrementing counter: browsers suspend intervals in the background, so remaining
+// time is always recomputed from the clock, and visibilitychange catches a rest that ended away.
 let restTimer = null; // { exerciseName, choices, choiceIndex, endAt, phase: "running"|"done", intervalId, revertedFromDone }
 let lastRestTimerChoiceIndex = null; // save the choice index when timer ends, to allow revert on tap
 
@@ -34,12 +20,8 @@ function restTimerChoicesFor(name){
   return raw.filter((sec, i) => raw.indexOf(sec) === i);
 }
 
-// Pressing "Start Rest" again while a timer is already running for THIS
-// exercise doesn't restart it from scratch - it advances through the same
-// 60 / 90 / upper-limit cycle the floating badge uses, then one more
-// press past the end removes the timer entirely. That covers "I tapped
-// it by accident" without needing a separate cancel control: just keep
-// pressing the button you already pressed.
+// Pressing Start Rest again on the same lift steps through 60 / 90 / the upper limit, then one
+// more press clears it, so an accidental tap needs no separate cancel.
 // Each rest-timer start marks the end of a set of that lift. Kept per day so the heart-rate split
 // can pin each lift's sets no matter whether it was logged after its first set or its last.
 const REST_TAPS_KEY = "strength-tracker-rest-taps";
@@ -74,13 +56,8 @@ function tickRestTimer(){
   checkRestTimerCompletion();
 }
 
-// The one place that transitions a running timer to "done" - called both
-// by the regular 1-second interval (while the app is open) and by the
-// visibilitychange listener (the moment the app is reopened or
-// foregrounded again). Comparing against the wall clock rather than a
-// counter makes this safe to call from either place, or both: it only
-// ever fires the completion side effect (vibrate) once, since
-// phase is no longer "running" the second time either caller checks.
+// The only place a running timer turns "done": safe from both the interval and visibilitychange,
+// since the vibrate fires once and the phase check stops a second caller.
 function checkRestTimerCompletion(){
   if(!restTimer || restTimer.phase !== "running") return;
   if(Date.now() >= restTimer.endAt){
@@ -241,12 +218,6 @@ function computeRecoveryReadiness(){
 }
 
 
-// Deload week overlays every other modifier's math: ~10% lighter and about a
-// third fewer sets, reps back to the lift's base target. Lifts already cut for
-// an injury (Knee/Back Care) or by a miss-streak deload keep that weight
-// instead of being cut again, and only lose sets. Sets logged during a deload
-// are tagged (entry.deload) and skipped when computing suggestions, so
-// progression resumes from the pre-deload working weights.
 // Heaviest load the gym has for a lift (EXERCISE_DEFAULTS maxWeight). Once a
 // progression would pass it, progress by reps up to MAX_WEIGHT_REP_CAP, then
 // point at a harder variation instead of a heavier weight.
@@ -333,8 +304,8 @@ function applyNoteTarget(core, ex, last){
 // Coming back, two rules on top of the normal progression (Deload Week, when on, overrides both):
 // - Time off: a gap of BREAK_DAYS or more since the last session restarts at ~90% of the last
 //   working weight, then 95%, then the full weight, one session each, while targets are hit.
-// - After a deload: the first session back on a pressing (push) lift holds the pre-deload weight
-//   instead of adding, so tender shoulders get one session at a known load before progressing.
+// - After a deload: the first session back repeats the pre-deload weight unless that session was
+//   clean (reps hit, RPE 7 or less, no concern in the note); pressing lifts always repeat once.
 const BREAK_DAYS = 14;
 const REENTRY_STEPS = [0.9, 0.95, 1];
 const roundLoad = w => Math.round(w / 2.5) * 2.5;
@@ -403,6 +374,10 @@ function applyPain(s, ex){
   const cap = hold.drop ? roundLoad(last.weight * 0.9) : last.weight;
   return { ...s, weight: Math.min(s.weight, cap), readyToProgress: false, painHold: hold };
 }
+// The full suggestion: the core progression, then the note target, the equipment cap, the comeback
+// rules, Shoulder Rehab and the joint check, with Deload Week last (about 10% lighter, a third
+// fewer sets; a lift already cut keeps its weight and only loses sets). Deload-week sessions are
+// skipped here, so progression resumes from the pre-deload weights.
 function computeSuggestion(ex, name){
   if(!ex.entries.length || isRecovery(name)) return null;
   const baseline = ex.entries.filter(e => !e.deload);
