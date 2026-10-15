@@ -19,7 +19,7 @@ const DAY_ORDER = {
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
   // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
-  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Incline Treadmill Walk","Zone 2 Ride","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
+  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Incline Treadmill Walk","Zone 2 Ride","C2 Row","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
 };
 const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
 // Preseason lifts that stay on in season, once a week, to keep power without leg fatigue.
@@ -63,6 +63,7 @@ const EXTRA_CATEGORY = {
   "Push-Ups": "strength",
   "Zone 2 Ride": "cardio",
   "Incline Treadmill Walk": "cardio",
+  "C2 Row": "cardio",
   "5-Minute Core Routine": "core",
   "Copenhagen Plank": "core",
   "Thoracic Spine Stretch": "stretch",
@@ -137,6 +138,7 @@ const EXERCISE_TIPS = {
   "Lateral Raise": ["Slight lean, lead with elbows, stop at shoulder.", "Cable or machine lateral raise."],
   "Zone 2 Ride": ["Conversational pace, steady cadence.", "Rower or incline walk at the same effort."],
   "Incline Treadmill Walk": ["No handrails, tall posture, steady pace.", "Stair climber or Zone 2 bike."],
+  "C2 Row": ["Legs, then lean back, then arms; reverse on the way in. Damper 4-6.", "Zone 2 ride or incline walk at the same effort."],
 };
 
 // What the logged numbers mean, so a one-arm or one-leg lift is never ambiguous. weight: "hand"
@@ -167,6 +169,7 @@ const VALID_TRACK_BY_VALUES = ["weight", "duration", "reps", "checklist"];
 const EXERCISE_DEFAULTS = {
   "Zone 2 Ride": { trackBy: "duration", trackDistance: true, trackSpeed: true },
   "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true, trackSpeed: true },
+  "C2 Row": { trackBy: "duration", trackDistance: true, trackSpeed: true, rowing: true, trackSpm: true },
   "Squat": {
     targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell",
     preseason: true, targetRepsPreseason: 5, preseasonTempo: "4 sec lowering",
@@ -273,10 +276,10 @@ Object.entries(EXERCISE_DEFAULTS).forEach(([exName, preset]) => {
 });
 // Defaults filled onto an exercise saved before they existed: additive metadata only, never
 // fields that would reinterpret logged sessions.
-const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange", "inSeasonNote"];
+const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange", "inSeasonNote", "rowing", "trackSpm"];
 // App-authored copy and targets (never synced, never edited in the UI): always refreshed from
 // EXERCISE_DEFAULTS, so a wording or number change reaches devices that already have the lift.
-const ALWAYS_SYNC_KEYS = ["preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange", "inSeasonNote"];
+const ALWAYS_SYNC_KEYS = ["preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange", "inSeasonNote", "rowing", "trackSpm"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
 }
@@ -303,6 +306,6 @@ function backfillExerciseDefaults(){
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v104";
+const APP_VERSION = "v105";
 const APP_UPDATED = "Oct 15, 2026";
 

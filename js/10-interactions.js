@@ -69,24 +69,17 @@ function logEntry(){
   let entry;
   if(ex.trackBy === "duration"){
     const minutesEl = document.getElementById("f-minutes");
-    if(!minutesEl || !minutesEl.value){ flashFieldError(minutesEl); return; }
+    const cardio = readCardio("f", ex);
+    if(!cardio.minutes){ flashFieldError(minutesEl); return; }
     entry = {
       clientId: genId(),
       label: "S" + (ex.entries.length + 1),
       date: dateEl.value || todayISO(),
       confirmed: true,
-      minutes: Number(minutesEl.value),
       difficulty,
       note: (noteEl.value || "").trim(),
     };
-    if(ex.trackDistance){
-      const distEl = document.getElementById("f-distance");
-      if(distEl && distEl.value) entry.distance = Number(distEl.value);
-    }
-    if(ex.trackSpeed){
-      const speedEl = document.getElementById("f-speed");
-      if(speedEl && speedEl.value) entry.speed = Number(speedEl.value);
-    }
+    Object.keys(cardio).forEach(k => { if(cardio[k] != null) entry[k] = cardio[k]; });
     const tempEl = document.getElementById("f-temp");
     if(tempEl && tempEl.value) entry.tempF = Number(tempEl.value);
     if(ex.trackIncline){

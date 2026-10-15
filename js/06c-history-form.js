@@ -21,10 +21,10 @@ function renderSkipControl(name){
 // note keeps the same room it has on a lift.
 function cardioCell(e, ex){
   const has = v => v != null && v !== "";
-  let speed = has(e.speed) ? `${e.speed} mph` : null;
-  if(!speed && ex.trackSpeed && has(e.distance) && e.minutes) speed = `~${Math.round((e.distance / (e.minutes / 60)) * 10) / 10} mph`;
-  const top = [`${e.minutes} min`, has(e.distance) && `${e.distance} mi`].filter(Boolean).join(" · ");
-  const bottom = [speed, has(e.incline) && `${e.incline}%`].filter(Boolean).join(" · ");
+  const pace = cardioPace(e, ex);
+  const speed = !pace ? null : ex.rowing ? `${pace.calc ? "~" : ""}${fmtSplit(Math.round(pace.value))}/500` : `${pace.calc ? "~" : ""}${pace.value} mph`;
+  const top = [`${e.minutes} min`, has(e.distance) && `${e.distance} ${ex.rowing ? "m" : "mi"}`].filter(Boolean).join(" · ");
+  const bottom = [speed, has(e.spm) && `${e.spm} spm`, has(e.incline) && `${e.incline}%`].filter(Boolean).join(" · ");
   return bottom ? `${top}<br>${bottom}` : top;
 }
 
@@ -36,9 +36,7 @@ function renderHistRow(e, idx, isLatest, ex, name, pr){
       <div class="form-row">
         ${ex.trackBy==="weight" ? `<div class="field"><label>${weightFieldLabel(name)}</label><input type="number" inputmode="decimal" id="edit-weight" value="${e.weight}"></div>` : ""}
         ${ex.trackBy==="duration"
-          ? `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="edit-minutes" value="${e.minutes}"></div>`
-            + (ex.trackDistance ? `<div class="field"><label>Miles</label><input type="number" inputmode="decimal" step="0.1" id="edit-distance" value="${e.distance ?? ''}"></div>` : "")
-            + (ex.trackSpeed ? `<div class="field"><label>MPH</label><input type="number" inputmode="decimal" step="0.1" id="edit-speed" value="${e.speed ?? ''}"></div>` : "")
+          ? cardioFields("edit", ex, e)
             + (ex.trackIncline ? `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="edit-incline" value="${e.incline ?? ''}"></div>` : "")
             + (isRecovery(name) ? `<div class="field"><label>°F</label><input type="number" inputmode="numeric" id="edit-temp" value="${e.tempF ?? ''}"></div>` : "")
           : `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="edit-sets" value="${e.sets}"></div>
@@ -147,14 +145,7 @@ function saveEditEntry(name, idx){
     if(minutesEl) entry.minutes = Number(minutesEl.value) || entry.minutes;
     const tempEl = document.getElementById("edit-temp");
     if(tempEl) entry.tempF = tempEl.value ? Number(tempEl.value) : null;
-    if(ex.trackDistance){
-      const distEl = document.getElementById("edit-distance");
-      entry.distance = distEl && distEl.value ? Number(distEl.value) : null;
-    }
-    if(ex.trackSpeed){
-      const speedEl = document.getElementById("edit-speed");
-      entry.speed = speedEl && speedEl.value ? Number(speedEl.value) : null;
-    }
+    Object.assign(entry, readCardio("edit", ex));
     if(ex.trackIncline){
       const inclineEl = document.getElementById("edit-incline");
       entry.incline = inclineEl && inclineEl.value ? Number(inclineEl.value) : null;
@@ -237,9 +228,7 @@ function renderForm(name, ex){
     html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}" oninput="syncPerSet()"></div>`;
     html += `<div class="field"><label>${repsFieldLabel(name, ex.unit)}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   } else if(ex.trackBy === "duration"){
-    html += `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="f-minutes" value="${minutesDefault}"></div>`;
-    if(ex.trackDistance) html += `<div class="field"><label>Miles</label><input type="number" inputmode="decimal" step="0.1" id="f-distance"></div>`;
-    if(ex.trackSpeed) html += `<div class="field"><label>MPH</label><input type="number" inputmode="decimal" step="0.1" id="f-speed"></div>`;
+    html += cardioFields("f", ex, { minutes: minutesDefault });
     if(ex.trackIncline) html += `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="f-incline"></div>`;
     if(recovery) html += `<div class="field"><label>Temp °F</label><input type="number" inputmode="numeric" id="f-temp" value="${lastLog && lastLog.tempF != null ? lastLog.tempF : RECOVERY[name].temp}"></div>`;
   } else {
@@ -302,6 +291,55 @@ function readPain(prefix){
 }
 function painTag(e){
   return e.pain != null ? `<span class="pain-tag${e.pain > PAIN_HOLD_ABOVE ? " high" : ""}">Pain ${e.pain}${e.painArea ? " " + e.painArea : ""}</span>` : "";
+}
+
+// Time, distance and pace for a cardio card (plus stroke rate on the rower). Typing any two fills
+// the third (marked as worked out); typing into a filled field makes it yours again.
+function cardioFields(prefix, ex, e){
+  const v = x => x == null ? "" : x;
+  const auto = `oninput="cardioAutofill('${prefix}', ${!!ex.rowing}, this)"`;
+  let html = `<div class="field"><label>Minutes</label><input type="number" inputmode="decimal" step="any" id="${prefix}-minutes" value="${v(e.minutes)}" ${auto}></div>`;
+  if(ex.trackDistance) html += `<div class="field"><label>${ex.rowing ? "Meters" : "Miles"}</label><input type="number" inputmode="decimal" step="any" id="${prefix}-distance" value="${v(e.distance)}" ${auto}></div>`;
+  if(ex.trackSpeed) html += ex.rowing
+    ? `<div class="field"><label>Split /500m</label><input type="text" id="${prefix}-speed" placeholder="2:05" value="${e.speed ? fmtSplit(e.speed) : ""}" ${auto}></div>`
+    : `<div class="field"><label>MPH</label><input type="number" inputmode="decimal" step="any" id="${prefix}-speed" value="${v(e.speed)}" ${auto}></div>`;
+  if(ex.trackSpm) html += `<div class="field"><label>SPM</label><input type="number" inputmode="numeric" id="${prefix}-spm" value="${v(e.spm)}"></div>`;
+  return html;
+}
+function cardioAutofill(prefix, rowing, typed){
+  const els = { t: document.getElementById(prefix + "-minutes"), d: document.getElementById(prefix + "-distance"), p: document.getElementById(prefix + "-speed") };
+  if(!els.t || !els.d || !els.p) return;
+  if(typed) delete typed.dataset.auto;
+  const read = k => {
+    const el = els[k];
+    if(!el.value || el.dataset.auto) return null;
+    const n = k === "p" && rowing ? parseSplit(el.value) : Number(el.value);
+    return n > 0 ? n : null;
+  };
+  const vals = { t: read("t"), d: read("d"), p: read("p") };
+  const missing = Object.keys(vals).filter(k => vals[k] == null);
+  if(missing.length !== 1){
+    Object.values(els).forEach(el => { if(el.dataset.auto && el !== typed){ el.value = ""; delete el.dataset.auto; } });
+    return;
+  }
+  const k = missing[0], solved = solveCardio(vals.t, vals.d, vals.p, rowing);
+  const out = { t: solved.minutes, d: solved.distance, p: solved.speed }[k];
+  if(!out) return;
+  els[k].value = k === "p" && rowing ? fmtSplit(out) : out;
+  els[k].dataset.auto = "1";
+}
+// The cardio fields as entry values; a missing one is worked out from the other two.
+function readCardio(prefix, ex){
+  const num = id => { const el = document.getElementById(prefix + "-" + id); return el && el.value !== "" && Number(el.value) > 0 ? Number(el.value) : null; };
+  const speedEl = document.getElementById(prefix + "-speed");
+  const speed = !speedEl || !speedEl.value ? null : ex.rowing ? parseSplit(speedEl.value) : (Number(speedEl.value) > 0 ? Number(speedEl.value) : null);
+  const solved = solveCardio(num("minutes"), ex.trackDistance ? num("distance") : null, ex.trackSpeed ? speed : null, !!ex.rowing);
+  const out = {};
+  if(solved.minutes) out.minutes = solved.minutes;
+  if(ex.trackDistance) out.distance = solved.distance;
+  if(ex.trackSpeed) out.speed = solved.speed;
+  if(ex.trackSpm) out.spm = num("spm");
+  return out;
 }
 
 // The per-set reps row: one small box per set, filled with the reps above. Opening it, or changing

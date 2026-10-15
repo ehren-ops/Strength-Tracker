@@ -174,6 +174,7 @@ function entryToRow(entry, exerciseId, userId){
     temp_f: entry.tempF ?? null,
     reps_by_set: entry.repsBySet ?? null,
     pain: entry.pain ?? null,
+    spm: entry.spm ?? null,
     pain_area: entry.painArea ?? null,
     // The device's edit time, so the newest edit wins across devices. Undefined keeps the server's.
     updated_at: entry.updatedAt || undefined,
@@ -202,6 +203,7 @@ function rowToEntry(row){
     tempF: row.temp_f ?? undefined,
     repsBySet: row.reps_by_set || undefined,
     pain: row.pain ?? undefined,
+    spm: row.spm ?? undefined,
     painArea: row.pain_area || undefined,
     deload: row.deload || undefined,
     preseason: row.preseason || undefined,
@@ -454,6 +456,8 @@ async function pullRemoteAndMerge(){
     ex.entries.sort(byDate);
     ex.entries.forEach((e,i) => { e.label = "S" + (i+1); });
   });
+
+  backfillExerciseDefaults(); // lifts first seen in the cloud pick up their app defaults (units, tips)
 
   const { data: settingsRow } = await supabaseClient.from("user_settings").select("*").eq("user_id", userId).maybeSingle();
   // Settings come from the JSON field, falling back to the old per-mode columns for rows written

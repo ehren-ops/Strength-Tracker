@@ -205,18 +205,54 @@ function repRecord(ex, weight){
   return best;
 }
 
+// Cardio with distance: any two of time, distance and pace give the third. Bike and walk use
+// minutes, miles and mph; the rower uses minutes, meters and the split (seconds per 500 m).
+function solveCardio(t, d, p, rowing){
+  const r = (v, n) => Math.round(v * 10 ** n) / 10 ** n;
+  if(rowing){
+    if(t && d && !p) p = r(t * 60 * 500 / d, 1);
+    else if(t && p && !d) d = Math.round(t * 60 / p * 500);
+    else if(d && p && !t) t = r(d / 500 * p / 60, 1);
+  } else {
+    if(t && d && !p) p = r(d / (t / 60), 1);
+    else if(t && p && !d) d = r(p * t / 60, 2);
+    else if(d && p && !t) t = r(d / p * 60, 1);
+  }
+  return { minutes: t || null, distance: d || null, speed: p || null };
+}
+// A 500 m split typed as "2:05", "2:05.3", "2.05" or plain seconds ("125"), in seconds.
+function parseSplit(v){
+  const s = String(v == null ? "" : v).trim();
+  let m = s.match(/^(\d+):(\d{1,2}(?:\.\d+)?)$/);
+  if(m) return Number(m[1]) * 60 + Number(m[2]);
+  m = s.match(/^(\d)\.(\d{2})$/);
+  if(m) return Number(m[1]) * 60 + Number(m[2]);
+  const n = Number(s);
+  return s && n >= 60 ? n : null;
+}
+function fmtSplit(sec){
+  if(!(sec > 0)) return "";
+  const t = Math.round(sec * 10) / 10, m = Math.floor(t / 60), r = Math.round((t - m * 60) * 10) / 10;
+  return `${m}:${r < 10 ? "0" : ""}${Number.isInteger(r) ? r : r.toFixed(1)}`;
+}
+// Concept2's watts for a split: 2.80 / (seconds per meter)^3.
+function rowWatts(split){ return split > 0 ? Math.round(2.8 / Math.pow(split / 500, 3)) : null; }
+// The pace of a cardio entry, logged or worked out from time and distance.
+function cardioPace(e, ex){
+  const has = v => v != null && v !== "";
+  if(has(e.speed)) return { value: Number(e.speed), calc: false };
+  if(!(ex.trackSpeed && has(e.distance) && e.minutes)) return null;
+  return { value: solveCardio(Number(e.minutes), Number(e.distance), null, !!ex.rowing).speed, calc: true };
+}
+
 function formatEntryValue(e, ex){
   if(ex.trackBy === "weight") return `${e.weight} lb ${setsText(e, ex)}`;
   if(ex.trackBy === "duration"){
     let s = `${e.minutes} min`;
-    if(e.distance != null && e.distance !== "") s += `, ${e.distance} mi`;
-    let speed = (e.speed != null && e.speed !== "") ? e.speed : null;
-    let speedIsCalculated = false;
-    if(speed == null && ex.trackSpeed && e.distance != null && e.distance !== "" && e.minutes){
-      speed = Math.round((e.distance / (e.minutes / 60)) * 10) / 10;
-      speedIsCalculated = true;
-    }
-    if(speed != null) s += ` @ ${speedIsCalculated ? "~" : ""}${speed} mph`;
+    if(e.distance != null && e.distance !== "") s += `, ${e.distance} ${ex.rowing ? "m" : "mi"}`;
+    const pace = cardioPace(e, ex);
+    if(pace) s += ex.rowing ? ` @ ${pace.calc ? "~" : ""}${fmtSplit(pace.value)} /500m, ${rowWatts(pace.value)} W` : ` @ ${pace.calc ? "~" : ""}${pace.value} mph`;
+    if(e.spm != null && e.spm !== "") s += `, ${e.spm} spm`;
     if(e.incline != null && e.incline !== "") s += ` @ ${e.incline}% incline`;
     if(e.tempF != null && e.tempF !== "") s += ` at ${e.tempF}°F`;
     return s;

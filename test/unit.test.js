@@ -158,6 +158,19 @@ test("ski phases are exclusive and preseason adds its week-3 lifts in week 3", (
   eq(run(`[modes.preseason, modes.ski]`), [false, true], "in season");
   eq(run(`[getDisplayOrder("lower")[0], activeDayOrder("lower").filter(n => PRESEASON_ONLY.has(n))]`), ["Box Jumps", ["Box Jumps"]], "box jumps stay in season, first");
 });
+test("cardio: any two of time, distance and pace give the third (bike and rower)", () => {
+  eq(run(`solveCardio(30, 6, null, false)`), { minutes: 30, distance: 6, speed: 12 }, "bike speed");
+  eq(run(`solveCardio(30, null, 12, false)`), { minutes: 30, distance: 6, speed: 12 }, "bike distance");
+  eq(run(`solveCardio(null, 6, 12, false)`), { minutes: 30, distance: 6, speed: 12 }, "bike minutes");
+  eq(run(`solveCardio(20, 5000, null, true)`), { minutes: 20, distance: 5000, speed: 120 }, "row split");
+  eq(run(`solveCardio(20, null, 120, true)`), { minutes: 20, distance: 5000, speed: 120 }, "row meters");
+  eq(run(`solveCardio(null, 5000, 120, true)`), { minutes: 20, distance: 5000, speed: 120 }, "row minutes");
+});
+test("rower split reads 2:05, 2:05.3, 2.05 and seconds; watts follow Concept2", () => {
+  eq(run(`[parseSplit("2:05"), parseSplit("2:05.3"), parseSplit("2.05"), parseSplit("125"), parseSplit("x")]`), [125, 125.3, 125, 125, null], "parse");
+  eq(run(`[fmtSplit(125), fmtSplit(125.3), fmtSplit(119.96)]`), ["2:05", "2:05.3", "2:00"], "format");
+  eq(run(`rowWatts(120)`), 203, "watts at 2:00");
+});
 test("modifier registry rows are complete", () => {
   const bad = run(`MODE_DEFS.filter(m => !m.key || !m.storageKey || !m.name || !m.tag || !["light", "block"].includes(m.tag.kind) || typeof m.applies !== "function").map(m => m.key)`);
   eq(bad, [], "incomplete rows");

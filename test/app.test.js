@@ -722,10 +722,12 @@ async function main(){
   if(await page.locator('#f-speed').count() !== 1) throw new Error('expected an MPH field on Zone 2 Ride');
   await page.fill('#f-minutes', '60');
   await page.fill('#f-distance', '15');
+  const filledSpeed = await page.inputValue('#f-speed');
+  if(filledSpeed !== '15') throw new Error('expected the MPH field to fill itself with 15 from 15 miles in 60 min, got: ' + filledSpeed);
   await page.click('button.log:has-text("Log set")');
   await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'zone2 ride auto-speed sync');
   const rideAutoSpeedText = await page.locator('.hist-row.latest .exact').first().textContent();
-  if(!rideAutoSpeedText.includes('~15 mph')) throw new Error('expected auto-calculated ~15 mph (15 miles in 60 min) in history, got: ' + rideAutoSpeedText);
+  if(!rideAutoSpeedText.includes('15 mph')) throw new Error('expected 15 mph (15 miles in 60 min) in history, got: ' + rideAutoSpeedText);
   console.log('OK: Zone 2 Ride auto-calculates and labels speed when left blank:', rideAutoSpeedText);
 
   await page.fill('#f-minutes', '30');
@@ -1429,7 +1431,7 @@ async function main(){
   }
   const expectGroups = {
     Strength: [["Farmer's Carry", 'cat-strength'], ['Dead Hang', 'cat-strength'], ['Push-Ups', 'cat-strength']],
-    Cardio: [['Incline Treadmill Walk', 'cat-cardio'], ['Zone 2 Ride', 'cat-cardio']],
+    Cardio: [['Incline Treadmill Walk', 'cat-cardio'], ['Zone 2 Ride', 'cat-cardio'], ['C2 Row', 'cat-cardio']],
     Mobility: [],
     Recovery: [['Sauna', 'cat-recovery'], ['Cold Plunge', 'cat-recovery'], ['Hot Tub', 'cat-recovery']],
   };
@@ -2943,6 +2945,40 @@ async function main(){
     r92.prompt && r92.snoozed && JSON.stringify(r92.answered) === JSON.stringify([true, false, true]) && r92.spring && r92.synced === 'season';
   if(!ok92) throw new Error('expected one Ski setting with exclusive, dated phases and phase-end prompts, got: ' + JSON.stringify(r92));
   console.log('OK: Preseason and In season never run together, preseason counts its weeks and adds Skater Bound in week 3, offers In season after 10 weeks (snoozable) and Off in spring');
+
+  console.log('=== 93: cardio cards fill the missing one of time, distance and pace; the C2 rower logs meters, split, stroke rate and watts ===');
+  const r93 = await page.evaluate(() => {
+    const saved = { data: JSON.stringify({ row: data['C2 Row'], walk: data['Incline Treadmill Walk'] }), view, selected, extraGroup: typeof extraGroup !== 'undefined' ? extraGroup : null };
+    const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const out = {};
+    delete data['C2 Row'];
+    view = 'extra'; selected = 'C2 Row'; render();
+    out.labels = [...document.querySelectorAll('.form-row .field label')].map(l => l.textContent).slice(0, 4);
+    set('f-minutes', '20'); set('f-speed', '2:00');
+    out.meters = document.getElementById('f-distance').value;
+    set('f-spm', '24');
+    logEntry();
+    const e = data['C2 Row'].entries[data['C2 Row'].entries.length - 1];
+    out.entry = [e.minutes, e.distance, e.speed, e.spm];
+    selected = 'C2 Row'; render();
+    out.hist = document.querySelector('.hist-row.latest .exact').innerHTML;
+    out.text = formatEntryValue(e, data['C2 Row']);
+    // Incline walk: distance and speed give the minutes; typing into the filled field makes it yours.
+    selected = 'Incline Treadmill Walk'; render();
+    set('f-minutes', ''); set('f-distance', '1.5'); set('f-speed', '3');
+    out.walkMinutes = document.getElementById('f-minutes').value;
+    set('f-minutes', '35');
+    out.owned = [document.getElementById('f-minutes').value, document.getElementById('f-speed').value];
+    const r = JSON.parse(saved.data);
+    if(r.row) data['C2 Row'] = r.row; else delete data['C2 Row'];
+    if(r.walk) data['Incline Treadmill Walk'] = r.walk;
+    view = saved.view; selected = saved.selected; persist(); render();
+    return out;
+  });
+  const ok93 = r93.labels.join(',') === 'Minutes,Meters,Split /500m,SPM' && r93.meters === '5000' && JSON.stringify(r93.entry) === JSON.stringify([20, 5000, 120, 24]) &&
+    /20 min · 5000 m<br>2:00\/500 · 24 spm/.test(r93.hist) && /2:00 \/500m, 203 W, 24 spm/.test(r93.text) && r93.walkMinutes === '30' && r93.owned.join(',') === '35,3';
+  if(!ok93) throw new Error('expected cardio fields to fill each other and the rower to log meters, split, stroke rate and watts, got: ' + JSON.stringify(r93));
+  console.log('OK: 20 min at 2:00 fills 5000 m and logs 203 W at 24 spm; 1.5 mi at 3 mph fills 30 min; typing over a filled field keeps your number');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
