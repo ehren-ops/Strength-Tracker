@@ -39,6 +39,8 @@ let editing1RM = null;
 // Everything that lists modifiers reads it: the on/off/persist/sync bookkeeping (toggleMode, the cloud
 // merge, the settings row), card badges and the card class (06), planModifiers (06), the note tags and
 // graph markers (07), the Overview rows and the coach payload (09). The order here is the order shown.
+//   column: the legacy user_settings column (the first six only). Settings sync through the
+//           user_settings.settings JSON field, so a new modifier needs no schema change.
 //   applies(name, ex): the lifts that carry its badge and note tag while it is on.
 //   changesNumbers(name, ex): the lifts whose weight, sets or reps it changes today (planModifiers).
 //   tag.kind: "light" (lighter on purpose: diamond) or "block" (a block with its own target: circle).

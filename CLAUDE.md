@@ -17,7 +17,7 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 
 | File | What lives there |
 |---|---|
-| `js/01-sync.js` | Supabase client, offline op queue (`enqueueOp`/`runOp`/`flushQueue`), row mapping (`entryToRow`/`rowToEntry`), `pullRemoteAndMerge` (local wins, remote only adds) |
+| `js/01-sync.js` | Supabase client, offline op queue (`enqueueOp`/`runOp`/`flushQueue`), row mapping (`entryToRow`/`rowToEntry`), `pullRemoteAndMerge` (paged fetch; newest `updatedAt` wins per entry, pending local ops always win, synced entries missing from the cloud are removed only for the same account) |
 | `js/02-program.js` | Program data: `DAY_ORDER`, `EXERCISE_DEFAULTS`, tips, sides, checklists, Extra groups, `RECOVERY`, `APP_VERSION` |
 | `js/03-state.js` | Loaded state, `MODE_DEFS` (modifiers synced to `user_settings`), `toggleMode`, deload and rehab date records |
 | `js/04-helpers.js` | Dates, formatting, plate math, `isLoggedToday`, `skipReason`, workout-complete check |
@@ -31,14 +31,16 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 | `js/11-init.js` | Startup and event wiring |
 | `supabase/functions/coach/index.ts` | Edge function: session/weekly AI notes (Claude), `hr` mode, prompts in `PRINCIPLES` |
 | `supabase/migrations/` | SQL history; apply new ones with the Supabase MCP `apply_migration` |
+| `test/unit.test.js` | Fast Node unit tests: the scripts loaded into a stubbed browser; progression math and helpers |
 | `test/app.test.js` | Playwright regression suite against a mocked Supabase (`test/mock-supabase.js`) |
 
 ## Patterns to follow
 - A new entry field needs: `entryToRow` and `rowToEntry` in 01, a migration adding the column, and
   the mock needs nothing (it is generic).
 - A new modifier is one row in `MODE_DEFS` (03): name, emoji, badge, tag (kind light or block),
-  `applies` / `changesNumbers` rules and the Overview text. Then add its `user_settings` column, a
-  `--<key>` color token in both themes and its `.<key>-badge` style; scenario 88 checks the row.
+  `applies` / `changesNumbers` rules and the Overview text, plus a `--<key>` color token in both
+  themes and its `.<key>-badge` style; scenario 88 checks the row. No schema change: settings sync
+  through `user_settings.settings` (JSON). The old per-mode columns are legacy; leave them be.
   What it actually does to the numbers lives with its own logic (05, 05b, the exercise fields).
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
@@ -54,7 +56,9 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 
 ## Commands
 - Tests: `cd test && npm install` once (with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`), then
-  `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium npm test`. Prints `ALL SCENARIOS PASSED`.
+  `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium npm test`: unit tests first (`npm run unit`,
+  under a second), then the browser suite. Prints `UNIT TESTS PASSED` and `ALL SCENARIOS PASSED`.
+  Add a unit test for any new progression rule; use the browser suite for UI and sync.
   Scenarios share one page, so save and restore any global state a scenario changes.
 - Local server for screenshots: `cd test && TEST_PORT=8133 node server.js`, then Playwright at
   `viewport {width:360}` with the Supabase script routed to `test/mock-supabase.js`.

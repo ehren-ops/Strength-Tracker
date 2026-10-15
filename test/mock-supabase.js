@@ -31,6 +31,8 @@
       constructor(table){ this.table = table; this.filters = []; this.op = null; this._single = false; this._maybeSingle = false; }
       select(cols){ if(!this.op) this.op = 'select'; this.selectCols = cols; return this; }
       eq(col, val){ this.filters.push([col, val]); return this; }
+      order(col){ this._order = col; return this; }
+      range(from, to){ this._range = [from, to]; return this; }
       single(){ this._single = true; return this; }
       maybeSingle(){ this._maybeSingle = true; return this; }
       upsert(payload, opts){ this.op = 'upsert'; this.payload = payload; this.onConflict = opts && opts.onConflict; return this; }
@@ -53,7 +55,9 @@
           saveDb(db);
           return { data: null, error: null };
         }
-        const matched = rows.filter(r => this.filters.every(([c,v]) => r[c] === v));
+        let matched = rows.filter(r => this.filters.every(([c,v]) => r[c] === v));
+        if(this._order) matched = [...matched].sort((a, b) => String(a[this._order]) < String(b[this._order]) ? -1 : 1);
+        if(this._range) matched = matched.slice(this._range[0], this._range[1] + 1);
         if(this._single) return { data: matched[0] || null, error: matched[0] ? null : { message: 'no rows' } };
         if(this._maybeSingle) return { data: matched[0] || null, error: null };
         return { data: matched, error: null };

@@ -14,6 +14,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const QUEUE_KEY = "strength-tracker-pending-ops-v1";
 const LAST_SYNC_KEY = "strength-tracker-last-synced";
+const SYNC_USER_KEY = "strength-tracker-sync-user"; // the account this device's "synced" marks belong to
 
 let currentSession = null;
 let pendingQueue = loadQueue();
@@ -57,7 +58,14 @@ function saveQueue(){
   noteLocalSave("queue", ok);
 }
 
+// Every entry change that syncs passes through here, so this is where it gets its edit time: the
+// newest edit of an entry wins when two devices disagree (see pullRemoteAndMerge). A bulk re-upload
+// passes keepTime so it doesn't make every old entry look freshly edited.
 function enqueueOp(op){
+  if(op.type === "upsert_entry" && !op.payload.keepTime){
+    const ex = data[op.payload.exerciseName], e = ex && ex.entries.find(x => x.clientId === op.payload.clientId);
+    if(e) e.updatedAt = new Date().toISOString();
+  }
   pendingQueue.push(op);
   saveQueue();
   renderSyncStatus();
@@ -167,6 +175,8 @@ function entryToRow(entry, exerciseId, userId){
     reps_by_set: entry.repsBySet ?? null,
     pain: entry.pain ?? null,
     pain_area: entry.painArea ?? null,
+    // The device's edit time, so the newest edit wins across devices. Undefined keeps the server's.
+    updated_at: entry.updatedAt || undefined,
     deload: !!entry.deload,
     preseason: !!entry.preseason,
     // undefined (dropped from the request) rather than null for entries logged before this
@@ -196,6 +206,8 @@ function rowToEntry(row){
     deload: row.deload || undefined,
     preseason: row.preseason || undefined,
     loggedAt: row.logged_at || undefined,
+    updatedAt: row.updated_at || undefined,
+    synced: true,
   };
 }
 
@@ -239,6 +251,7 @@ async function runOp(op){
     if(!exerciseId) return false;
     const { error } = await supabaseClient.from("entries").upsert(entryToRow(entry, exerciseId, userId), { onConflict: "user_id,client_id" });
     if(error) throw error;
+    entry.synced = true;
     return true;
   }
   if(op.type === "upsert_skip"){
@@ -267,9 +280,12 @@ async function runOp(op){
     return true;
   }
   if(op.type === "upsert_settings"){
+    const { prev: _p, ...deloadRecord } = deloadDates, { prev: _r, ...rehabRecord } = shoulderRehab;
     const { error } = await supabaseClient.from("user_settings").upsert({
       user_id: userId,
-      ...Object.fromEntries(MODE_DEFS.map(m => [m.column, modes[m.key]])),
+      // The JSON field is the source of truth; the per-mode columns are kept for older app versions.
+      settings: { modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), deload: deloadRecord, shoulderRehab: rehabRecord },
+      ...Object.fromEntries(MODE_DEFS.filter(m => m.column).map(m => [m.column, modes[m.key]])),
       deload_started_on: deloadDates.startedOn || null,
       deload_ended_on: deloadDates.endedOn || null,
       deload_planned_end_on: deloadDates.plannedEndOn || null,
@@ -381,54 +397,87 @@ function flashSyncButton(btn, text, success, originalText){
   }, 2600);
 }
 
+// Every row of a table for this user, a page at a time: a plain select stops at the server's
+// 1000-row cap, which would silently drop the oldest history.
+async function fetchAllRows(table, userId){
+  const rows = [];
+  for(let from = 0; ; from += 1000){
+    const { data: page, error } = await supabaseClient.from(table).select("*").eq("user_id", userId).order("id").range(from, from + 999);
+    if(error) return { data: null, error };
+    rows.push(...(page || []));
+    if(!page || page.length < 1000) return { data: rows, error: null };
+  }
+}
+
+// Merging the cloud into this device, entry by entry (clientId):
+//   only in the cloud: added here, unless a delete of it is still waiting to sync;
+//   on both: the newer edit wins (updatedAt), unless this device has an edit still waiting to sync;
+//   only here: kept, unless it had synced before (so the cloud dropped it: deleted on another
+//   device) and nothing about it is waiting to sync. Never when the cloud returned no entries,
+//   and only when this device last synced with the same account.
 async function pullRemoteAndMerge(){
   const userId = currentSession.user.id;
   const { data: exRows, error: exErr } = await supabaseClient.from("exercises").select("*").eq("user_id", userId);
   if(exErr){ console.error(exErr); return; }
-  const { data: entryRows, error: enErr } = await supabaseClient.from("entries").select("*").eq("user_id", userId);
+  const { data: entryRows, error: enErr } = await fetchAllRows("entries", userId);
   if(enErr){ console.error(enErr); return; }
 
   const entriesByExerciseId = {};
   (entryRows || []).forEach(r => { (entriesByExerciseId[r.exercise_id] ||= []).push(r); });
+  const pending = new Set(pendingQueue.filter(o => o.payload && o.payload.clientId).map(o => o.payload.clientId));
+  const remoteIds = new Set((entryRows || []).map(r => r.client_id));
+  // Deletions only carry over between syncs of the same account: never on a device's first sync
+  // with this version, and never when the phone switches accounts.
+  let sameAccount = false;
+  try{ sameAccount = window.localStorage.getItem(SYNC_USER_KEY) === userId; window.localStorage.setItem(SYNC_USER_KEY, userId); }catch(e){}
+  const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
 
   (exRows || []).forEach(row => {
     exerciseIdCache[row.name] = row.id;
-    const remoteEntries = (entriesByExerciseId[row.id] || []).map(rowToEntry);
+    const remoteEntries = (entriesByExerciseId[row.id] || []).map(rowToEntry).filter(e => !pending.has(e.clientId));
     if(!data[row.name]){
       const ex = rowToExercise(row);
-      ex.entries = remoteEntries.sort((a,b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      ex.entries = remoteEntries.sort(byDate);
       ex.entries.forEach((e,i) => { e.label = "S" + (i+1); });
       data[row.name] = ex;
-    } else {
-      const existingIds = new Set(data[row.name].entries.map(e => e.clientId).filter(Boolean));
-      remoteEntries.forEach(e => { if(!existingIds.has(e.clientId)) data[row.name].entries.push(e); });
-      // Entries logged before order tracking pick up the server's backfilled log time.
-      const remoteAt = new Map(remoteEntries.map(e => [e.clientId, e.loggedAt]));
-      data[row.name].entries.forEach(e => { if(!e.loggedAt && remoteAt.get(e.clientId)) e.loggedAt = remoteAt.get(e.clientId); });
-      // A set tagged preseason on the server (logged on another device, or marked after the fact) is
-      // tagged here too, so its chart point turns Preseason purple. Never untagged from here.
-      const remotePre = new Set(remoteEntries.filter(e => e.preseason).map(e => e.clientId));
-      data[row.name].entries.forEach(e => { if(!e.preseason && remotePre.has(e.clientId)) e.preseason = true; });
-      data[row.name].entries.sort((a,b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-      data[row.name].entries.forEach((e,i) => { e.label = "S" + (i+1); });
+      return;
     }
+    const ex = data[row.name];
+    const local = new Map(ex.entries.map(e => [e.clientId, e]));
+    remoteEntries.forEach(r => {
+      const e = local.get(r.clientId);
+      if(!e){ ex.entries.push(r); return; }
+      if(r.updatedAt && (!e.updatedAt || Date.parse(r.updatedAt) > Date.parse(e.updatedAt))) Object.assign(e, r);
+      else { if(!e.loggedAt && r.loggedAt) e.loggedAt = r.loggedAt; e.synced = true; }
+    });
+    if(sameAccount && remoteIds.size) ex.entries = ex.entries.filter(e => !(e.synced && !remoteIds.has(e.clientId) && !pending.has(e.clientId)));
+    ex.entries.sort(byDate);
+    ex.entries.forEach((e,i) => { e.label = "S" + (i+1); });
   });
 
   const { data: settingsRow } = await supabaseClient.from("user_settings").select("*").eq("user_id", userId).maybeSingle();
+  // Settings come from the JSON field, falling back to the old per-mode columns for rows written
+  // before it existed. A device only adopts them where it has nothing of its own.
+  const saved = (settingsRow && settingsRow.settings) || {};
+  const savedModes = saved.modes || {};
   MODE_DEFS.forEach(m => {
     let unset = false;
     try{ unset = window.localStorage.getItem(m.storageKey) === null; }catch(e){}
     if(settingsRow && unset){
-      modes[m.key] = !!settingsRow[m.column];
+      modes[m.key] = m.key in savedModes ? !!savedModes[m.key] : !!(m.column && settingsRow[m.column]);
       try{ window.localStorage.setItem(m.storageKey, modes[m.key] ? "1" : "0"); }catch(e){}
     }
   });
-  if(settingsRow && !deloadDates.startedOn && settingsRow.deload_started_on){
-    deloadDates = { startedOn: settingsRow.deload_started_on, endedOn: settingsRow.deload_ended_on || null, plannedEndOn: settingsRow.deload_planned_end_on || null };
+  const savedDeload = saved.deload && saved.deload.startedOn ? saved.deload
+    : settingsRow && settingsRow.deload_started_on ? { startedOn: settingsRow.deload_started_on, endedOn: settingsRow.deload_ended_on, plannedEndOn: settingsRow.deload_planned_end_on } : null;
+  if(savedDeload && !deloadDates.startedOn){
+    deloadDates = { startedOn: savedDeload.startedOn, endedOn: savedDeload.endedOn || null, plannedEndOn: savedDeload.plannedEndOn || null };
     saveDeloadDates();
   }
-  if(settingsRow && !shoulderRehab.startedOn && settingsRow.shoulder_rehab_started_on){
-    shoulderRehab = { startedOn: settingsRow.shoulder_rehab_started_on, endedOn: settingsRow.shoulder_rehab_ended_on || null, phase3: !!settingsRow.shoulder_rehab_phase3 };
+  const savedRehab = saved.shoulderRehab && saved.shoulderRehab.startedOn ? saved.shoulderRehab
+    : settingsRow && settingsRow.shoulder_rehab_started_on ? { startedOn: settingsRow.shoulder_rehab_started_on, endedOn: settingsRow.shoulder_rehab_ended_on, phase3: settingsRow.shoulder_rehab_phase3 } : null;
+  if(savedRehab && !shoulderRehab.startedOn){
+    shoulderRehab = { startedOn: savedRehab.startedOn, endedOn: savedRehab.endedOn || null, phase3: !!savedRehab.phase3 };
     saveShoulderRehab();
   }
 
@@ -464,7 +513,7 @@ function reconcileAllToQueue(){
   });
   Object.entries(data).forEach(([name, ex]) => {
     ex.entries.forEach(entry => {
-      enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: name, clientId: entry.clientId } });
+      enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: name, clientId: entry.clientId, keepTime: true } });
     });
   });
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });

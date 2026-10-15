@@ -1891,7 +1891,8 @@ async function main(){
   if(!/Last deload:/.test(offStatus) || !/Next recommended: .*in \d+ day/.test(offStatus)) throw new Error('expected the last deload and the next due date after switching it off, got: ' + offStatus);
   await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'deload settings sync');
   const settingsRow = await page.evaluate(() => (JSON.parse(sessionStorage.getItem('__mock_supabase_db__')).user_settings || [])[0]);
-  if(!settingsRow || !settingsRow.deload_started_on || !settingsRow.deload_ended_on || settingsRow.deload_mode !== false) throw new Error('expected deload dates synced to user_settings, got: ' + JSON.stringify(settingsRow));
+  if(!settingsRow || !settingsRow.deload_started_on || !settingsRow.deload_ended_on || settingsRow.deload_mode !== false
+    || !settingsRow.settings || settingsRow.settings.modes.deload !== false || settingsRow.settings.deload.startedOn !== settingsRow.deload_started_on || 'prev' in settingsRow.settings.deload) throw new Error('expected deload dates synced to user_settings and its settings JSON, got: ' + JSON.stringify(settingsRow));
   console.log('OK: Deload Week is first, cuts load and sets, respects care-mode cuts, skips deload sessions afterward, and syncs its dates');
 
   console.log('=== 65: Kettlebell Swings cap at 35 lb, deload messages carry the RPE 6 cap, and a deload ends itself after a week ===');
@@ -2594,8 +2595,8 @@ async function main(){
     const saved = { data, from: supabaseClient.from, session: currentSession, render: window.render, persist: window.persist, auto: window.checkDeloadAutoEnd };
     window.render = () => {}; window.persist = () => {}; window.checkDeloadAutoEnd = () => {};
     data = { 'Squat': Object.assign(newExerciseShell('Squat'), { entries: [{ clientId: 'sq1', date: todayISO(), weight: 180, sets: 3, reps: 5, label: 'S1' }] }) };
-    const rows = { exercises: [{ id: 'ex-sq', name: 'Squat', user_id: 'u' }], entries: [{ client_id: 'sq1', exercise_id: 'ex-sq', entry_date: todayISO(), weight: 180, sets: 3, reps: 5, preseason: true }], user_settings: [], skips: [], ai_breakdowns: [] };
-    const q = (t) => { const b = { select(){ return b; }, eq(){ return b; }, maybeSingle(){ return Promise.resolve({ data: null, error: null }); }, then(res){ return Promise.resolve({ data: rows[t], error: null }).then(res); } }; return b; };
+    const rows = { exercises: [{ id: 'ex-sq', name: 'Squat', user_id: 'u' }], entries: [{ client_id: 'sq1', exercise_id: 'ex-sq', entry_date: todayISO(), weight: 180, sets: 3, reps: 5, preseason: true, updated_at: new Date().toISOString() }], user_settings: [], skips: [], ai_breakdowns: [] };
+    const q = (t) => { const b = { select(){ return b; }, eq(){ return b; }, order(){ return b; }, range(){ return b; }, maybeSingle(){ return Promise.resolve({ data: null, error: null }); }, then(res){ return Promise.resolve({ data: rows[t], error: null }).then(res); } }; return b; };
     supabaseClient.from = q;
     currentSession = { user: { id: 'u' } };
     try { await pullRemoteAndMerge(); } catch (e) { return { err: String(e) }; }
@@ -2751,7 +2752,7 @@ async function main(){
     const bad = [];
     const savedTheme = darkMode;
     MODE_DEFS.forEach(m => {
-      ['key', 'storageKey', 'column', 'name', 'short', 'emoji', 'desc'].forEach(f => { if(!m[f]) bad.push(m.key + ' missing ' + f); });
+      ['key', 'storageKey', 'name', 'short', 'emoji', 'desc'].forEach(f => { if(!m[f]) bad.push(m.key + ' missing ' + f); });
       if(!m.badge) bad.push(m.key + ' missing badge');
       if(!m.tag || !['light', 'block'].includes(m.tag.kind) || !(m.tag.re instanceof RegExp) || !m.tag.re.test(m.tag.label)) bad.push(m.key + ' tag');
       if(typeof m.applies !== 'function' || typeof m.changesNumbers !== 'function') bad.push(m.key + ' rules');
@@ -2839,6 +2840,53 @@ async function main(){
     /Knee pain was above 3 on 2 of your last 2 joint checks: consider turning on Knee Care/.test(r90.notes) && /pain 4\/10 knee/.test(r90.payload);
   if(!ok90) throw new Error('expected the joint check to log, hold, drop, sync and nudge, got: ' + JSON.stringify(r90));
   console.log('OK: joint check opens under Knee Care (closed on bench, set to shoulder), pain 5 holds 180, pain 7 drops to 162.5, it syncs, shows "Pain 5 knee", reaches the coach, and two high knee checks suggest Knee Care');
+
+  console.log('=== 91: sync takes the newest edit, keeps edits still waiting to sync, carries deletions over, pages past 1000 rows, reads settings from JSON ===');
+  const r91 = await page.evaluate(async () => {
+    const saved = { data, from: supabaseClient.from, session: currentSession, render: window.render, persist: window.persist, auto: window.checkDeloadAutoEnd, queue: pendingQueue, modes: { ...modes } };
+    window.render = () => {}; window.persist = () => {}; window.checkDeloadAutoEnd = () => {};
+    const savedLs = {}; MODE_DEFS.forEach(m => { savedLs[m.key] = localStorage.getItem(m.storageKey); localStorage.removeItem(m.storageKey); modes[m.key] = false; });
+    const savedUser = localStorage.getItem(SYNC_USER_KEY);
+    const t = n => new Date(Date.now() + n * 60000).toISOString();
+    const e = (id, reps, extra) => Object.assign({ clientId: id, date: todayISO(), weight: 180, sets: 3, reps, label: 'S' }, extra);
+    const row = (id, reps, at) => ({ client_id: id, exercise_id: 'ex-sq', entry_date: todayISO(), weight: 180, sets: 3, reps, updated_at: at });
+    const bulk = Array.from({ length: 1100 }, (_, i) => ({ client_id: 'old' + String(i).padStart(4, '0'), exercise_id: 'ex-rdl', entry_date: shiftISO(todayISO(), -400 + (i % 300)), weight: 200, sets: 3, reps: 8, updated_at: t(-9999) }));
+    const rows = {
+      exercises: [{ id: 'ex-sq', name: 'Squat', user_id: 'u' }, { id: 'ex-rdl', name: 'RDL', user_id: 'u' }],
+      entries: [row('newer-remote', 9, t(5)), row('newer-local', 9, t(-5)), row('pending-edit', 9, t(5)), row('pending-delete', 8, t(0)), row('remote-only', 7, t(0)), ...bulk],
+      user_settings: [{ user_id: 'u', settings: { modes: { knee: true, futureModifier: true } }, knee_care_mode: false }], skips: [], ai_breakdowns: [],
+    };
+    const q = tbl => { const b = { _r: null, select(){ return b; }, eq(){ return b; }, order(){ return b; }, range(a, z){ b._r = [a, z]; return b; },
+      maybeSingle(){ return Promise.resolve({ data: rows[tbl][0] || null, error: null }); },
+      then(res){ const all = rows[tbl]; return Promise.resolve({ data: b._r ? all.slice(b._r[0], b._r[1] + 1) : all.slice(0, 1000), error: null }).then(res); } }; return b; };
+    supabaseClient.from = q;
+    currentSession = { user: { id: 'u' } };
+    const run = async (localSquat, queue, sameUser) => {
+      data = { 'Squat': Object.assign(newExerciseShell('Squat'), { entries: localSquat }) };
+      pendingQueue = queue;
+      if(sameUser) localStorage.setItem(SYNC_USER_KEY, 'u'); else localStorage.removeItem(SYNC_USER_KEY);
+      await pullRemoteAndMerge();
+      const sq = Object.fromEntries(data['Squat'].entries.map(x => [x.clientId, x.reps]));
+      return { sq, rdl: (data['RDL'] || { entries: [] }).entries.length };
+    };
+    const local = () => [e('newer-remote', 6, { updatedAt: t(0), synced: true }), e('newer-local', 6, { updatedAt: t(0), synced: true }), e('pending-edit', 6, { updatedAt: t(0), synced: true }),
+      e('deleted-elsewhere', 8, { synced: true }), e('never-synced', 8)];
+    const queue = [{ type: 'upsert_entry', payload: { exerciseName: 'Squat', clientId: 'pending-edit' } }, { type: 'delete_entry', payload: { clientId: 'pending-delete' } }];
+    const out = { same: await run(local(), queue, true), firstSync: await run(local(), queue, false) };
+    out.modes = { knee: modes.knee };
+    data = saved.data; supabaseClient.from = saved.from; currentSession = saved.session; pendingQueue = saved.queue;
+    window.render = saved.render; window.persist = saved.persist; window.checkDeloadAutoEnd = saved.auto;
+    MODE_DEFS.forEach(m => { if(savedLs[m.key] == null) localStorage.removeItem(m.storageKey); else localStorage.setItem(m.storageKey, savedLs[m.key]); });
+    Object.assign(modes, saved.modes);
+    if(savedUser == null) localStorage.removeItem(SYNC_USER_KEY); else localStorage.setItem(SYNC_USER_KEY, savedUser);
+    persist(); render();
+    return out;
+  });
+  const want91 = { 'newer-remote': 9, 'newer-local': 6, 'pending-edit': 6, 'never-synced': 8, 'remote-only': 7 };
+  const sameOk = Object.keys(want91).every(k => r91.same.sq[k] === want91[k]) && !('deleted-elsewhere' in r91.same.sq) && !('pending-delete' in r91.same.sq) && r91.same.rdl === 1100;
+  const firstOk = r91.firstSync.sq['deleted-elsewhere'] === 8 && !('pending-delete' in r91.firstSync.sq);
+  if(!sameOk || !firstOk || !r91.modes.knee) throw new Error('expected newest-edit-wins sync with guarded deletes, paging and JSON settings, got: ' + JSON.stringify(r91));
+  console.log('OK: the newer edit wins either way, an edit waiting to sync is kept, a pending delete is not brought back, a synced entry deleted elsewhere is removed (not on a first sync), all 1100 older rows arrive, and Knee Care comes from the settings JSON');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
