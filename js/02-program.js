@@ -22,6 +22,8 @@ const DAY_ORDER = {
   extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Incline Treadmill Walk","Zone 2 Ride","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
 };
 const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
+// Preseason lifts that stay on in season, once a week, to keep power without leg fatigue.
+const IN_SEASON_KEEP = new Set(["Box Jumps"]);
 // Shown only while Knee Care is on: on Extra, and after the numbered lifts on Lower and Full Body.
 const KNEE_ONLY = new Set(["Spanish Squat"]);
 // The main barbell lifts. Only these show Est. 1RM on the card; everything else shows its rep
@@ -29,7 +31,7 @@ const KNEE_ONLY = new Set(["Spanish Squat"]);
 const COMPOUND_LIFTS = new Set(["Squat", "Bench Press", "RDL", "Barbell Row", "Hip Thrust"]);
 function activeDayOrder(day){
   const week = preseasonWeek();
-  return DAY_ORDER[day].filter(name => (modes.preseason || !PRESEASON_ONLY.has(name)) && (modes.knee || !KNEE_ONLY.has(name))
+  return DAY_ORDER[day].filter(name => (modes.preseason || !PRESEASON_ONLY.has(name) || (modes.ski && IN_SEASON_KEEP.has(name))) && (modes.knee || !KNEE_ONLY.has(name))
     && !(week != null && week < 3 && (EXERCISE_DEFAULTS[name] || {}).preseasonWeek3));
 }
 // Extra shows one group at a time, picked from buttons above its row. Mobility is a single card
@@ -188,7 +190,7 @@ const EXERCISE_DEFAULTS = {
   "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb, keep building load." },
   "Kettlebell Swings": { maxWeight: 35, preseason: true, preseasonPower: true, preseasonNote: "Power: do this first. 4x10 at 35 lb; add reps, then go single-arm." },
   "Standing Calf Raise": { trackBy: "weight", targetReps: 15, repRange: "12-20", preseason: true, preseasonNote: "3x15, loaded. Log the total: both dumbbells added together, or the bar." },
-  "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down, never jump down; stop if speed drops. Gentler: slow 3 sec step-down." },
+  "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down, never jump down; stop if speed drops. Gentler: slow 3 sec step-down.", inSeasonNote: "In season: 3x3, first in the session, full rest between jumps. Skip it the day before a big ski day." },
   "Med Ball Slam": { trackBy: "weight", targetReps: 6, preseason: true, preseasonPower: true, preseasonNote: "3x6, 10-15 lb. Stop if speed drops." },
   "Lateral Lunge": { trackBy: "weight", targetReps: 8, preseason: true, preseasonNote: "3x8 per side, bodyweight up to 30 lb DB." },
   "Copenhagen Plank": { trackBy: "reps", unit: "sec", targetReps: 20, preseason: true, preseasonNote: "3x20 sec per side, adductors." },
@@ -271,10 +273,10 @@ Object.entries(EXERCISE_DEFAULTS).forEach(([exName, preset]) => {
 });
 // Defaults filled onto an exercise saved before they existed: additive metadata only, never
 // fields that would reinterpret logged sessions.
-const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange"];
+const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange", "inSeasonNote"];
 // App-authored copy and targets (never synced, never edited in the UI): always refreshed from
 // EXERCISE_DEFAULTS, so a wording or number change reaches devices that already have the lift.
-const ALWAYS_SYNC_KEYS = ["preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange"];
+const ALWAYS_SYNC_KEYS = ["preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange", "inSeasonNote"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
 }
@@ -301,6 +303,6 @@ function backfillExerciseDefaults(){
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v103";
+const APP_VERSION = "v104";
 const APP_UPDATED = "Oct 15, 2026";
 

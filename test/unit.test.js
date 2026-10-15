@@ -156,6 +156,7 @@ test("ski phases are exclusive and preseason adds its week-3 lifts in week 3", (
   eq(run(`[preseasonWeek(), activeDayOrder("lower").includes("Trap Bar Jump")]`), [3, true], "week 3");
   run(`setSkiPhase("season");`);
   eq(run(`[modes.preseason, modes.ski]`), [false, true], "in season");
+  eq(run(`[getDisplayOrder("lower")[0], activeDayOrder("lower").filter(n => PRESEASON_ONLY.has(n))]`), ["Box Jumps", ["Box Jumps"]], "box jumps stay in season, first");
 });
 test("modifier registry rows are complete", () => {
   const bad = run(`MODE_DEFS.filter(m => !m.key || !m.storageKey || !m.name || !m.tag || !["light", "block"].includes(m.tag.kind) || typeof m.applies !== "function").map(m => m.key)`);

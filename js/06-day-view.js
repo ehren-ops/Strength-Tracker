@@ -79,12 +79,12 @@ function renderMobilityCard(){
   return renderChecklistCard(routine, ex, { title: MOBILITY_NAME, chips });
 }
 
-// The pill row's visual order only (preseason power first). Everything else reads DAY_ORDER as is,
+// The pill row's visual order only (power first: preseason power work, or Box Jumps in season). Everything else reads DAY_ORDER as is,
 // so a tab still opens on its main lift.
 function getDisplayOrder(day){
   const order = activeDayOrder(day);
-  if(!modes.preseason) return order;
-  const isPower = name => !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseasonPower);
+  if(!modes.preseason && !modes.ski) return order;
+  const isPower = name => !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseasonPower) && (modes.preseason || IN_SEASON_KEEP.has(name));
   const power = order.filter(isPower);
   if(!power.length) return order;
   return power.concat(order.filter(name => !isPower(name)));
@@ -334,6 +334,9 @@ function renderExerciseCard(name, ex){
   }
   if(kneeActive || backActive){
     modHtml += `<p class="care-disclaimer">Load adjustment only, not a substitute for a PT or doctor.</p>`;
+  }
+  if(modes.ski && ex.inSeasonNote){
+    modHtml += `<div class="ski-tempo-line">${ex.inSeasonNote}</div>`;
   }
   if(skiActive && ex.skiTempo){
     modHtml += `<div class="ski-tempo-line">Ski tempo: ${ex.skiTempo} · target ${ex.targetRepsSki} reps</div>`;
