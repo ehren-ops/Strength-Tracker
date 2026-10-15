@@ -59,6 +59,62 @@ function keepDeloadOn(){
   render();
 }
 
+// Ski: one row, a three-way phase control and one status line.
+const SKI_PHASES = [["off", "Off"], ["preseason", "Preseason"], ["season", "In season"]];
+function renderSkiModifier(){
+  const phase = currentSkiPhase(), start = skiPhaseStart(), week = preseasonWeek();
+  const desc = phase === "preseason" ? MODE_DEFS.find(m => m.key === "preseason").desc
+    : phase === "season" ? MODE_DEFS.find(m => m.key === "ski").desc
+    : "Two phases. Preseason: the 7 to 10 week ramp of power, lateral and calf work. In season: lower reps with a slow lowering on squats and lunges.";
+  const status = phase === "preseason"
+    ? (week ? `Week ${week} of ${PRESEASON_WEEKS}${start ? `, since ${fmtShortDate(start)}` : ""}.${week < 3 ? " Trap Bar Jump and Skater Bound join in week 3." : ""}` : "On.")
+    : phase === "season" ? `In season${start ? ` since ${fmtShortDate(start)}` : ""}.`
+    : skiPhase.endedOn ? `Last block ended ${fmtShortDate(skiPhase.endedOn)}.` : "Off.";
+  return `<div class="mod-row">
+      <div class="mod-head"><span class="mod-title">🎿 Ski</span>
+        <div class="seg" role="group" aria-label="Ski phase">${SKI_PHASES.map(([k, label]) =>
+          `<button class="seg-btn ${k}${k === phase ? " on" : ""}" aria-pressed="${k === phase}" onclick="setSkiPhase('${k}')">${label}</button>`).join("")}</div>
+      </div>
+      <p class="mod-desc">${desc}</p>
+      <div class="ski-status">${status}</div>
+    </div>`;
+}
+// End of a phase: after the preseason weeks, offer In season; in spring, offer Off. Shares the
+// deload popup's slot and never shows over it. "Not yet" asks again in a week or two.
+function checkSkiPhasePrompt(){
+  const el = document.getElementById("deload-modal");
+  if(!el || !el.hidden) return;
+  const today = todayISO(), week = preseasonWeek(), md = today.slice(5);
+  if(skiPhase.snoozeUntil && today < skiPhase.snoozeUntil) return;
+  let body, yes, later;
+  if(modes.preseason && week > PRESEASON_WEEKS){
+    body = `Preseason is ${week - 1} weeks in. Switch to In season? Squats and lunges move to lower reps with a slow lowering, and the preseason extras come off your days.`;
+    yes = `<button class="tool-btn seg-yes season" onclick="skiPromptAnswer('season')">Switch to In season</button>`;
+    later = 7;
+  } else if(modes.ski && md >= "04-15" && md <= "09-30"){
+    body = "Ski season winding down? Turning Ski off puts your leg lifts back on their regular reps.";
+    yes = `<button class="tool-btn seg-yes off" onclick="skiPromptAnswer('off')">Turn Ski off</button>`;
+    later = 14;
+  } else return;
+  el.innerHTML = `<div class="app-modal-card">
+    <h3 class="section" style="color:var(--ski-text);">🎿 Ski</h3>
+    <p style="font-size:0.85rem;line-height:1.5;margin:0 0 0.8rem;">${body}</p>
+    <div style="display:flex;gap:0.5rem;justify-content:flex-end;flex-wrap:wrap;">
+      <button class="tool-btn" onclick="snoozeSkiPrompt(${later})">Not yet</button>${yes}
+    </div>
+  </div>`;
+  el.hidden = false;
+}
+function snoozeSkiPrompt(days){
+  skiPhase.snoozeUntil = shiftISO(todayISO(), days);
+  saveSkiPhase();
+  closeDeloadModal();
+}
+function skiPromptAnswer(phase){
+  closeDeloadModal();
+  setSkiPhase(phase);
+}
+
 // Overview sections that fold away by tapping their heading, remembered on this device like the
 // graph toggle. Folded, the heading carries a one-line summary instead.
 const OVERVIEW_COLLAPSED_KEY = "strength-tracker-overview-collapsed";
@@ -139,28 +195,35 @@ function weeklyBalance(){
   const ratio = push ? Math.round(pull / push * 10) / 10 : null;
   // Extra pull sets a week that would reach the target at the current pressing volume.
   const short = ratio != null && ratio < target ? Math.ceil((push * target - pull) / 4) : 0;
-  return { week, avg, ratio, target, short };
+  return { week, avg, four, push, pull, ratio, target, short };
 }
+// Weekly Balance: one plain sentence, pulling against pressing over 4 weeks (with the pull target
+// marked on the pull bar), then every pattern's working sets this week next to its weekly average.
 function renderBalanceCard(){
   const b = weeklyBalance();
   const rows = BALANCE_PATTERNS.filter(p => b.week[p] || b.avg[p]);
-  const ratioTxt = b.ratio == null ? "" : `Pull : push ${b.ratio} : 1`;
-  let html = `<div class="card">${collapsibleHead("balance", "Weekly Balance", ratioTxt)}`;
+  const summary = b.ratio == null ? "" : b.ratio >= b.target ? "Pulling keeps up" : `Pulling short ${b.short}/wk`;
+  let html = `<div class="card">${collapsibleHead("balance", "Weekly Balance", summary)}`;
   if(overviewCollapsed.balance) return html + `</div>`;
-  if(!rows.length) return html + `<p class="range-note">Sets per movement pattern show here once you log a few sessions.</p></div>`;
-  const ok = b.ratio != null && b.ratio >= b.target;
-  if(b.ratio != null){
-    html += `<p class="bal-ratio ${ok ? "bal-ok" : "bal-low"}"><b>${ratioTxt}</b> over 4 weeks · target ${b.target} : 1${modes.shoulder ? " while rehabbing" : ""}.${ok ? "" : ` About ${b.short} more pull set${b.short === 1 ? "" : "s"} a week would even it out.`}</p>`;
+  if(!rows.length) return html + `<p class="range-note">Working sets per movement pattern show here once you log a few sessions.</p></div>`;
+  if(b.push){
+    const goal = Math.round(b.push * b.target);
+    const ok = b.ratio >= b.target;
+    const aim = b.target === 1 ? "at least one pull set per press set" : "1.5 pull sets per press set while rehabbing";
+    html += `<p class="bal-ratio ${ok ? "bal-ok" : "bal-low"}">Last 4 weeks: <b>${b.pull} pulling sets</b> and <b>${b.push} pressing</b>. ${ok ? `Pulling is keeping up (aim for ${aim}).` : `Aim for ${aim}: add about ${b.short} pull set${b.short === 1 ? "" : "s"} a week.`}</p>`;
+    const max = Math.max(b.push, b.pull, goal, 1), pct = n => (n / max * 100).toFixed(1);
+    html += `<div class="bal-compare" role="img" aria-label="Last 4 weeks: ${b.pull} pull sets, ${b.push} push sets, pull target ${goal}">
+      <div class="bal-row"><span class="bal-name">Pull</span><span class="bal-bar"><span class="pull" style="width:${pct(b.pull)}%"></span><i style="left:${pct(goal)}%" title="Target ${goal}"></i></span><span class="bal-n">${b.pull}</span></div>
+      <div class="bal-row"><span class="bal-name">Push</span><span class="bal-bar"><span style="width:${pct(b.push)}%"></span></span><span class="bal-n">${b.push}</span></div>
+      <p class="bal-key"><i></i>Pull target: ${goal} sets</p>
+    </div>`;
   }
-  const max = Math.max(...rows.map(p => Math.max(b.week[p] || 0, b.avg[p] || 0)), 1);
-  html += `<div class="bal-head"><span></span><span></span><span>Week · avg</span></div>`;
+  html += `<table class="bal-table"><thead><tr><th>Pattern</th><th>This week</th><th>Weekly avg</th></tr></thead><tbody>`;
   rows.forEach(p => {
     const w = b.week[p] || 0, a = b.avg[p] || 0;
-    html += `<div class="bal-row"><span class="bal-name">${p}</span>
-      <span class="bal-bar"><span style="width:${(w / max * 100).toFixed(0)}%"></span><i style="left:${(a / max * 100).toFixed(0)}%"></i></span>
-      <span class="bal-n">${w} · ${a}</span></div>`;
+    html += `<tr><td>${p[0].toUpperCase() + p.slice(1)}</td><td>${w}</td><td>${a}</td></tr>`;
   });
-  html += `<p class="range-note">Working sets per pattern. The tick marks the 4-week weekly average.</p></div>`;
+  html += `</tbody></table><p class="range-note">Working sets. This week is the last 7 days; the average is over the last 4 weeks.</p></div>`;
   return html;
 }
 
@@ -315,7 +378,9 @@ function renderOverview(){
   html += `</div>`;
 
   const modsOn = MODE_DEFS.filter(m => modes[m.key]).map(m => m.short);
-  const modRow = m => m.key === "deload" ? renderDeloadModifier() : m.key === "shoulder" ? renderShoulderModifier() : renderModifierRow(m.key);
+  // Preseason and Ski share one row (renderSkiModifier), shown where Preseason sits in the registry.
+  const modRow = m => m.key === "deload" ? renderDeloadModifier() : m.key === "shoulder" ? renderShoulderModifier()
+    : m.key === "preseason" ? renderSkiModifier() : m.key === "ski" ? "" : renderModifierRow(m.key);
   html += `<div class="card">
     ${collapsibleHead("modifiers", "Training Modifiers", modsOn.length ? `On: ${modsOn.join(", ")}` : "All off")}
     ${overviewCollapsed.modifiers ? "" : MODE_DEFS.map(modRow).join("")}

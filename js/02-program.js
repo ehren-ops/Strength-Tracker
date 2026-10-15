@@ -6,14 +6,15 @@ const SEED = {
 
 };
 
-// Each day's list, in planned order. Position 0 is the lift a tab opens on, so it stays the main
+// Each day's list, in planned order. Main lifts (Squat, Bench, RDL, Row) and Face Pulls and Back
+// Extension run twice a week; every other accessory lives on one day, so days stay about 7 lifts. Position 0 is the lift a tab opens on, so it stays the main
 // lift even though preseason power work moves to the front of the pill row (getDisplayOrder).
 // Every name in a day's list counts toward that day's completion banner, so a lift lives on one
 // day only (Farmer's Carry is on Extra, Kettlebell Swings on Lower). PRESEASON_ONLY lifts are
 // hidden while Preseason Prep is off (activeDayOrder).
 const DAY_ORDER = {
-  full: ["Squat","Bench Press","Incline DB Press","RDL","Bulgarian Split Squat","Barbell Row","Cable Chest Fly","Face Pulls","Back Extension","Seated Calf Raise"],
-  upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Cable Lat Pulldown","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
+  full: ["Squat","Bench Press","RDL","Barbell Row","Cable Lat Pulldown","Face Pulls","Back Extension","Seated Calf Raise"],
+  upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
   lower: ["Squat","RDL","Bulgarian Split Squat","Hip Thrust","Kettlebell Swings","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound"],
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
@@ -27,7 +28,9 @@ const KNEE_ONLY = new Set(["Spanish Squat"]);
 // record, which is what an accessory actually progresses by.
 const COMPOUND_LIFTS = new Set(["Squat", "Bench Press", "RDL", "Barbell Row", "Hip Thrust"]);
 function activeDayOrder(day){
-  return DAY_ORDER[day].filter(name => (modes.preseason || !PRESEASON_ONLY.has(name)) && (modes.knee || !KNEE_ONLY.has(name)));
+  const week = preseasonWeek();
+  return DAY_ORDER[day].filter(name => (modes.preseason || !PRESEASON_ONLY.has(name)) && (modes.knee || !KNEE_ONLY.has(name))
+    && !(week != null && week < 3 && (EXERCISE_DEFAULTS[name] || {}).preseasonWeek3));
 }
 // Extra shows one group at a time, picked from buttons above its row. Mobility is a single card
 // holding the stretch and core routines; each routine keeps its own history under its own name.
@@ -298,6 +301,6 @@ function backfillExerciseDefaults(){
 const TAB_ORDER = ["full","upper","lower","extra","overview"];
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v102";
+const APP_VERSION = "v103";
 const APP_UPDATED = "Oct 15, 2026";
 

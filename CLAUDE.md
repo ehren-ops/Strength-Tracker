@@ -45,6 +45,10 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   themes and its `.<key>-badge` style; scenario 88 checks the row. No schema change: settings sync
   through `user_settings.settings` (JSON). The old per-mode columns are legacy; leave them be.
   What it actually does to the numbers lives with its own logic (05, 05b, the exercise fields).
+- Ski is one setting with two phases (`setSkiPhase`, 03): Preseason and In season are still the
+  modes `preseason` and `ski`, never on together; route changes through `setSkiPhase` (or
+  `toggleMode`, which calls it). `skiPhase` dates the phase (`preseasonWeek`, the week-3 lifts in
+  `activeDayOrder`, `checkSkiPhasePrompt`) and syncs in `user_settings.settings.ski`.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double

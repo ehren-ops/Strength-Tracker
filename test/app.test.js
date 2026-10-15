@@ -348,7 +348,7 @@ async function main(){
   let skiBadgeCount = await page.locator('.ski-badge').count();
   if(skiBadgeCount !== 0) throw new Error('did not expect a ski badge before ski season mode is on');
   await page.click('.tab:has-text("Overview")');
-  await page.click('button:has-text("Ski Season: OFF")');
+  await page.click('.seg-btn.season');
   await page.click('.tab:has-text("Full Body")');
   await page.click('.pill:has-text("Squat")');
   skiBadgeCount = await page.locator('.ski-badge').count();
@@ -361,7 +361,7 @@ async function main(){
 
   console.log('=== 15: ski fields backfill onto an exercise that already existed before this fix ===');
   await page.click('.tab:has-text("Overview")');
-  await page.click('button:has-text("Ski Season: ON")'); // turn back off for a clean re-check
+  await page.click('.seg-btn.off'); // turn back off for a clean re-check
   const backfillCheck = await page.evaluate(() => {
     // Simulate a pre-existing exercise saved before ski defaults existed (no targetRepsSki/skiTempo)
     const store = JSON.parse(localStorage.getItem('strength-tracker-v1'));
@@ -385,9 +385,10 @@ async function main(){
   if(await page.locator('.knee-care-line').count() !== 1) throw new Error('expected a knee care tip line on Squat');
   await page.locator('.pill').filter({ hasText: new RegExp('^' + '2\. Bench Press' + '\\s*.?$') }).click();
   if(await page.locator('.knee-badge').count() !== 0) throw new Error('did not expect a knee badge on Bench Press');
-  await page.locator('.pill').filter({ hasText: new RegExp('^' + '5\. Bulgarian Split Squat' + '\\s*.?$') }).click();
+  await page.click('.tab:has-text("Lower Body")');
+  await page.locator('.pill').filter({ hasText: new RegExp('^' + '3\. Bulgarian Split Squat' + '\\s*.?$') }).click();
   if(await page.locator('.knee-badge').count() !== 1) throw new Error('expected a knee badge on Bulgarian Split Squat');
-  await page.locator('.pill').filter({ hasText: new RegExp('^' + '4\. RDL' + '\\s*.?$') }).click();
+  await page.locator('.pill').filter({ hasText: new RegExp('^' + '2\. RDL' + '\\s*.?$') }).click();
   if(await page.locator('.knee-badge').count() !== 0) throw new Error('did not expect a knee badge on RDL');
   console.log('OK: knee badge/tip appear only on Squat and Bulgarian Split Squat, not Bench Press or RDL');
 
@@ -395,9 +396,9 @@ async function main(){
   await page.click('.tab:has-text("Overview")');
   await page.click('button:has-text("Low Back Care: OFF")');
   await page.click('.tab:has-text("Full Body")');
-  await page.locator('.pill').filter({ hasText: new RegExp('^' + '4\. RDL' + '\\s*.?$') }).click();
+  await page.locator('.pill').filter({ hasText: new RegExp('^' + '3\. RDL' + '\\s*.?$') }).click();
   if(await page.locator('.back-badge').count() !== 1) throw new Error('expected a back badge on RDL');
-  await page.locator('.pill').filter({ hasText: new RegExp('^' + '6\. Barbell Row' + '\\s*.?$') }).click();
+  await page.locator('.pill').filter({ hasText: new RegExp('^' + '4\. Barbell Row' + '\\s*.?$') }).click();
   if(await page.locator('.back-badge').count() !== 1) throw new Error('expected a back badge on Barbell Row');
   await page.locator('.pill').filter({ hasText: new RegExp('^' + '2\. Bench Press' + '\\s*.?$') }).click();
   if(await page.locator('.back-badge').count() !== 0) throw new Error('did not expect a back badge on Bench Press');
@@ -414,8 +415,8 @@ async function main(){
   console.log('OK: back badge appears only on RDL/Barbell Row/Hip Thrust/Kettlebell Swings, Hip Thrust swaps to a glute bridge, and Squat shows both badges at once');
 
   console.log('=== 18: Knee Care mode cuts load ~10% and holds, instead of progressing, with the tip surfaced ===');
-  await page.click('.tab:has-text("Full Body")');
-  await page.locator('.pill').filter({ hasText: new RegExp('^' + '5\. Bulgarian Split Squat' + '\\s*.?$') }).click();
+  await page.click('.tab:has-text("Lower Body")');
+  await page.locator('.pill').filter({ hasText: new RegExp('^' + '3\. Bulgarian Split Squat' + '\\s*.?$') }).click();
   await page.fill('#f-weight', '50');
   await page.fill('#f-sets', '3');
   await page.fill('#f-reps', '8');
@@ -472,8 +473,10 @@ async function main(){
   await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
   if(await page.locator('.plate-line').count() !== 1) throw new Error('expected plate math on Bench Press');
 
-  await page.locator('.pill').filter({ hasText: /^3\.\s*Incline DB Press/ }).click();
+  await page.click('.tab:has-text("Upper Body")');
+  await page.locator('.pill').filter({ hasText: /^2\.\s*Incline DB Press/ }).click();
   if(await page.locator('.plate-line').count() !== 0) throw new Error('did not expect plate math on a dumbbell exercise (Incline DB Press)');
+  await page.click('.tab:has-text("Full Body")');
   console.log('OK: plate math shows on barbell exercises (Squat, Bench Press) and not on Incline DB Press');
 
   await page.evaluate(() => {
@@ -494,7 +497,7 @@ async function main(){
   if(!squatPillClass.includes('logged-today')) throw new Error('expected Squat pill to show logged-today, class was: ' + squatPillClass);
   const squatPillText = await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).textContent();
   if(!squatPillText.includes('✓')) throw new Error('expected a checkmark on the Squat pill, got: ' + squatPillText);
-  const rdlPillClass = await page.locator('.pill').filter({ hasText: /^4\.\s*RDL/ }).getAttribute('class');
+  const rdlPillClass = await page.locator('.pill').filter({ hasText: /^3\.\s*RDL/ }).getAttribute('class');
   if(rdlPillClass.includes('logged-today')) throw new Error('did not expect RDL pill (never logged) to show logged-today, class was: ' + rdlPillClass);
   console.log('OK: Squat (logged today) shows the lightened/checked pill, RDL (never logged) does not');
 
@@ -827,7 +830,7 @@ async function main(){
   await page.click('button:has-text("Low Back Care: ON")');
   await sleep(150);
   await page.click('.tab:has-text("Full Body")');
-  await page.locator('.pill').filter({ hasText: /^4\.\s*RDL/ }).click();
+  await page.locator('.pill').filter({ hasText: /^3\.\s*RDL/ }).click();
   await page.fill('#f-weight', '50');
   await page.fill('#f-sets', '3');
   await page.fill('#f-reps', '12');
@@ -888,7 +891,7 @@ async function main(){
     };
   });
   await page.click('.tab:has-text("Overview")');
-  await page.click('button:has-text("Ski Season: OFF")');
+  await page.click('.seg-btn.season');
   await page.click('.tab:has-text("Full Body")');
   await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
   await page.fill('#f-weight', '165');
@@ -957,10 +960,10 @@ async function main(){
 
   console.log('=== 40: Preseason Prep toggle lives next to Ski Season, is independent, and persists ===');
   await page.click('.tab:has-text("Overview")');
-  if(await page.locator('button:has-text("Preseason Prep: OFF"), button:has-text("Preseason Prep: ON")').count() !== 1) throw new Error('expected a Preseason Prep toggle in Training Modifiers');
+  if(await page.locator('.seg-btn.preseason').count() !== 1) throw new Error('expected a Preseason phase button on the Ski row in Training Modifiers');
   const preseasonStateBefore = await page.evaluate(() => modes.preseason);
   if(preseasonStateBefore) throw new Error('expected Preseason Prep to start OFF');
-  await page.click('button:has-text("Preseason Prep: OFF")');
+  await page.click('.seg-btn.preseason');
   await waitForText(page, '#sync-status', t => t.includes('Synced'), 10000, 'preseason toggle sync');
   const preseasonStateAfter = await page.evaluate(() => modes.preseason);
   if(!preseasonStateAfter) throw new Error('expected Preseason Prep to turn ON after clicking it');
@@ -1020,7 +1023,10 @@ async function main(){
   if(lowerLandingExName !== 'Squat') throw new Error('expected Lower Body to still default to Squat with Preseason Prep on, got: ' + lowerLandingExName);
   if(await page.locator('.pill').filter({ hasText: /Box Jumps/ }).count() !== 1) throw new Error('expected a single Box Jumps pill on Lower Body (squat day)');
   if(await page.locator('.pill').filter({ hasText: /Lateral Lunge/ }).count() !== 1) throw new Error('expected Lateral Lunge pill on Lower Body (squat day)');
-  if(await page.locator('.pill').filter({ hasText: /Skater Bound/ }).count() !== 1) throw new Error('expected Skater Bound pill on Lower Body (moved from Full Body - it is quad/glute-med dominant, not hinge-pattern)');
+  // Skater Bound and Trap Bar Jump join in preseason week 3; the block was just switched on (week 1).
+  if(await page.locator('.pill').filter({ hasText: /Skater Bound|Trap Bar Jump/ }).count() !== 0) throw new Error('expected the week-3 additions hidden in preseason week 1');
+  await page.evaluate(() => { skiPhase.startedOn = shiftISO(todayISO(), -15); render(); });
+  if(await page.locator('.pill').filter({ hasText: /Skater Bound/ }).count() !== 1) throw new Error('expected Skater Bound pill on Lower Body from preseason week 3');
   if(await page.locator('.pill').filter({ hasText: /Spanish Squat/ }).count() !== (await page.evaluate(() => modes.knee) ? 1 : 0)) throw new Error('expected Spanish Squat on Lower Body only as the Knee Care bridge');
   console.log('OK: preseason pills are grouped by movement pattern with each day\'s main lift, not spread evenly; opening a tab still lands on its original main lift');
 
@@ -1036,7 +1042,7 @@ async function main(){
   await page.click('.tab:has-text("Extra")');
   await page.click('.group-chip:has-text("Strength")');
   if(await page.locator('.pill').filter({ hasText: /Spanish Squat/ }).count() !== 1) throw new Error('expected Spanish Squat to stay on Extra with Preseason Prep off');
-  await page.evaluate((was) => { modes.knee = was; toggleMode('preseason'); }, kneeBeforeSpanish);
+  await page.evaluate((was) => { modes.knee = was; toggleMode('preseason'); skiPhase.startedOn = shiftISO(todayISO(), -15); render(); }, kneeBeforeSpanish);
   console.log('OK: Copenhagen Plank and Spanish Squat live on Extra; Spanish Squat is no longer a preseason lift');
 
   console.log('=== 42b: power exercises are visually bumped to the front of the pill row while Preseason Prep is on ===');
@@ -1066,7 +1072,11 @@ async function main(){
   await page.click('.tab:has-text("Lower Body")');
   await page.locator('.pill').filter({ hasText: /Skater Bound/ }).click();
   const week3Note = await page.locator('.preseason-line').textContent();
-  if(!week3Note.includes('Add from week 3')) throw new Error('expected a "add from week 3" note on Skater Bound, got: ' + week3Note);
+  // Preseason is in week 3 here, so the "Add from week 3" reminder has done its job.
+  if(week3Note.includes('Add from week 3')) throw new Error('expected no "add from week 3" note once preseason reaches week 3, got: ' + week3Note);
+  const earlyNote = await page.evaluate(() => { const s = skiPhase.startedOn; skiPhase.startedOn = undefined; const prev = data['Skater Bound']; const div = document.createElement('div');
+    div.innerHTML = renderExerciseCard('Skater Bound', data['Skater Bound'] || newExerciseShell('Skater Bound')); skiPhase.startedOn = s; return (div.querySelector('.preseason-line') || {}).textContent || ''; });
+  if(!/Add from week 3/.test(earlyNote) && await page.evaluate(() => preseasonWeek() == null)) throw new Error('expected the week-3 note while the preseason week is unknown, got: ' + earlyNote);
   if(await page.locator('.knee-badge').count() !== 1) throw new Error('expected Skater Bound to carry a Knee Care badge alongside its Preseason badge');
   if(await page.locator('.preseason-badge').count() !== 1) throw new Error('expected Skater Bound to still carry its Preseason badge alongside the Knee Care badge');
   await page.locator('.pill').filter({ hasText: /Box Jumps/ }).click();
@@ -1084,7 +1094,7 @@ async function main(){
   if(!coreListWithPreseasonOn.includes('Med Ball Slam')) throw new Error('expected Med Ball Slam to always count toward the Upper Body core list');
 
   await page.click('.tab:has-text("Overview")');
-  await page.click('button:has-text("Preseason Prep: ON")'); // turn it off
+  await page.click('.seg-btn.off'); // turn it off
   await sleep(150);
   const coreListWithPreseasonOff = await page.evaluate(() => DAY_ORDER.upper);
   if(!coreListWithPreseasonOff.includes('Med Ball Slam')) throw new Error('expected Med Ball Slam to still count toward the Upper Body core list with Preseason Prep off - DAY_ORDER is fixed and toggle-independent');
@@ -1286,7 +1296,7 @@ async function main(){
 
   console.log('=== 49: preseason-flagged pills get a light purple background, and a darker purple when active ===');
   await page.click('.tab:has-text("Overview")');
-  await page.click('button:has-text("Preseason Prep: OFF")'); // scenario 44 left this off
+  await page.click('.seg-btn.preseason'); // scenario 44 left this off
   await sleep(150);
   await page.click('.tab:has-text("Full Body")');
   const kbPillClass = await page.locator('.pill').filter({ hasText: /Seated Calf Raise/ }).getAttribute('class');
@@ -1307,7 +1317,7 @@ async function main(){
   console.log('OK: an active preseason pill renders a different (darker purple) background than a normal active pill:', kbBg, 'vs', nonPreseasonActiveBg);
 
   await page.click('.tab:has-text("Overview")');
-  await page.click('button:has-text("Preseason Prep: ON")');
+  await page.click('.seg-btn.off');
   await sleep(150);
   await page.click('.tab:has-text("Full Body")');
   // Squat always shows and carries preseason notes, so it's the one to check;
@@ -1331,7 +1341,7 @@ async function main(){
   console.log('OK: Date and Log Set sit on the same row for both a standard exercise and a duration-tracked one');
 
   console.log('=== 51: Cable Chest Fly progression is not permanently locked by one old miss buried in a same-weight streak ===');
-  await page.click('.tab:has-text("Full Body")');
+  await page.click('.tab:has-text("Upper Body")');
   await page.evaluate(() => {
     const mk = (i, reps) => ({ clientId: 'cf'+i, label: 'S'+i, date: '2026-08-'+(String(10+i).padStart(2,'0')), confirmed: true, weight: 50, sets: 3, reps, difficulty: 6, note: '' });
     data['Cable Chest Fly'] = { trackBy: 'weight', entries: [mk(1,6), mk(2,8), mk(3,8), mk(4,8), mk(5,8)] };
@@ -1482,7 +1492,7 @@ async function main(){
   // historical (non-today) dates to test the progression-lock fix. Log it
   // fresh today, then clear today's "already celebrated" flag and re-run
   // the check directly rather than re-logging all 11 exercises.
-  await page.click('.tab:has-text("Full Body")');
+  await page.click('.tab:has-text("Upper Body")');
   await page.locator('.pill').filter({ hasText: /Cable Chest Fly/ }).click();
   await sleep(150);
   await page.fill('#f-weight', '55');
@@ -1735,7 +1745,7 @@ async function main(){
   const modOrder = await page.evaluate(() => {
     const card = [...document.querySelectorAll('.card')].find(c => c.textContent.includes('Training Modifiers'));
     const t = card.textContent;
-    return { deload: t.indexOf('Deload Week'), ski: t.indexOf('Ski Season'), status: document.getElementById('deload-status').textContent };
+    return { deload: t.indexOf('Deload Week'), ski: t.indexOf('🎿 Ski'), status: document.getElementById('deload-status').textContent };
   });
   if(modOrder.deload < 0 || modOrder.deload > modOrder.ski) throw new Error('expected Deload Week to be the first modifier, got: ' + JSON.stringify(modOrder));
   if(!/No deload logged yet/.test(modOrder.status) || !/Next recommended/.test(modOrder.status)) throw new Error('expected deload status to show no prior deload and a next recommended date, got: ' + modOrder.status);
@@ -2484,7 +2494,7 @@ async function main(){
     toggleOverviewSection('modifiers'); toggleOverviewSection('change');
     return { open, closed, saved, reopened: state() };
   });
-  if(r80.open.mods !== 6 || r80.closed.mods !== 0 || r80.closed.bars !== 0 || r80.closed.summaries.length !== 2 || !/"modifiers":true/.test(r80.saved) || r80.reopened.mods !== 6 || r80.reopened.bars !== r80.open.bars)
+  if(r80.open.mods !== 5 || r80.closed.mods !== 0 || r80.closed.bars !== 0 || r80.closed.summaries.length !== 2 || !/"modifiers":true/.test(r80.saved) || r80.reopened.mods !== 5 || r80.reopened.bars !== r80.open.bars)
     throw new Error('expected both Overview sections to fold and unfold from their headings, got: ' + JSON.stringify(r80));
   console.log('OK: both sections fold to a one-line summary (' + r80.closed.summaries.join(' | ') + ') and come back; the choice is remembered');
 
@@ -2675,7 +2685,7 @@ async function main(){
     data = {
       // Logged every Upper session, so each reads as an Upper day.
       'Tricep Pushdown': Object.assign(newExerciseShell('Tricep Pushdown'), { entries: [e(d(-14)), ...S.map(n => e(d(n), n === -10 ? { deload: true } : {}))] }),
-      'Cable Lat Pulldown': Object.assign(newExerciseShell('Cable Lat Pulldown'), { entries: [e(d(-14))] }),
+      'Incline DB Press': Object.assign(newExerciseShell('Incline DB Press'), { entries: [e(d(-14))] }),
       'Bicep Curl': Object.assign(newExerciseShell('Bicep Curl'), { entries: [e(d(-14))] }),
       'Face Pulls': Object.assign(newExerciseShell('Face Pulls'), { entries: [e(d(-14))] }),
       'Cable Chest Fly': Object.assign(newExerciseShell('Cable Chest Fly'), { entries: [e(d(-14))] }),
@@ -2685,12 +2695,12 @@ async function main(){
     out.due = dueLifts();
     // Face Pulls: one of its three misses was the deload session, so 2 real misses: due.
     // Bicep Curl: 2 of 3 misses were skipped with a reason, so 1 real miss: not due.
-    // Lat Pulldown: missed all 3 Upper sessions after the deload one... the deload one doesn't count: 2.
+    // Incline DB Press: missed all 3 Upper sessions after the deload one... the deload one doesn't count: 2.
     modes.shoulder = true; shoulderRehab = { startedOn: d(-12), endedOn: null, phase3: false };
     out.dueRehab = Object.keys(dueLifts());
     modes.shoulder = false; shoulderRehab = {};
-    view = 'upper'; selected = 'Cable Lat Pulldown'; render();
-    const lat = [...document.querySelectorAll('.pill.due')].find(p => /Cable Lat Pulldown/.test(p.textContent));
+    view = 'upper'; selected = 'Incline DB Press'; render();
+    const lat = [...document.querySelectorAll('.pill.due')].find(p => /Incline DB Press/.test(p.textContent));
     out.pill = lat && lat.textContent;
     out.pillTitle = lat && lat.getAttribute('title');
     out.guide = guidancePools.flat().find(t => /^Due:/.test(t)) || null;
@@ -2701,12 +2711,12 @@ async function main(){
     return out;
   });
   const due86 = Object.keys(r86.due).sort();
-  const ok86 = JSON.stringify(due86) === JSON.stringify(['Cable Chest Fly', 'Cable Lat Pulldown', 'Face Pulls']) &&
-    r86.due['Cable Lat Pulldown'].missedSessions === 2 && !r86.dueRehab.includes('Cable Chest Fly') &&
-    /Cable Lat Pulldown/.test(r86.pill || '') && /missed its last 2 sessions/.test(r86.pillTitle || '') && /^Due: missed its last 2 sessions/.test(r86.guide || '') &&
-    /Due: .*Cable Lat Pulldown/.test(r86.notes) && Array.isArray(r86.coach) && r86.coach.some(l => l.name === 'Cable Lat Pulldown');
+  const ok86 = JSON.stringify(due86) === JSON.stringify(['Cable Chest Fly', 'Face Pulls', 'Incline DB Press']) &&
+    r86.due['Incline DB Press'].missedSessions === 2 && !r86.dueRehab.includes('Cable Chest Fly') &&
+    /Incline DB Press/.test(r86.pill || '') && /missed its last 2 sessions/.test(r86.pillTitle || '') && /^Due: missed its last 2 sessions/.test(r86.guide || '') &&
+    /Due: .*Incline DB Press/.test(r86.notes) && Array.isArray(r86.coach) && r86.coach.some(l => l.name === 'Incline DB Press');
   if(!ok86) throw new Error('expected due lifts with intentional skips, deload weeks and rehab pauses excluded, got: ' + JSON.stringify(r86));
-  console.log('OK: Lat Pulldown, Face Pulls and Fly are due; Bicep Curl (skipped for injury and equipment) is not; Fly is not due while Shoulder Rehab pauses it; dot, Next line, Coach\'s Notes and the coach payload all agree');
+  console.log('OK: Incline DB Press, Face Pulls and Fly are due; Bicep Curl (skipped for injury and equipment) is not; Fly is not due while Shoulder Rehab pauses it; dot, Next line, Coach\'s Notes and the coach payload all agree');
 
   console.log('=== 87: reps per set log as 8/8/6 and count as a miss; the Weekly Balance card compares pulling with pressing ===');
   const r87 = await page.evaluate(() => {
@@ -2734,7 +2744,7 @@ async function main(){
     out.next = computeSuggestion(data['Bench Press'], 'Bench Press').weight;
     out.equal = applyPerSet({ sets: 3, reps: 8 }, [8, 8, 8]);
     view = 'overview'; render();
-    out.balance = { ratio: (document.querySelector('.bal-ratio') || {}).textContent, rows: [...document.querySelectorAll('.bal-row .bal-name')].map(e => e.textContent) };
+    out.balance = { ratio: (document.querySelector('.bal-ratio') || {}).textContent, bars: [...document.querySelectorAll('.bal-row .bal-name')].map(e => e.textContent), rows: [...document.querySelectorAll('.bal-table tbody tr')].map(r => [...r.children].map(c => c.textContent).join(' ')), target: (document.querySelector('.bal-key') || {}).textContent };
     out.coach = buildWeeklyCoachPayload().weeklySets;
     out.notes = generateCoachNotes() || '';
     data = saved.data; Object.assign(modes, JSON.parse(saved.modes)); render();
@@ -2742,10 +2752,11 @@ async function main(){
   });
   const ok87 = r87.boxes === 4 && r87.boxes4 === 5 && r87.entry.sets === 3 && r87.entry.reps === 6 && JSON.stringify(r87.entry.by) === '[8,8,6]' && JSON.stringify(r87.entry.row) === '[8,8,6]' &&
     /155 lb 8\/8\/6/.test(r87.hist) && r87.next === 155 && r87.equal.repsBySet === undefined && r87.equal.reps === 8 &&
-    /Pull : push 0\.6 : 1/.test(r87.balance.ratio || '') && r87.balance.rows.join(',') === 'push,pull,squat' &&
+    /Last 4 weeks: 6 pulling sets and 10 pressing\. Aim for at least one pull set per press set: add about 1 pull set a week\./.test(r87.balance.ratio || '') &&
+    r87.balance.bars.join(',') === 'Pull,Push' && r87.balance.target === 'Pull target: 10 sets' && r87.balance.rows.join('|') === 'Push 7 2.5|Pull 3 1.5|Squat 3 0.8' &&
     r87.coach.pullToPushRatio4Weeks === 0.6 && r87.coach.thisWeek.push === 7 && !/moved up in weight/.test(r87.notes) && /Pulling is behind pressing/.test(r87.notes);
   if(!ok87) throw new Error('expected per-set reps and the weekly balance card to work, got: ' + JSON.stringify(r87));
-  console.log('OK: "8 8 6" logs as 3 sets at 6 (shown 8/8/6, synced, held at 155); Weekly Balance reads pull : push 0.6 : 1 with a nudge in Coach\'s Notes and the coach payload');
+  console.log('OK: "8 8 6" logs as 3 sets at 6 (shown 8/8/6, synced, held at 155); Weekly Balance reads 6 pulling sets to 10 pressing, target 10, with a nudge in Coach\'s Notes and the coach payload');
 
   console.log('=== 88: every modifier in the registry is complete, with a color in both themes ===');
   const reg = await page.evaluate(() => {
@@ -2887,6 +2898,51 @@ async function main(){
   const firstOk = r91.firstSync.sq['deleted-elsewhere'] === 8 && !('pending-delete' in r91.firstSync.sq);
   if(!sameOk || !firstOk || !r91.modes.knee) throw new Error('expected newest-edit-wins sync with guarded deletes, paging and JSON settings, got: ' + JSON.stringify(r91));
   console.log('OK: the newer edit wins either way, an edit waiting to sync is kept, a pending delete is not brought back, a synced entry deleted elsewhere is removed (not on a first sync), all 1100 older rows arrive, and Knee Care comes from the settings JSON');
+
+  console.log('=== 92: Ski is one setting with two phases: exclusive, dated, week 3 additions, and a prompt at the end of each phase ===');
+  const r92 = await page.evaluate(() => {
+    const saved = { modes: { ...modes }, phase: JSON.stringify(skiPhase), view, todayISO: window.todayISO };
+    const modal = document.getElementById('deload-modal');
+    const out = {};
+    MODE_DEFS.forEach(m => { modes[m.key] = false; }); skiPhase = {};
+    setSkiPhase('preseason');
+    out.pre = [modes.preseason, modes.ski, skiPhase.phase, skiPhase.startedOn === todayISO(), preseasonWeek()];
+    out.week1Lower = activeDayOrder('lower').includes('Skater Bound');
+    skiPhase.startedOn = shiftISO(todayISO(), -16);
+    out.week3 = [preseasonWeek(), activeDayOrder('lower').includes('Skater Bound')];
+    view = 'overview'; overviewCollapsed.modifiers = false; render();
+    out.status = document.querySelector('.ski-status').textContent;
+    out.pressed = [...document.querySelectorAll('.seg-btn')].map(b => b.getAttribute('aria-pressed')).join(',');
+    setSkiPhase('season');
+    out.season = [modes.preseason, modes.ski, skiPhase.phase];
+    toggleMode('preseason');
+    out.toggled = [modes.preseason, modes.ski];
+    // After 10 weeks of preseason the app offers In season; "Not yet" waits a week.
+    skiPhase.startedOn = shiftISO(todayISO(), -75); modal.hidden = true;
+    checkSkiPhasePrompt();
+    out.prompt = !modal.hidden && /Switch to In season/.test(modal.textContent);
+    snoozeSkiPrompt(7); checkSkiPhasePrompt();
+    out.snoozed = modal.hidden;
+    skiPhase.snoozeUntil = null; checkSkiPhasePrompt();
+    skiPromptAnswer('season');
+    out.answered = [modes.ski, modes.preseason, modal.hidden];
+    // In season during spring: offer Off.
+    window.todayISO = () => new Date().getFullYear() + '-05-01';
+    modal.hidden = true; checkSkiPhasePrompt();
+    out.spring = !modal.hidden && /Turn Ski off/.test(modal.textContent);
+    modal.hidden = true; window.todayISO = saved.todayISO;
+    out.synced = JSON.parse(JSON.stringify({ ski: skiPhase })).ski.phase;
+    skiPhase = JSON.parse(saved.phase); saveSkiPhase();
+    MODE_DEFS.forEach(m => setModeFlag(m.key, !!saved.modes[m.key]));
+    view = saved.view; render();
+    return out;
+  });
+  const ok92 = JSON.stringify(r92.pre) === JSON.stringify([true, false, 'preseason', true, 1]) && !r92.week1Lower &&
+    JSON.stringify(r92.week3) === JSON.stringify([3, true]) && /^Week 3 of 10, since /.test(r92.status) && r92.pressed === 'false,true,false' &&
+    JSON.stringify(r92.season) === JSON.stringify([false, true, 'season']) && JSON.stringify(r92.toggled) === JSON.stringify([true, false]) &&
+    r92.prompt && r92.snoozed && JSON.stringify(r92.answered) === JSON.stringify([true, false, true]) && r92.spring && r92.synced === 'season';
+  if(!ok92) throw new Error('expected one Ski setting with exclusive, dated phases and phase-end prompts, got: ' + JSON.stringify(r92));
+  console.log('OK: Preseason and In season never run together, preseason counts its weeks and adds Skater Bound in week 3, offers In season after 10 weeks (snoozable) and Off in spring');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

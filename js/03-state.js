@@ -135,6 +135,50 @@ function saveShoulderRehab(){
   try{ window.localStorage.setItem(SHOULDER_REHAB_KEY, JSON.stringify(shoulderRehab)); }catch(e){}
 }
 
+// Ski: one setting with two phases, Preseason (the ramp into the season) and In season. They are
+// stored as the two modes "preseason" and "ski", which never run together, so everything reading
+// modes.preseason / modes.ski keeps working. The phase record dates the block for its week count,
+// the week-3 additions and the end-of-block prompt.
+const SKI_PHASE_KEY = "strength-tracker-ski-phase";
+const PRESEASON_WEEKS = 10;
+let skiPhase = (function(){
+  try{ return JSON.parse(window.localStorage.getItem(SKI_PHASE_KEY)) || {}; }catch(e){ return {}; }
+})();
+function saveSkiPhase(){
+  try{ window.localStorage.setItem(SKI_PHASE_KEY, JSON.stringify(skiPhase)); }catch(e){}
+}
+function currentSkiPhase(){ return modes.preseason ? "preseason" : modes.ski ? "season" : "off"; }
+// When the current phase began: its record, or for a preseason switched on before records existed,
+// the first preseason session in the last four months.
+function skiPhaseStart(){
+  if(skiPhase.startedOn && skiPhase.phase === currentSkiPhase()) return skiPhase.startedOn;
+  if(!modes.preseason) return null;
+  const since = shiftISO(todayISO(), -120);
+  let first = null;
+  Object.entries(data).forEach(([n, ex]) => ex.entries.forEach(e => {
+    if(e.date >= since && (e.preseason || PRESEASON_ONLY.has(n)) && (!first || e.date < first)) first = e.date;
+  }));
+  return first;
+}
+function preseasonWeek(){
+  const start = modes.preseason ? skiPhaseStart() : null;
+  return start ? Math.floor(Math.max(0, daysBetween(start, todayISO())) / 7) + 1 : null;
+}
+function setModeFlag(key, on){
+  const def = MODE_DEFS.find(m => m.key === key);
+  modes[key] = on;
+  try{ window.localStorage.setItem(def.storageKey, on ? "1" : "0"); }catch(e){}
+}
+function setSkiPhase(phase){
+  if(phase === currentSkiPhase()) return;
+  setModeFlag("preseason", phase === "preseason");
+  setModeFlag("ski", phase === "season");
+  skiPhase = phase === "off" ? { ...skiPhase, phase: "off", endedOn: todayISO(), snoozeUntil: null } : { phase, startedOn: todayISO(), snoozeUntil: null };
+  saveSkiPhase();
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  render();
+}
+
 // The deload record follows what was actually logged. With Deload Week off, a recorded window
 // holding no deload sessions (a quick on/off, or an older bad record) is replaced: by the record it
 // overwrote when that one is still backed by sessions, or else by the latest run of deload-tagged
@@ -160,6 +204,8 @@ function repairDeloadDates(){
 }
 
 function toggleMode(key){
+  // The two ski phases go through setSkiPhase, which keeps them exclusive and dates the phase.
+  if(key === "preseason" || key === "ski") return setSkiPhase(modes[key] ? "off" : key === "preseason" ? "preseason" : "season");
   const def = MODE_DEFS.find(m => m.key === key);
   modes[key] = !modes[key];
   try{ window.localStorage.setItem(def.storageKey, modes[key] ? "1" : "0"); }catch(e){}

@@ -15,7 +15,7 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
 window.addEventListener("online", () => { renderSyncStatus(); flushQueue(); });
 window.addEventListener("offline", () => { renderSyncStatus(); });
 document.addEventListener("visibilitychange", () => {
-  if(document.visibilityState === "visible"){ checkRestTimerCompletion(); checkDeloadAutoEnd(); refreshHeartRate(); }
+  if(document.visibilityState === "visible"){ checkRestTimerCompletion(); checkDeloadAutoEnd(); checkSkiPhasePrompt(); refreshHeartRate(); }
 });
 
 // The Next tile's guidance lines depend on the font; refit once the web font is in.
@@ -30,4 +30,4 @@ render();
 if(repairDeloadDates()) render();
 ensureDeloadNotes();
 ensureRehabNotes();
-checkDeloadAutoEnd();
+checkDeloadAutoEnd(); checkSkiPhasePrompt();

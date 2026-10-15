@@ -144,6 +144,19 @@ test("trend line for the coach is one short sentence", () => {
   const t = { pattern: "squat", e1rmChange4WeeksPct: 3.2, sessionsAtCurrentLoad: 3, rpeAtCurrentLoad: [7, 7, 8], sessionsLast4Weeks: 6 };
   eq(run(`trendText(${JSON.stringify(t)})`), "squat; e1RM +3.2% in 4 wk; 3 sessions at this load, RPE 7 7 8; 6 sessions in 4 wk", "trend");
 });
+test("day lists: about 7 lifts each, Back Extension on Full and Upper, Lat Pulldown on Full", () => {
+  reset();
+  eq(run(`activeDayOrder("full")`), ["Squat", "Bench Press", "RDL", "Barbell Row", "Cable Lat Pulldown", "Face Pulls", "Back Extension"], "full");
+  eq(run(`activeDayOrder("upper")`), ["Bench Press", "Incline DB Press", "Cable Chest Fly", "Barbell Row", "Face Pulls", "Bicep Curl", "Tricep Pushdown", "Back Extension"], "upper");
+});
+test("ski phases are exclusive and preseason adds its week-3 lifts in week 3", () => {
+  reset(); run(`skiPhase = {}; setSkiPhase("preseason");`);
+  eq(run(`[modes.preseason, modes.ski, preseasonWeek(), activeDayOrder("lower").includes("Trap Bar Jump")]`), [true, false, 1, false], "week 1");
+  run(`skiPhase.startedOn = shiftISO(todayISO(), -14);`);
+  eq(run(`[preseasonWeek(), activeDayOrder("lower").includes("Trap Bar Jump")]`), [3, true], "week 3");
+  run(`setSkiPhase("season");`);
+  eq(run(`[modes.preseason, modes.ski]`), [false, true], "in season");
+});
 test("modifier registry rows are complete", () => {
   const bad = run(`MODE_DEFS.filter(m => !m.key || !m.storageKey || !m.name || !m.tag || !["light", "block"].includes(m.tag.kind) || typeof m.applies !== "function").map(m => m.key)`);
   eq(bad, [], "incomplete rows");

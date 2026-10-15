@@ -284,7 +284,7 @@ async function runOp(op){
     const { error } = await supabaseClient.from("user_settings").upsert({
       user_id: userId,
       // The JSON field is the source of truth; the per-mode columns are kept for older app versions.
-      settings: { modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), deload: deloadRecord, shoulderRehab: rehabRecord },
+      settings: { modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), deload: deloadRecord, shoulderRehab: rehabRecord, ski: skiPhase },
       ...Object.fromEntries(MODE_DEFS.filter(m => m.column).map(m => [m.column, modes[m.key]])),
       deload_started_on: deloadDates.startedOn || null,
       deload_ended_on: deloadDates.endedOn || null,
@@ -476,6 +476,10 @@ async function pullRemoteAndMerge(){
   }
   const savedRehab = saved.shoulderRehab && saved.shoulderRehab.startedOn ? saved.shoulderRehab
     : settingsRow && settingsRow.shoulder_rehab_started_on ? { startedOn: settingsRow.shoulder_rehab_started_on, endedOn: settingsRow.shoulder_rehab_ended_on, phase3: settingsRow.shoulder_rehab_phase3 } : null;
+  if(saved.ski && saved.ski.phase && !skiPhase.phase){
+    skiPhase = saved.ski;
+    saveSkiPhase();
+  }
   if(savedRehab && !shoulderRehab.startedOn){
     shoulderRehab = { startedOn: savedRehab.startedOn, endedOn: savedRehab.endedOn || null, phase3: !!savedRehab.phase3 };
     saveShoulderRehab();
@@ -505,6 +509,7 @@ async function pullRemoteAndMerge(){
   persist();
   render();
   checkDeloadAutoEnd();
+  checkSkiPhasePrompt();
 }
 
 function reconcileAllToQueue(){

@@ -342,7 +342,7 @@ function renderExerciseCard(name, ex){
     modHtml += `<div class="preseason-line">Preseason tempo: ${ex.preseasonTempo} · target ${ex.targetRepsPreseason} reps</div>`;
   }
   if(preseasonActive && ex.preseasonNote){
-    modHtml += `<div class="preseason-line">${ex.preseasonNote}${ex.preseasonWeek3 ? ' <b>Add from week 3.</b>' : ''}</div>`;
+    modHtml += `<div class="preseason-line">${ex.preseasonNote}${ex.preseasonWeek3 && !(preseasonWeek() >= 3) ? ' <b>Add from week 3.</b>' : ''}</div>`;
   }
 
   let html = `<div class="card${mods.filter(m => m.key !== "deload").map(m => ` ${m.key}-mode`).join("")}">`;

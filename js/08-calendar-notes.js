@@ -284,7 +284,7 @@ function generateCoachNotes(){
   }
   const bal = weeklyBalance();
   if(bal.ratio != null && bal.ratio < bal.target){
-    sentences.push(`Pulling is behind pressing (${bal.ratio} : 1 over 4 weeks, target ${bal.target} : 1): about ${bal.short} more pull set${bal.short === 1 ? "" : "s"} a week evens it out.`);
+    sentences.push(`Pulling is behind pressing: ${bal.pull} pull sets to ${bal.push} press over 4 weeks. About ${bal.short} more pull set${bal.short === 1 ? "" : "s"} a week evens it out.`);
   }
   const dueNow = Object.keys(dueLifts());
   if(dueNow.length){
