@@ -286,6 +286,7 @@ function buildSessionCoachPayload(date){
       name,
       today: compactEntry(ex.entries[idx], ex),
       targetReps: ex.trackBy === "weight" ? effectiveTargetReps(ex) : null,
+      repRange: activeRepRange(ex) ? ex.repRange : undefined,
       history: ex.entries.slice(Math.max(0, idx - 8), idx).map(e => compactEntry(e, ex)),
       appSuggestion: describeSuggestion(ex, name),
       trend: liftTrend(name, ex, date),

@@ -202,22 +202,31 @@ const EXERCISE_DEFAULTS = {
     targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell",
     preseason: true, targetRepsPreseason: 5, preseasonTempo: "4 sec lowering",
   },
-  "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec eccentric descent per leg" },
+  "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec eccentric descent per leg", repRange: "8-12" },
   "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec controlled descent each step" },
   "Bench Press": { equipment: "barbell" },
   "RDL": { equipment: "barbell" },
   "Hip Thrust": { equipment: "barbell", targetReps: 10 },
   "Barbell Row": { equipment: "barbell" },
-  "Back Extension": { trackBy: "weight", autoloadLastReps: true },
+  "Back Extension": { trackBy: "weight", autoloadLastReps: true, repRange: "10-15" },
+  // Accessories progress by reps inside a range before adding weight (double progression): +5 lb is
+  // 3% on a squat but a third of a light dumbbell, so these earn it at the top of the range.
+  "Incline DB Press": { repRange: "8-12" },
+  "Cable Chest Fly": { repRange: "10-15" },
+  "Face Pulls": { repRange: "12-15" },
+  "Cable Lat Pulldown": { repRange: "8-12" },
+  "Bicep Curl": { repRange: "8-12" },
+  "Tricep Pushdown": { repRange: "10-15" },
+  "Lateral Raise": { repRange: "12-15" },
   "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb, keep building load." },
   "Kettlebell Swings": { maxWeight: 35, preseason: true, preseasonPower: true, preseasonNote: "Power: do this first. 4x10 at 35 lb; add reps, then go single-arm." },
-  "Standing Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15, loaded. Log the total: both dumbbells added together, or the bar." },
+  "Standing Calf Raise": { trackBy: "weight", targetReps: 15, repRange: "12-20", preseason: true, preseasonNote: "3x15, loaded. Log the total: both dumbbells added together, or the bar." },
   "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down, never jump down; stop if speed drops. Gentler: slow 3 sec step-down." },
   "Med Ball Slam": { trackBy: "weight", targetReps: 6, preseason: true, preseasonPower: true, preseasonNote: "3x6, 10-15 lb. Stop if speed drops." },
   "Lateral Lunge": { trackBy: "weight", targetReps: 8, preseason: true, preseasonNote: "3x8 per side, bodyweight up to 30 lb DB." },
   "Copenhagen Plank": { trackBy: "reps", unit: "sec", targetReps: 20, preseason: true, preseasonNote: "3x20 sec per side, adductors." },
   "Dead Hang": { trackBy: "reps", unit: "sec", targetReps: 45 },
-  "Seated Calf Raise": { trackBy: "weight", targetReps: 15, preseason: true, preseasonNote: "3x15, soleus for boot control." },
+  "Seated Calf Raise": { trackBy: "weight", targetReps: 15, repRange: "12-20", preseason: true, preseasonNote: "3x15, soleus for boot control." },
   "Trap Bar Jump": { trackBy: "weight", targetReps: 3, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "4x3 @ 95-135 lb. Stop if speed drops." },
   "Skater Bound": { trackBy: "reps", targetReps: 4, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "3x4 per side, stick each landing 2 sec." },
   "Spanish Squat": { trackBy: "reps", targetReps: 10, preseason: false, preseasonWeek3: false },
@@ -301,7 +310,7 @@ Object.entries(EXERCISE_DEFAULTS).forEach(([exName, preset]) => {
 // locally before this default existed: purely additive metadata that never
 // reinterprets anything already logged (unlike trackBy/trackDistance, which
 // would misrepresent already-logged weight/sets/reps entries if changed).
-const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps"];
+const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange"];
 // These preseason fields are pure app-authored copy: never synced to
 // Supabase (see exerciseToRow, which has no preseason_* columns) and
 // never user-editable through any UI. Unlike the rest of BACKFILL_KEYS,
@@ -310,7 +319,7 @@ const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "target
 // otherwise a later wording or number edit (e.g. dropping a knee-specific
 // load reduction once the knee wasn't an issue anymore) would silently
 // never reach anyone who already had the exercise locally.
-const ALWAYS_SYNC_KEYS = ["preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps"];
+const ALWAYS_SYNC_KEYS = ["preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
 }
@@ -342,6 +351,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v95";
+const APP_VERSION = "v96";
 const APP_UPDATED = "Oct 14, 2026";
 

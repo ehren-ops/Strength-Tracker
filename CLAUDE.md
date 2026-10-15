@@ -41,6 +41,9 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   pick kind light or block), an Overview row (09), CSS color tokens (light and dark).
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
+- Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double
+  progression (add a rep, add weight once every set reaches the top). Read targets through
+  `effectiveTargetReps` / `activeRepRange` (03), never `ex.targetReps` directly.
 - Render is a full `innerHTML` rebuild on every change; keep helpers pure and cheap.
 
 ## Commands

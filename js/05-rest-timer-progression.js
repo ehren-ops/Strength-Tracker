@@ -477,6 +477,17 @@ function computeSuggestionCore(ex, name){
     const requiredStreak = ex.conservative ? 2 : 1;
     const hitTarget = last.reps >= targetReps;
     let readyToProgress = streak >= requiredStreak;
+    // Rep range: weight goes up only once every set reaches the top; until then, one more rep.
+    const range = activeRepRange(ex);
+    if(range){
+      let atTop = 0;
+      for(let i = ex.entries.length - 1; i >= 0; i--){
+        const e = ex.entries[i];
+        if(e.weight !== last.weight || e.reps < range[1]) break;
+        atTop++;
+      }
+      readyToProgress = atTop >= requiredStreak;
+    }
     let difficultyNote = null;
 
     if(last.difficulty){
@@ -514,7 +525,8 @@ function computeSuggestionCore(ex, name){
     return {
       weight: readyToProgress ? last.weight + increment : last.weight,
       sets: last.sets,
-      reps: targetReps,
+      reps: !range ? targetReps : readyToProgress ? range[0] : hitTarget ? Math.min(range[1], last.reps + 1) : range[0],
+      range,
       hitTarget,
       readyToProgress,
       streak,

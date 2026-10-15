@@ -1840,7 +1840,7 @@ async function main(){
     const mk = (name, rows) => Object.assign(newExerciseShell(name), { entries: rows.map((r, i) => ({ clientId: name + i, date: day(r[0]), weight: r[1], sets: r[2] || 3, reps: r[3] || 8, difficulty: 7, deload: r[4] || undefined, label: 'x' })) });
     const out = {};
     // after a deload: press holds, a non-press adds
-    data = { 'Cable Chest Fly': mk('Cable Chest Fly', [[-9, 60, 3, 12], [-2, 40, 2, 12, true]]), 'Seated Calf Raise': mk('Seated Calf Raise', [[-9, 95, 3, 15], [-2, 90, 2, 15, true]]) };
+    data = { 'Cable Chest Fly': mk('Cable Chest Fly', [[-9, 60, 3, 15], [-2, 40, 2, 15, true]]), 'Seated Calf Raise': mk('Seated Calf Raise', [[-9, 95, 3, 20], [-2, 90, 2, 20, true]]) };
     data['Cable Chest Fly'].targetReps = 12; data['Seated Calf Raise'].targetReps = 15;
     const fly = computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly'), calf = computeSuggestion(data['Seated Calf Raise'], 'Seated Calf Raise');
     out.fly = [fly.weight, !!fly.postDeloadHold]; out.calf = calf.weight;
@@ -1867,6 +1867,21 @@ async function main(){
   });
   if(JSON.stringify(comeback) !== JSON.stringify({ fly: [60, true], calf: 100, hard: [235, 'last full session was RPE 8', 135, null], ramp: [162.5, 1, 170, 180], skipped: false })) throw new Error('expected press hold after deload and a 90/95/100% ramp after time off, got: ' + JSON.stringify(comeback));
   console.log('OK: after a deload pressing lifts hold (fly 60) while others add (calf 100); after 20 days off squat ramps 162.5, 170, 180; a skipped lift is not a break');
+  // Accessory rep ranges: add a rep inside the range, add weight once every set reaches the top.
+  const ranged = await page.evaluate(() => {
+    const savedData = data, savedModes = { ...modes };
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const day = n => shiftISO(todayISO(), n);
+    const at = rows => Object.assign(newExerciseShell('Cable Chest Fly'), { entries: rows.map((r, i) => ({ clientId: 'rr' + i, date: day(r[0]), weight: r[1], sets: 3, reps: r[2], difficulty: 7, label: 'x' })) });
+    const run = rows => { data = { 'Cable Chest Fly': at(rows) }; const s = computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly'); return [s.weight, s.reps, !!s.readyToProgress]; };
+    const out = { range: activeRepRange(newExerciseShell('Cable Chest Fly')), mid: run([[-3, 50, 12]]), top: run([[-3, 50, 15]]), under: run([[-3, 50, 9]]) };
+    modes.preseason = true; out.preseasonRange = activeRepRange(Object.assign(newExerciseShell('Cable Chest Fly'), { targetRepsPreseason: 6 }));
+    data = savedData; Object.assign(modes, savedModes);
+    return out;
+  });
+  if(JSON.stringify(ranged) !== JSON.stringify({ range: [10, 15], mid: [50, 13, false], top: [55, 10, true], under: [50, 10, false], preseasonRange: null }))
+    throw new Error('expected double progression inside 10-15 for the fly, got: ' + JSON.stringify(ranged));
+  console.log('OK: fly in a 10-15 range holds 50 and aims for 13 after 12 reps, adds to 55 and drops to 10 reps at 15, holds at 10 after a miss; a preseason rep target overrides the range');
   await page.click('.tab:has-text("Overview")');
   await page.click('button:has-text("Deload Week: ON")');
   await sleep(150);
@@ -2058,7 +2073,7 @@ async function main(){
     return { bss: read('Bulgarian Split Squat'), squat: read('Squat'), fly: read('Cable Chest Fly'), copen: read('Copenhagen Plank'),
       walk: read('Walking Lunge'), lateral: read('Lateral Lunge'), walkUnits: sidesText('Walking Lunge') };
   });
-  if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lb\/hand · 3x8\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
+  if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lb\/hand · 3x9\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
   if(!sides.squat.labels.includes('Lb total') || !/^\d+ lb · 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
   if(!sides.fly.labels.includes('Lb / hand')) throw new Error('expected Cable Chest Fly labeled per hand (each stack), got: ' + JSON.stringify(sides.fly));
   if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
@@ -2419,9 +2434,9 @@ async function main(){
 
     toggleMode('shoulder');
     const f1 = computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly');
-    data['Cable Chest Fly'].entries.push({ clientId: 'r79-fly2', date: today, confirmed: true, weight: f1.weight, sets: 3, reps: 8 });
+    data['Cable Chest Fly'].entries.push({ clientId: 'r79-fly2', date: today, confirmed: true, weight: f1.weight, sets: 3, reps: 10 });
     const f2 = computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly');
-    out.ret = { w1: f1.weight, s1: f1.shoulderReturn && f1.shoulderReturn.step, w2: f2.weight, s2: f2.shoulderReturn && f2.shoulderReturn.step, bench: computeSuggestion(data['Bench Press'], 'Bench Press').weight, endedOn: shoulderRehab.endedOn === today };
+    out.ret = { w1: f1.weight, s1: f1.shoulderReturn && f1.shoulderReturn.step, w2: f2.weight, s2: (f2.shoulderReturn || f2.reentry || {}).step, bench: computeSuggestion(data['Bench Press'], 'Bench Press').weight, endedOn: shoulderRehab.endedOn === today };
     view = 'upper'; selected = 'Bench Press'; render();
     out.afterOff = { first: pills()[0], rehabPill: !!document.querySelector('.pill.rehab-pill') };
 

@@ -159,13 +159,24 @@ function toggleMode(key){
 
 // The target a logged set was meant to hit: the preseason target when it was logged with Preseason
 // Prep on, otherwise the normal one. Charts and notes judge history with this, not the current mode.
+// An accessory's rep range ("10-15" as [10, 15]) while no modifier sets a fixed target instead.
+function activeRepRange(ex){
+  if(!ex || !ex.repRange) return null;
+  if((modes.preseason && ex.targetRepsPreseason) || (modes.ski && ex.targetRepsSki)) return null;
+  const m = String(ex.repRange).match(/^(\d+)-(\d+)$/);
+  return m ? [Number(m[1]), Number(m[2])] : null;
+}
 function entryTargetReps(ex, entry){
   if(entry && entry.preseason && ex.targetRepsPreseason) return ex.targetRepsPreseason;
-  return ex.targetReps || 8;
+  const m = ex.repRange && String(ex.repRange).match(/^(\d+)-/);
+  return m ? Number(m[1]) : (ex.targetReps || 8);
 }
+// The reps a session must reach to count as hit: the bottom of an accessory's range, else the target.
 function effectiveTargetReps(ex){
   if(modes.preseason && ex.targetRepsPreseason) return ex.targetRepsPreseason;
-  return (modes.ski && ex.targetRepsSki) ? ex.targetRepsSki : (ex.targetReps || 8);
+  if(modes.ski && ex.targetRepsSki) return ex.targetRepsSki;
+  const range = activeRepRange(ex);
+  return range ? range[0] : (ex.targetReps || 8);
 }
 
 function loadSaved(){

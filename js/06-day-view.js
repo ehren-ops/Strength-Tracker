@@ -387,6 +387,8 @@ function progressionRule(name, ex){
   const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;
   if(maxW) return `At ${maxW} lb, progress with reps, then single-arm.`;
   const inc = ex.increment || 5;
+  const range = activeRepRange(ex);
+  if(range) return `Add a rep each session; add ${inc} lb once every set reaches ${range[1]}.`;
   return ex.unit === "sec" ? `Add ${inc} lb once every hold reaches ${target} sec.` : `Add ${inc} lb once every set reaches ${target} ${repsWord(name)}.`;
 }
 function effortLine(ex){
@@ -600,7 +602,7 @@ function renderExerciseCard(name, ex){
         // When the prior session's actual reps beat the target, call that out by
         // name with the real number instead of flattening it to a plain "hit
         // target" - going over is a stronger, more specific signal than a bare hit.
-        const wentOverTarget = suggestion.hitTarget && !suggestion.deload && !suggestion.deloadWeek && work.reps > suggestion.reps;
+        const wentOverTarget = suggestion.hitTarget && !suggestion.range && !suggestion.deload && !suggestion.deloadWeek && work.reps > suggestion.reps;
         const actualAmt = ex.unit === "sec" ? `${work.reps} sec` : `${work.reps} reps`;
         const targetAmt = ex.unit === "sec" ? `${suggestion.reps} sec` : `${suggestion.reps} reps`;
         const hitLeadIn = wentOverTarget
@@ -661,6 +663,11 @@ function renderExerciseCard(name, ex){
           msg = `${hitLeadIn}, but rated 9-10: hold.`;
         } else if(suggestion.difficultyNote === "easy"){
           msg = `${hitLeadIn}, felt easy: add weight early.`;
+        } else if(suggestion.range && !suggestion.deloadWeek){
+          const [lo, hi] = suggestion.range;
+          msg = suggestion.readyToProgress ? `Top of the ${lo}-${hi} range: add weight, back to ${lo} reps.`
+            : suggestion.hitTarget ? `${work.reps} reps, inside ${lo}-${hi}: same weight, aim for ${suggestion.reps}.`
+            : `Under ${lo} reps: same weight, build back into ${lo}-${hi}.`;
         } else if(suggestion.readyToProgress){
           if(ex.conservative){
             msg = wentOverTarget
