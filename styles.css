@@ -171,6 +171,7 @@
   .onerm-label{display:inline;margin-right:0.35rem;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);white-space:nowrap;}
   .onerm-val{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.78rem;font-weight:600;color:var(--slate);white-space:nowrap;}
   .onerm-edit{display:flex;align-items:center;gap:0.25rem;}
+  .rep-record{cursor:default;}
   .onerm-edit input{width:58px;padding:0.2rem 0.35rem;border:1px solid var(--line);border-radius:5px;font-size:0.85rem;background:var(--input-bg);color:var(--ink);}
   .rec-box{margin-top:0.5rem;background:var(--rec-bg);border:1px solid var(--amber-light);border-radius:8px;padding:0.45rem 0.65rem 0.35rem;color:var(--rec-text);
     font-family:var(--font-body);box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;gap:0.15rem;}
@@ -244,6 +245,7 @@
   .hist-row.latest{background:var(--rec-bg);border-radius:4px;padding-left:0.3rem;margin-left:-0.3rem;}
   .hist-row.latest .exact{font-weight:600;}
   .latest-tag{font-family:var(--font-body);font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--amber);font-weight:700;}
+  .pr-tag{display:inline-block;margin-left:0.3rem;padding:0 0.25rem;border-radius:3px;font-family:var(--font-body);font-size:0.56rem;font-weight:700;letter-spacing:0.04em;vertical-align:1px;color:var(--emerald);border:1px solid color-mix(in srgb, var(--emerald) 45%, transparent);}
   .note{font-size:0.68rem;color:var(--amber);font-style:italic;margin-left:0.4rem;}
   .est{color:var(--amber-light);}
   .add-ex-row{display:flex;gap:0.4rem;margin-bottom:0.8rem;}

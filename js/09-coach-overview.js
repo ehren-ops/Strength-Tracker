@@ -31,6 +31,7 @@ function compactEntry(e, ex){
   if(e.difficulty) s += ` @${e.difficulty}`;
   if(e.note) s += ` "${String(e.note).slice(0, 100)}"`;
   if(e.deload) s += " [deload]";
+  else if(prFlags(ex)[ex.entries.indexOf(e)]) s += " [rep PR]";
   return s;
 }
 function describeSuggestion(ex, name){

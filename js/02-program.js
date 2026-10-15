@@ -47,6 +47,9 @@ const DAY_ORDER = {
 const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
 // Shown only while Knee Care is on: on Extra, and after the numbered lifts on Lower and Full Body.
 const KNEE_ONLY = new Set(["Spanish Squat"]);
+// The main barbell lifts. Only these show Est. 1RM on the card; everything else shows its rep
+// record, which is what an accessory actually progresses by.
+const COMPOUND_LIFTS = new Set(["Squat", "Bench Press", "RDL", "Barbell Row", "Hip Thrust"]);
 function activeDayOrder(day){
   return DAY_ORDER[day].filter(name => (modes.preseason || !PRESEASON_ONLY.has(name)) && (modes.knee || !KNEE_ONLY.has(name)));
 }
@@ -351,6 +354,6 @@ const TAB_ORDER = ["full","upper","lower","extra","overview"];
 // APP_VERSION was part of the habit). v23 picked up its count from this
 // file's git history (22 prior commits touching index.html at the time),
 // so it keeps counting forward rather than restarting at v1.
-const APP_VERSION = "v97";
+const APP_VERSION = "v98";
 const APP_UPDATED = "Oct 15, 2026";
 

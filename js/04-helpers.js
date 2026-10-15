@@ -183,6 +183,34 @@ function applyPerSet(entry, reps){
 function setsText(e, ex){
   return e.repsBySet && e.repsBySet.length > 1 ? e.repsBySet.join("/") + (ex.unit === "sec" ? " sec" : "") : repLabel(e.sets, e.reps, ex.unit);
 }
+// Rep records. A session is a rep PR when it beats the most reps (every set) ever done at that
+// weight or heavier; a new top weight is not flagged, or nearly every barbell session would be.
+// Lifts without weight compare reps (or seconds) alone. Deload sessions never count.
+function prFlags(ex){
+  if(ex.trackBy === "duration" || ex.trackBy === "checklist") return ex.entries.map(() => false);
+  const prior = [];
+  return ex.entries.map(e => {
+    let pr = false;
+    if(!e.deload && e.reps > 0){
+      const loaded = ex.trackBy === "weight" && e.weight > 0;
+      const at = loaded ? prior.filter(p => p.weight >= e.weight) : prior;
+      pr = at.length > 0 && e.reps > Math.max(...at.map(p => p.reps || 0));
+      prior.push(e);
+    }
+    return pr;
+  });
+}
+// The record to beat at a weight: the session with the most reps at that weight or heavier.
+function repRecord(ex, weight){
+  const loaded = ex.trackBy === "weight" && weight > 0;
+  let best = null;
+  ex.entries.forEach(e => {
+    if(e.deload || !(e.reps > 0) || (loaded && !(e.weight >= weight))) return;
+    if(!best || e.reps >= best.reps) best = e;
+  });
+  return best;
+}
+
 function formatEntryValue(e, ex){
   if(ex.trackBy === "weight") return `${e.weight} lb ${setsText(e, ex)}`;
   if(ex.trackBy === "duration"){

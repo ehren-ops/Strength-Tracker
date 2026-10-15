@@ -2763,6 +2763,35 @@ async function main(){
   if(reg.bad.length) throw new Error('expected every modifier row to be complete, got: ' + JSON.stringify(reg));
   console.log('OK: ' + reg.keys.join(', ') + ' each carry a name, badge, tag kind, rules and a color in both themes');
 
+  console.log('=== 89: rep PRs are flagged, accessories show their rep record instead of Est. 1RM, Coach\'s Notes skip what the cards say ===');
+  const r89 = await page.evaluate(() => {
+    const saved = JSON.stringify({ fly: data['Cable Chest Fly'], squat: data['Squat'] }), savedModes = { ...modes };
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const d = n => shiftISO(todayISO(), n);
+    const mk = (name, rows) => Object.assign(newExerciseShell(name), { entries: rows.map((r, i) => ({ clientId: 'p89' + name + i, date: d(r[0]), weight: r[1], sets: 3, reps: r[2], difficulty: 7, deload: r[3] || undefined })) });
+    const fly = mk('Cable Chest Fly', [[-20, 50, 12], [-15, 55, 10], [-10, 50, 11], [-5, 50, 13], [-3, 45, 14, true], [0, 50, 14]]);
+    const out = { flags: prFlags(fly), record: repRecord(fly, 50).reps, recordHeavier: repRecord(fly, 55).weight };
+    data['Cable Chest Fly'] = fly; modes.knee = true;
+    const card = name => { const div = document.createElement('div'); div.innerHTML = renderExerciseCard(name, data[name]); return div; };
+    let c = card('Cable Chest Fly');
+    out.flySlot = c.querySelector('.onerm-box').textContent.replace(/\s+/g, ' ').trim();
+    out.flyLabel = c.querySelector('.big-label').textContent;
+    out.chips = c.querySelectorAll('.pr-tag').length;
+    data['Squat'] = mk('Squat', [[-9, 175, 8], [-4, 175, 9]]);
+    c = card('Squat');
+    out.squatSlot = c.querySelector('.onerm-box').textContent.replace(/\s+/g, ' ').trim();
+    out.notes = generateCoachNotes() || '';
+    const restore = JSON.parse(saved);
+    ['Cable Chest Fly', 'Squat'].forEach((n, i) => { const v = i ? restore.squat : restore.fly; if(v) data[n] = v; else delete data[n]; });
+    Object.assign(modes, savedModes);
+    return out;
+  });
+  const ok89 = JSON.stringify(r89.flags) === JSON.stringify([false, false, false, true, false, true]) && r89.record === 14 && r89.recordHeavier === 55 &&
+    /^Most reps ?14 reps$/.test(r89.flySlot) && /Logged today ✓ · Rep PR/.test(r89.flyLabel) && r89.chips === 2 && /^Est\. 1RM/.test(r89.squatSlot) &&
+    /Rep PRs?: .*Cable Chest Fly \(14 at 50 lb\)/.test(r89.notes) && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
+  if(!ok89) throw new Error('expected rep PRs, the rep record slot and trimmed Coach\'s Notes, got: ' + JSON.stringify(r89));
+  console.log('OK: fly 3x13 and 3x14 at 50 lb are rep PRs (the deload and a new weight are not), the fly shows "Most reps 14", squat keeps Est. 1RM, and Coach\'s Notes lead with the PR and skip modifier lines');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

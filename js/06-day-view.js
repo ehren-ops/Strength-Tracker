@@ -209,6 +209,17 @@ function toggleConservative(name){
   render();
 }
 
+// Top right of the card: Est. 1RM on the main barbell lifts (and custom lifts, or any lift with a
+// tested 1RM); everything else shows its rep record at today's weight, the number it is chasing.
+function topRightSlot(name, ex, work, now, isCustom){
+  if(ex.trackBy === "weight" && (COMPOUND_LIFTS.has(name) || ex.actual1RM || isCustom)) return render1RMInline(name, ex, work);
+  if(ex.trackBy !== "weight" && ex.trackBy !== "reps") return "";
+  const loaded = ex.trackBy === "weight" && now.weight > 0;
+  const rec = repRecord(ex, loaded ? now.weight : 0);
+  const label = ex.unit === "sec" ? "Longest hold" : "Most reps";
+  const val = !rec ? "New weight" : `${rec.reps} ${ex.unit === "sec" ? "sec" : "reps"}${loaded && rec.weight !== now.weight ? ` at ${rec.weight} lb` : ""}`;
+  return `<div class="onerm-box rep-record"><span class="onerm-label">${label}</span><span class="onerm-val">${val}</span></div>`;
+}
 function start1RM(name){ editing1RM = name; render(); }
 function cancel1RM(){ editing1RM = null; render(); }
 function save1RM(name){
@@ -311,10 +322,10 @@ function guidanceHtml(msg, pool){
   pool.forEach(t => { if(t && parts.join(" ").length + t.length + 1 <= 105) parts.push(t); });
   return `<span data-gpool="${id}">${escapeHtml(parts.join(" "))}</span>`;
 }
-function composeGuidance(msg, name, ex, last, work){
+function composeGuidance(msg, name, ex, last, work, suggestion){
   return guidanceHtml(msg, [
     dueLine(name), lastSessionLine(ex, work), ...noteInsights(ex.entries), deloadSessionLine(ex, last), hrLine(name, last), ...trendLine(name, ex),
-    bestLine(ex, work), progressionRule(name, ex), effortLine(ex), daysSinceLine(last), LOG_TIMING_TIP, NOTE_TIP,
+    repRecordLine(name, ex, suggestion), bestLine(ex, work), progressionRule(name, ex), effortLine(ex), daysSinceLine(last), LOG_TIMING_TIP, NOTE_TIP,
   ]);
 }
 function firstSessionGuidance(name, ex){
@@ -367,6 +378,12 @@ function bestLine(ex, last){
   if(best === last || score(best) <= score(last)) return "";
   const what = ex.trackBy === "weight" && best.weight > 0 ? `${best.weight} lb, ${repLabel(best.sets, best.reps, ex.unit)}` : repLabel(best.sets, best.reps, ex.unit);
   return `Best: ${what} on ${fmtShortDate(best.date)}.`;
+}
+// Compound lifts keep Est. 1RM up top, so their rep record at today's weight rides in the tile.
+function repRecordLine(name, ex, s){
+  if(!s || ex.trackBy !== "weight" || !COMPOUND_LIFTS.has(name) || !(s.weight > 0) || s.deloadWeek) return "";
+  const rec = repRecord(ex, s.weight);
+  return rec ? `Rep PR at ${rec.weight} lb: ${rec.reps} reps, ${fmtShortDate(rec.date)}.` : "";
 }
 // How this lift moves up, in one line.
 function progressionRule(name, ex){
@@ -512,6 +529,7 @@ function renderExerciseCard(name, ex){
   // keeps the last day a full session was lifted, before today, so the two never get mixed up.
   const today = todayISO();
   const todayLog = recovery ? null : [...ex.entries].reverse().find(e => e.date === today) || null;
+  const prs = prFlags(ex);
   const prior = [...ex.entries].reverse().find(e => e.date < today && !e.deload) || null;
   // Just the weight; a tap adds the date, on every card, until tapped again.
   const priorHtml = prior && !recovery ? `<button type="button" class="last-line" onclick="toggleLastDate()" aria-pressed="${lastDateShown}" title="${fmtShortDate(prior.date)}">Last: ${shortValue(name, ex, prior)}${lastDateShown ? ` · ${fmtShortDate(prior.date)}` : ""}</button>` : "";
@@ -565,7 +583,7 @@ function renderExerciseCard(name, ex){
       : ex.trackBy==="duration" ? v.minutes+" min" + (v.tempF != null ? sideTag(` ${v.tempF}°F`) : "") : v.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
     let bigVal, bigLabel;
     if(recovery){ bigVal = bigOf(work); bigLabel = "Last"; }
-    else if(todayLog){ bigVal = bigOf(todayLog); bigLabel = "Logged today ✓"; }
+    else if(todayLog){ bigVal = bigOf(todayLog); bigLabel = "Logged today ✓" + (prs[ex.entries.lastIndexOf(todayLog)] ? ` · ${ex.unit === "sec" ? "Hold" : "Rep"} PR` : ""); }
     else if(suggestion && suggestion.shoulderPaused){ bigVal = "Paused"; bigLabel = "Today"; }
     else if(suggestion){ bigVal = bigOf(suggestion); bigLabel = "Today"; }
     else { bigVal = bigOf(work); bigLabel = "Last"; }
@@ -575,7 +593,7 @@ function renderExerciseCard(name, ex){
         <span class="big-val">${bigVal}</span>
         <span class="big-label${todayLog ? " locked" : ""}">${bigLabel}</span>
       </div>
-      ${ex.trackBy === "weight" ? render1RMInline(name, ex, work) : ''}
+      ${topRightSlot(name, ex, work, todayLog || suggestion || work, isCustom)}
     </div>`;
     html += modHtml;
 
@@ -687,7 +705,7 @@ function renderExerciseCard(name, ex){
       if(todayLog) headline = `Next time: ${nextLabel}`;
       else if(suggestion.shoulderPaused) headline = "Paused today";
       else headline = [planShape(name, ex, suggestion), stepText(ex, suggestion, prior)].filter(Boolean).join(" · ");
-      recHtml = renderNextTile(headline, ex, composeGuidance(msg, name, ex, last, work), suggestion.shoulderPaused ? "No load today" : loadText(name, ex, suggestion));
+      recHtml = renderNextTile(headline, ex, composeGuidance(msg, name, ex, last, work, suggestion), suggestion.shoulderPaused ? "No load today" : loadText(name, ex, suggestion));
     }
 
     // Recovery: this week's total and the last session instead of a plan and a graph.
@@ -709,14 +727,14 @@ function renderExerciseCard(name, ex){
     const histColLabel = recovery ? "Session" : ex.trackBy==="duration" ? "Cardio" : ex.trackBy==="weight" ? "Load" + (sidesOf(name).weight === "total" ? "" : "/" + sidesOf(name).weight) : "Sets" + repsSuffix(name);
     const cardioCls = ex.trackBy==="duration" ? " cardio" : "";
     html += `<div class="hist-row header${cardioCls}"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;
-    recent.forEach((r, idx) => { html += renderHistRow(r.e, r.i, idx === 0, ex, name); });
+    recent.forEach((r, idx) => { html += renderHistRow(r.e, r.i, idx === 0, ex, name, prs[r.i]); });
 
     // One footer row: earlier history on the left, Skip today on the right.
     // While picking a skip reason the link steps aside so the reasons fit on this one row.
     html += `<div class="hist-foot">${older.length && skipPicking !== name ? `<button class="hist-toggle" onclick="toggleHistory('${name.replace(/'/g,"\\'")}')">Show earlier history (${older.length})</button>` : ""}${renderSkipControl(name)}</div>`;
     if(older.length){
       html += `<div class="hist ${openHistory[name] ? 'open' : ''}" id="hist-${cssId(name)}">`;
-      older.forEach(r => { html += renderHistRow(r.e, r.i, false, ex, name); });
+      older.forEach(r => { html += renderHistRow(r.e, r.i, false, ex, name, prs[r.i]); });
       html += `</div>`;
     }
 
@@ -756,7 +774,7 @@ function cardioCell(e, ex){
   return bottom ? `${top}<br>${bottom}` : top;
 }
 
-function renderHistRow(e, idx, isLatest, ex, name){
+function renderHistRow(e, idx, isLatest, ex, name, pr){
   const key = name + "|" + idx;
 
   if(editingKey === key){
@@ -796,7 +814,7 @@ function renderHistRow(e, idx, isLatest, ex, name){
   const tag = isLatest ? (e.date === todayISO() ? "Today" : "Latest") : "";
   html += `<span>${fmtDate(e.date)}${e.confirmed===false?'<span class="est">*</span>':''}${tag ? `<br><span class="latest-tag">${tag}</span>` : ''}</span>`;
   const hr = hrFor(name, e.date);
-  html += `<span class="exact">${ex.trackBy === "duration" && !isRecovery(name) ? cardioCell(e, ex) : formatEntryValue(e, ex)}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">${hrShort(hr)}</span>` : ""}</span>`;
+  html += `<span class="exact">${ex.trackBy === "duration" && !isRecovery(name) ? cardioCell(e, ex) : formatEntryValue(e, ex)}${pr ? '<span class="pr-tag" title="Most reps yet at this weight">PR</span>' : ""}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">${hrShort(hr)}</span>` : ""}</span>`;
   html += `<span class="exact">${e.difficulty ?? "-"}</span>`;
   html += `<span class="hist-note-cell">`;
   html += `<span class="note">${e.note ? escapeHtml(e.note) : ""}</span>`;

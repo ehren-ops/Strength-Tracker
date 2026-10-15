@@ -235,15 +235,8 @@ function generateCoachNotes(){
     for(let i = ex.entries.length - 1; i >= 0; i--){
       if(ex.entries[i].date === lastDate){
         const entry = ex.entries[i];
-        const prev = ex.entries[i-1] || null;
-        let trend = "first";
-        if(prev){
-          if(ex.trackBy === "weight") trend = entry.weight > prev.weight ? "increased" : entry.weight < prev.weight ? "decreased" : "held";
-          else trend = entry.reps > prev.reps ? "increased" : entry.reps < prev.reps ? "decreased" : "held";
-        }
-        const targetReps = entryTargetReps(ex, entry);
-        const hit = ex.trackBy === "weight" ? entry.reps >= targetReps : true;
-        items.push({ name, entry, trend, hit, ex });
+        const hit = ex.trackBy === "weight" ? entry.reps >= entryTargetReps(ex, entry) : true;
+        items.push({ name, entry, hit, ex });
         break;
       }
     }
@@ -254,46 +247,33 @@ function generateCoachNotes(){
   const dayGuess = guessDayForNames(items.map(i => i.name));
   const dayLabel = dayGuess ? DAY_TITLES[dayGuess] : "Last session";
 
+  // Only what the cards don't already say: the session's result, misses, flagged notes, records,
+  // balance and lifts falling behind. Modifier status lives on the badges and the Overview rows.
   const total = items.length;
   const hitCount = items.filter(i => i.hit).length;
-  const increased = items.filter(i => i.trend === "increased" && i.hit);
-  const missed = items.filter(i => !i.hit);
+  const missed = items.filter(i => !i.hit && !i.entry.deload);
   const concerns = items.filter(i => i.entry.note && CONCERN_WORDS.some(w => i.entry.note.toLowerCase().includes(w)));
+  const records = items.filter(i => prFlags(i.ex)[i.ex.entries.indexOf(i.entry)]);
 
-  const sentences = [];
-  sentences.push(`${dayLabel} on ${fmtDate(lastDate)} - ${hitCount}/${total} lifts hit target clean.`);
-
-  if(increased.length){
-    const names = increased.slice(0,2).map(i => i.name).join(" and ");
-    sentences.push(`${names} moved up in weight and still landed it - good sign, keep building there.`);
+  const sentences = [`${dayLabel} on ${fmtDate(lastDate)}: ${hitCount}/${total} lifts hit target.`];
+  if(records.length){
+    sentences.push(`Rep PR${records.length > 1 ? "s" : ""}: ${records.slice(0, 3).map(i => i.ex.trackBy === "weight" ? `${i.name} (${i.entry.reps} at ${i.entry.weight} lb)` : `${i.name} (${i.entry.reps})`).join(", ")}.`);
   }
   if(missed.length){
     const names = missed.slice(0,2).map(i => i.ex.trackBy==="weight" ? `${i.name} (${i.entry.weight} lb)` : i.name).join(" and ");
-    sentences.push(`${names} missed target - hold steady there next time instead of adding more.`);
+    sentences.push(`${names} missed target: hold the weight next time.`);
   }
   if(concerns.length){
     const c = concerns[0];
-    sentences.push(`Worth flagging: ${c.name} noted "${escapeHtml(c.entry.note)}" - keep an eye on that rather than pushing through it.`);
-  }
-  if(!missed.length && !concerns.length && hitCount === total){
-    sentences.push(increased.length ? `Clean session across the board - nothing to dial back here.` : `Solid and consistent - everything landed, nothing urgent to change.`);
+    sentences.push(`Watch ${c.name}: you noted "${escapeHtml(c.entry.note)}". Don't push through it.`);
   }
   const bal = weeklyBalance();
   if(bal.ratio != null && bal.ratio < bal.target){
-    sentences.push(`Pulling is behind pressing (${bal.ratio} : 1 over 4 weeks, target ${bal.target} : 1) - about ${bal.short} more pull set${bal.short === 1 ? "" : "s"} a week would even it out.`);
+    sentences.push(`Pulling is behind pressing (${bal.ratio} : 1 over 4 weeks, target ${bal.target} : 1): about ${bal.short} more pull set${bal.short === 1 ? "" : "s"} a week evens it out.`);
   }
   const dueNow = Object.keys(dueLifts());
   if(dueNow.length){
-    sentences.push(`Due: ${dueNow.slice(0, 3).join(", ")}${dueNow.length > 3 ? ` and ${dueNow.length - 3} more` : ""} missed ${dueNow.length > 1 ? "their" : "its"} last 2+ sessions - work ${dueNow.length > 1 ? "them" : "it"} in early next time.`);
-  }
-  if(modes.ski && (dayGuess === "lower" || dayGuess === "full")){
-    sentences.push(`🎿 Ski season is on - keep leaning into single-leg work and a controlled lowering phase on squat/split squat/lunge.`);
-  }
-  if(modes.knee){
-    sentences.push(`🦵 Knee care mode is on - squat, Bulgarian split squat, and walking lunge are holding at a lighter load.`);
-  }
-  if(modes.back){
-    sentences.push(`🩺 Low back care mode is on - squat, RDL, barbell row, and kettlebell swings are holding at a lighter load.`);
+    sentences.push(`Due: ${dueNow.slice(0, 3).join(", ")}${dueNow.length > 3 ? ` and ${dueNow.length - 3} more` : ""} missed ${dueNow.length > 1 ? "their" : "its"} last 2+ sessions. Do ${dueNow.length > 1 ? "them" : "it"} early next time.`);
   }
 
   return sentences.join(" ");
