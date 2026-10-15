@@ -29,6 +29,7 @@ function shiftISO(iso, days){
 function compactEntry(e, ex){
   let s = `${e.date} ${formatEntryValue(e, ex)}`;
   if(e.difficulty) s += ` @${e.difficulty}`;
+  if(e.pain != null) s += ` pain ${e.pain}/10${e.painArea ? " " + e.painArea : ""}`;
   if(e.note) s += ` "${String(e.note).slice(0, 100)}"`;
   if(e.deload) s += " [deload]";
   else if(prFlags(ex)[ex.entries.indexOf(e)]) s += " [rep PR]";

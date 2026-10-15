@@ -225,6 +225,26 @@ function dueLine(name, due){
   return d ? `Due: missed its last ${d.missedSessions} sessions; do it early today.` : "";
 }
 
+// Joint checks over the last 14 days, by area: flagged when 2 of the area's last 3 scores are
+// above 3 of 10, the point where a care modifier (or a professional) should come in.
+const PAIN_CARE = { knee: "knee", back: "back", shoulder: "shoulder" };
+function painSignals(){
+  const since = shiftISO(todayISO(), -14), byArea = {};
+  Object.values(data).forEach(ex => ex.entries.forEach(e => {
+    if(e.pain != null && e.date >= since) (byArea[e.painArea || "other"] = byArea[e.painArea || "other"] || []).push(e);
+  }));
+  return Object.entries(byArea).map(([area, es]) => {
+    const last3 = es.sort((a, b) => ((a.date + (a.loggedAt || "")) < (b.date + (b.loggedAt || "")) ? -1 : 1)).slice(-3);
+    const high = last3.filter(e => e.pain > PAIN_HOLD_ABOVE).length;
+    return high >= 2 ? { area, high, of: last3.length } : null;
+  }).filter(Boolean);
+}
+function painLine(sig){
+  const what = `${sig.area[0].toUpperCase() + sig.area.slice(1)} pain was above 3 on ${sig.high} of your last ${sig.of} joint checks`;
+  const mod = PAIN_CARE[sig.area] && MODE_DEFS.find(m => m.key === PAIN_CARE[sig.area]);
+  return mod && !modes[mod.key] ? `${what}: consider turning on ${mod.name}.` : `${what}: if it keeps up, get it checked by a physio or doctor.`;
+}
+
 function generateCoachNotes(){
   const lastDate = getLastSessionDate();
   if(!lastDate) return null;
@@ -263,6 +283,7 @@ function generateCoachNotes(){
     const names = missed.slice(0,2).map(i => i.ex.trackBy==="weight" ? `${i.name} (${i.entry.weight} lb)` : i.name).join(" and ");
     sentences.push(`${names} missed target: hold the weight next time.`);
   }
+  painSignals().forEach(sig => sentences.push(painLine(sig)));
   if(concerns.length){
     const c = concerns[0];
     sentences.push(`Watch ${c.name}: you noted "${escapeHtml(c.entry.note)}". Don't push through it.`);

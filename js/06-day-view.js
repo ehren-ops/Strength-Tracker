@@ -379,6 +379,13 @@ function bestLine(ex, last){
   const what = ex.trackBy === "weight" && best.weight > 0 ? `${best.weight} lb, ${repLabel(best.sets, best.reps, ex.unit)}` : repLabel(best.sets, best.reps, ex.unit);
   return `Best: ${what} on ${fmtShortDate(best.date)}.`;
 }
+// The Next tile call after a joint check above 3 of 10.
+function painMessage(s, load){
+  const p = s.painHold, where = p.area ? ` (${p.area})` : "";
+  if(!load) return `Pain ${p.pain}/10${where} last time: same reps until it's 3 or less.`;
+  return p.drop || s.weight < p.from ? `Pain ${p.pain}/10${where} last time: down to ${load}. Stop a set if it passes 3.`
+    : `Pain ${p.pain}/10${where} last time: hold ${load} until it's 3 or less.`;
+}
 // Compound lifts keep Est. 1RM up top, so their rep record at today's weight rides in the tile.
 function repRecordLine(name, ex, s){
   if(!s || ex.trackBy !== "weight" || !COMPOUND_LIFTS.has(name) || !(s.weight > 0) || s.deloadWeek) return "";
@@ -618,6 +625,8 @@ function renderExerciseCard(name, ex){
           msg = name === "Bicep Curl"
             ? `Left arm paused until week 3 of Shoulder Rehab. Right-arm hammer curls are fine now.`
             : `Paused for Shoulder Rehab until the side-raise press is pain-free.`;
+        } else if(suggestion.painHold){
+          msg = painMessage(suggestion, `${suggestion.weight} lb`);
         } else if(suggestion.shoulderHold){
           const h = suggestion.shoulderHold;
           msg = name === "Bicep Curl"
@@ -695,7 +704,8 @@ function renderExerciseCard(name, ex){
           : `Holding steady.`;
       } else {
         nextLabel = repLabel(suggestion.sets,suggestion.reps,ex.unit) + repsSuffix(name);
-        msg = suggestion.deloadWeek ? `Deload: same reps, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`
+        msg = suggestion.painHold ? painMessage(suggestion, null)
+          : suggestion.deloadWeek ? `Deload: same reps, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`
           : suggestion.powerHold ? `Power: hold reps; go higher or farther only while every rep stays fast.`
           : `Add 2 reps.`;
       }
@@ -793,7 +803,7 @@ function renderHistRow(e, idx, isLatest, ex, name, pr){
       </div>
       ${ex.trackBy !== "duration" ? `<div class="form-row">
         <div class="field" style="flex:1 1 100%;"><label>Reps per set (optional)</label><input type="text" id="edit-perset" value="${(e.repsBySet || []).join(" ")}" placeholder="e.g. 8 8 6"></div>
-      </div>` : ""}
+      </div>${painRow("edit", e.pain, e.painArea || defaultPainArea(name, ex), false)}` : ""}
       <div class="form-row">
         <div class="field" style="flex:1 1 100%;"><label>Date</label><input type="date" id="edit-date" value="${e.date || todayISO()}"></div>
       </div>
@@ -817,7 +827,7 @@ function renderHistRow(e, idx, isLatest, ex, name, pr){
   html += `<span class="exact">${ex.trackBy === "duration" && !isRecovery(name) ? cardioCell(e, ex) : formatEntryValue(e, ex)}${pr ? '<span class="pr-tag" title="Most reps yet at this weight">PR</span>' : ""}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">${hrShort(hr)}</span>` : ""}</span>`;
   html += `<span class="exact">${e.difficulty ?? "-"}</span>`;
   html += `<span class="hist-note-cell">`;
-  html += `<span class="note">${e.note ? escapeHtml(e.note) : ""}</span>`;
+  html += `<span class="note">${painTag(e)}${e.note ? escapeHtml(e.note) : ""}</span>`;
   html += `<span class="row-actions">
     <button class="icon-btn" onclick="startEdit('${name.replace(/'/g,"\\'")}', ${idx})" aria-label="Edit">✎</button>
     <button class="icon-btn del-btn${deletingKey === key ? " armed" : ""}" onclick="tapDelete('${name.replace(/'/g,"\\'")}', ${idx})" aria-label="${deletingKey === key ? "Tap again to delete" : "Delete"}">✕</button>
@@ -912,6 +922,8 @@ function saveEditEntry(name, idx){
     entry.reps = Number(document.getElementById("edit-reps").value) || entry.reps;
     const perEl = document.getElementById("edit-perset");
     applyPerSet(entry, perEl ? (perEl.value.match(/\d+/g) || []).map(Number).filter(v => v > 0) : null);
+    const pain = readPain("edit");
+    if(pain) Object.assign(entry, pain); else { delete entry.pain; delete entry.painArea; }
     if(!isBodyweight && weightEl) entry.weight = Number(weightEl.value) || entry.weight;
   }
 
@@ -996,8 +1008,10 @@ function renderForm(name, ex){
   const prefill = plan ? (mods.length ? `Pre-filled: ${mods.join(", ")} plan` : "Pre-filled: next progression") : "";
   if(ex.trackBy !== "duration"){
     // Optional reps for each set, for sessions where the last set fell short: "8 8 6".
-    html += `<div class="prefill-row"><span class="prefill-note">${prefill}</span><button type="button" class="perset-toggle" onclick="togglePerSet(this)">Reps per set</button></div>`;
+    const painOpen = !recovery && careModifierOn(name, ex);
+    html += `<div class="prefill-row"><span class="prefill-note">${prefill}</span><span class="form-toggles"><button type="button" class="perset-toggle pain-toggle" onclick="togglePain(this)" aria-expanded="${painOpen}">Joint check</button><button type="button" class="perset-toggle" onclick="togglePerSet(this)">Reps per set</button></span></div>`;
     html += `<div class="perset-row" id="perset-row" hidden></div>`;
+    html += painRow("f", null, defaultPainArea(name, ex), !painOpen);
   } else if(plan) html += `<p class="prefill-note">${prefill}</p>`;
   html += `<div class="form-row">
     ${ex.trackBy === "duration" && !recovery ? rpeField : ""}<div class="field field-note">${ex.trackBy === "duration" && !recovery ? "<label>Note</label>" : ""}<input type="text" id="f-note" aria-label="Note" value="${withModifierTags("", activeModifierTags(name, ex))}" placeholder="${recovery ? 'Note, e.g. after lifting' : ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
@@ -1007,6 +1021,43 @@ function renderForm(name, ex){
     <button class="log" onclick="logEntry()">${recovery ? "Log session" : "Log set"}</button>
   </div>`;
   return html;
+}
+
+// Joint check: an optional 0-10 pain score and where, saved on the session. Open by itself when a
+// care modifier (knee, back, shoulder) covers this lift; otherwise one tap away.
+const PAIN_AREAS = ["knee", "back", "shoulder", "elbow", "hip", "wrist", "ankle", "other"];
+const PAIN_AREA_BY_PATTERN = { squat: "knee", "single-leg": "knee", power: "knee", hinge: "back", push: "shoulder", pull: "shoulder" };
+function careModifierOn(name, ex){
+  return modifiersOn(name, ex).some(m => m.key === "knee" || m.key === "back" || m.key === "shoulder");
+}
+function defaultPainArea(name, ex){
+  const care = modifiersOn(name, ex).find(m => m.key === "knee" || m.key === "back" || m.key === "shoulder");
+  if(care) return care.key;
+  const last = [...ex.entries].reverse().find(e => e.painArea);
+  return last ? last.painArea : PAIN_AREA_BY_PATTERN[LIFT_PATTERNS[name]] || "other";
+}
+function painRow(prefix, score, area, hidden){
+  return `<div class="pain-row" id="${prefix}-pain-row"${hidden ? " hidden" : ""}>
+    <label class="perset-field pain-score"><span>Pain 0-10</span><input type="number" inputmode="numeric" class="perset-in" id="${prefix}-pain" min="0" max="10" value="${score ?? ""}" placeholder="-"></label>
+    <label class="perset-field"><span>Where</span><select class="perset-in" id="${prefix}-pain-area">${PAIN_AREAS.map(a => `<option value="${a}"${a === area ? " selected" : ""}>${a[0].toUpperCase() + a.slice(1)}</option>`).join("")}</select></label>
+  </div>`;
+}
+function togglePain(btn){
+  const row = document.getElementById("f-pain-row");
+  if(!row) return;
+  row.hidden = !row.hidden;
+  btn.setAttribute("aria-expanded", String(!row.hidden));
+  if(row.hidden) document.getElementById("f-pain").value = "";
+  else document.getElementById("f-pain").focus();
+}
+// { pain, painArea } from an open joint check with a score typed in (0 counts); null otherwise.
+function readPain(prefix){
+  const row = document.getElementById(prefix + "-pain-row"), el = document.getElementById(prefix + "-pain");
+  if(!row || row.hidden || !el || el.value === "") return null;
+  return { pain: Math.max(0, Math.min(10, Math.round(Number(el.value) || 0))), painArea: document.getElementById(prefix + "-pain-area").value };
+}
+function painTag(e){
+  return e.pain != null ? `<span class="pain-tag${e.pain > PAIN_HOLD_ABOVE ? " high" : ""}">Pain ${e.pain}${e.painArea ? " " + e.painArea : ""}</span>` : "";
 }
 
 // The per-set reps row: one small box per set, filled with the reps above. Opening it, or changing

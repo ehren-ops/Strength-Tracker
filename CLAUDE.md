@@ -45,6 +45,11 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double
   progression (add a rep, add weight once every set reaches the top). Read targets through
   `effectiveTargetReps` / `activeRepRange` (03), never `ex.targetReps` directly.
+- Joint check: `pain` (0-10) and `painArea` on an entry. `applyPain` (05) holds the load above 3
+  and drops about 10% at 6+; `painSignals` (08) nudges the matching care modifier. Rep records
+  come from `prFlags` / `repRecord` (04); only `COMPOUND_LIFTS` (02) show Est. 1RM.
+- The coach system prompt is cached (5 minutes). Keep anything that changes per call out of
+  `PRINCIPLES` and the mode prompts, or every call pays the cache write for nothing.
 - Render is a full `innerHTML` rebuild on every change; keep helpers pure and cheap.
 
 ## Commands

@@ -392,17 +392,28 @@ function applyReturn(core, ex, name, baseline){
   return core;
 }
 
+// Joint check: pain above 3 of 10 on the last session (deload or not) holds the load; 6 or more
+// drops it about 10%. Lifts without weight hold their reps instead.
+const PAIN_HOLD_ABOVE = 3, PAIN_DROP_AT = 6;
+function applyPain(s, ex){
+  const last = ex.entries[ex.entries.length - 1];
+  if(!s || !last || !(last.pain > PAIN_HOLD_ABOVE) || ex.trackBy === "duration") return s;
+  const hold = { pain: last.pain, area: last.painArea || "", drop: last.pain >= PAIN_DROP_AT, from: last.weight };
+  if(ex.trackBy !== "weight" || !(last.weight > 0)) return { ...s, reps: Math.min(s.reps, last.reps), readyToProgress: false, painHold: hold };
+  const cap = hold.drop ? roundLoad(last.weight * 0.9) : last.weight;
+  return { ...s, weight: Math.min(s.weight, cap), readyToProgress: false, painHold: hold };
+}
 function computeSuggestion(ex, name){
   if(!ex.entries.length || isRecovery(name)) return null;
   const baseline = ex.entries.filter(e => !e.deload);
   const baseEntries = baseline.length ? baseline : ex.entries;
   const lastBaseEntry = baseEntries[baseEntries.length - 1];
-  const core = applyShoulder(applyReturn(capAtMaxWeight(applyNoteTarget(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, lastBaseEntry), ex, name, lastBaseEntry), ex, name, baseline), ex, name, baseline);
+  const core = applyPain(applyShoulder(applyReturn(capAtMaxWeight(applyNoteTarget(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, lastBaseEntry), ex, name, lastBaseEntry), ex, name, baseline), ex, name, baseline), ex);
   if(!modes.deload || !core || ex.trackBy === "duration") return core;
   const lastBase = (baseline.length ? baseline : ex.entries)[ (baseline.length ? baseline : ex.entries).length - 1 ];
   const sets = Math.max(2, Math.round((lastBase.sets || core.sets || 3) * 2 / 3));
   if(ex.trackBy !== "weight") return { ...core, sets, reps: lastBase.reps, deloadWeek: true };
-  const alreadyReduced = !!(core.careFlags && core.careFlags.length) || !!core.shoulderHold || core.deload || (core.noteTarget != null && core.noteTarget < lastBase.weight);
+  const alreadyReduced = !!(core.careFlags && core.careFlags.length) || !!core.shoulderHold || !!(core.painHold && core.painHold.drop) || core.deload || (core.noteTarget != null && core.noteTarget < lastBase.weight);
   const weight = alreadyReduced ? core.weight : Math.round((lastBase.weight * 0.9) / 2.5) * 2.5;
   return { ...core, weight, sets, reps: ex.targetReps || core.reps, readyToProgress: false, deloadWeek: true, deloadKeptReduction: alreadyReduced };
 }

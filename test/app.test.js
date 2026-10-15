@@ -2716,7 +2716,7 @@ async function main(){
     data = { 'Bench Press': mk('Bench Press', [[-9, 150, 3], [-2, 150, 4]]), 'Barbell Row': mk('Barbell Row', [[-9, 120, 3], [-2, 120, 3]]), 'Squat': mk('Squat', [[-3, 175, 3]]) };
     const out = {};
     view = 'upper'; selected = 'Bench Press'; render();
-    const btn = document.querySelector('.perset-toggle');
+    const btn = document.querySelector('.perset-toggle:not(.pain-toggle)');
     btn.click();
     out.boxes = document.querySelectorAll('#perset-row input').length;
     document.getElementById('f-sets').value = '5'; syncPerSet();
@@ -2791,6 +2791,54 @@ async function main(){
     /Rep PRs?: .*Cable Chest Fly \(14 at 50 lb\)/.test(r89.notes) && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
   if(!ok89) throw new Error('expected rep PRs, the rep record slot and trimmed Coach\'s Notes, got: ' + JSON.stringify(r89));
   console.log('OK: fly 3x13 and 3x14 at 50 lb are rep PRs (the deload and a new weight are not), the fly shows "Most reps 14", squat keeps Est. 1RM, and Coach\'s Notes lead with the PR and skip modifier lines');
+
+  console.log('=== 90: the joint check logs a 0-10 pain score and area, holds or drops the next weight, and nudges the matching care modifier ===');
+  const r90 = await page.evaluate(() => {
+    const saved = JSON.stringify({ squat: data['Squat'], bench: data['Bench Press'] }), savedModes = { ...modes }, savedView = view, savedSel = selected;
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const d = n => shiftISO(todayISO(), n);
+    data['Squat'] = Object.assign(newExerciseShell('Squat'), { entries: [{ clientId: 'j1', date: d(-7), weight: 175, sets: 3, reps: 8, difficulty: 7 }] });
+    data['Bench Press'] = Object.assign(newExerciseShell('Bench Press'), { entries: [{ clientId: 'j2', date: d(-5), weight: 150, sets: 3, reps: 8, difficulty: 7 }] });
+    const out = {};
+    view = 'upper'; selected = 'Bench Press'; render();
+    out.benchClosed = document.getElementById('f-pain-row').hidden && document.getElementById('f-pain-area').value === 'shoulder';
+    modes.knee = true; view = 'lower'; selected = 'Squat'; render();
+    out.squatOpen = !document.getElementById('f-pain-row').hidden && document.getElementById('f-pain-area').value === 'knee';
+    modes.knee = false; render();
+    // log 180 with pain 5 at the knee: next time holds 180
+    document.getElementById('f-weight').value = '180';
+    document.querySelector('.pain-toggle').click();
+    document.getElementById('f-pain').value = '5';
+    document.getElementById('f-pain-area').value = 'knee';
+    document.getElementById('f-date').value = d(-3);
+    logEntry();
+    const sq = data['Squat'], last = sq.entries[sq.entries.length - 1];
+    out.logged = [last.pain, last.painArea];
+    const s1 = computeSuggestion(sq, 'Squat');
+    out.hold = [s1.weight, !!s1.painHold, s1.painHold && s1.painHold.drop];
+    render();
+    out.msg = document.querySelector('.rec-desc').textContent;
+    out.hist = document.querySelector('.hist-row:not(.header) .pain-tag.high') ? document.querySelector('.hist-row:not(.header) .pain-tag').textContent : null;
+    last.pain = 7;
+    const s2 = computeSuggestion(sq, 'Squat');
+    out.drop = [s2.weight, s2.painHold.drop];
+    const row = entryToRow(last, 'ex', 'u'), back = rowToEntry(row);
+    out.sync = [row.pain, row.pain_area, back.pain, back.painArea];
+    sq.entries.push({ clientId: 'j3', date: d(-1), weight: 162.5, sets: 3, reps: 8, difficulty: 7, pain: 4, painArea: 'knee' });
+    out.notes = generateCoachNotes() || '';
+    out.payload = compactEntry(sq.entries[sq.entries.length - 1], sq);
+    const restore = JSON.parse(saved);
+    data['Squat'] = restore.squat; data['Bench Press'] = restore.bench;
+    if(!restore.squat) delete data['Squat']; if(!restore.bench) delete data['Bench Press'];
+    Object.assign(modes, savedModes); view = savedView; selected = savedSel; persist(); render();
+    return out;
+  });
+  const ok90 = r90.benchClosed && r90.squatOpen && r90.logged[0] === 5 && r90.logged[1] === 'knee' &&
+    r90.hold[0] === 180 && r90.hold[1] && !r90.hold[2] && /Pain 5\/10 \(knee\) last time: hold 180 lb/.test(r90.msg) && r90.hist === 'Pain 5 knee' &&
+    r90.drop[0] === 162.5 && r90.drop[1] && JSON.stringify(r90.sync) === JSON.stringify([7, 'knee', 7, 'knee']) &&
+    /Knee pain was above 3 on 2 of your last 2 joint checks: consider turning on Knee Care/.test(r90.notes) && /pain 4\/10 knee/.test(r90.payload);
+  if(!ok90) throw new Error('expected the joint check to log, hold, drop, sync and nudge, got: ' + JSON.stringify(r90));
+  console.log('OK: joint check opens under Knee Care (closed on bench, set to shoulder), pain 5 holds 180, pain 7 drops to 162.5, it syncs, shows "Pain 5 knee", reaches the coach, and two high knee checks suggest Knee Care');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
