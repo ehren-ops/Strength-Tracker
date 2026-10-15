@@ -35,24 +35,57 @@ function saveSkips(){ try{ localStorage.setItem(SKIPS_KEY, JSON.stringify(skips)
 let skipPicking = null; // lift whose skip reasons are showing
 let deletingExercise = null;
 let editing1RM = null;
-// Data-driven table for the four "training modifier" toggles, instead of a
-// separate variable/init/toggle/cloud-merge/settings-row block per mode -
-// see toggleMode() below, the cloud-settings merge in pullRemoteAndMerge(),
-// and the settings row built in runOp()'s upsert_settings handler, which
-// all loop over this same list instead of repeating themselves per mode.
-// This only unifies that identical on/off/persist/sync bookkeeping - each
-// mode's actual EFFECT (what it does while active) still lives entirely
-// separately: KNEE_SENSITIVE_EXERCISES/KNEE_CARE_TIP for knee, its back
-// equivalents, targetRepsSki/skiTempo for ski, and the preseason* fields
-// on individual exercises for preseason.
+// The modifier registry: one row per training modifier, and the only place a modifier is described.
+// Everything that lists modifiers reads it: the on/off/persist/sync bookkeeping (toggleMode, the cloud
+// merge, the settings row), card badges and the card class (06), planModifiers (06), the note tags and
+// graph markers (07), the Overview rows and the coach payload (09). The order here is the order shown.
+//   applies(name, ex): the lifts that carry its badge and note tag while it is on.
+//   changesNumbers(name, ex): the lifts whose weight, sets or reps it changes today (planModifiers).
+//   tag.kind: "light" (lighter on purpose: diamond) or "block" (a block with its own target: circle).
+// What a modifier DOES still lives with its own logic (KNEE_SENSITIVE_EXERCISES, the preseason fields,
+// 05b for the shoulder), and its color is the --<key> CSS token in both themes.
 const MODE_DEFS = [
-  { key: "deload", storageKey: "strength-tracker-deload-mode", column: "deload_mode" },
-  { key: "ski", storageKey: "strength-tracker-ski-mode", column: "ski_season_mode" },
-  { key: "knee", storageKey: "strength-tracker-knee-mode", column: "knee_care_mode" },
-  { key: "back", storageKey: "strength-tracker-back-mode", column: "low_back_care_mode" },
-  { key: "preseason", storageKey: "strength-tracker-preseason-mode", column: "preseason_mode" },
-  { key: "shoulder", storageKey: "strength-tracker-shoulder-mode", column: "shoulder_rehab_mode" },
+  { key: "deload", storageKey: "strength-tracker-deload-mode", column: "deload_mode",
+    name: "Deload Week", short: "Deload", emoji: "🔋", badge: "Deload",
+    tag: { kind: "light", re: /\bdeload\b/i, label: "Deload" },
+    applies: (n, ex) => ex.trackBy !== "duration",
+    changesNumbers: () => true,
+    desc: "A planned lighter week so joints and tendons catch up: about 10% less weight and a third fewer sets on every lift. Lifts already cut for Knee or Back Care just lose sets. Ends itself after 7 days." },
+  { key: "shoulder", storageKey: "strength-tracker-shoulder-mode", column: "shoulder_rehab_mode",
+    name: "Shoulder Rehab", short: "Shoulder Rehab", emoji: "🩹", badge: n => isShoulderPaused(n) ? "Paused" : "Shoulder Rehab",
+    tag: { kind: "light", re: /\b(shoulder )?rehab\b/i, label: "Rehab" },
+    applies: n => isShoulderModified(n),
+    changesNumbers: n => isShoulderPaused(n) || isShoulderHeld(n),
+    desc: "Adds a daily rehab card to every day and push-ups to Upper and Full Body. Pauses flies, incline press, lateral raises and slams; bench drops to 85%, medium grip, short of the chest; curls come back as hammer curls in week 3. Rows, pushdowns, legs and riding carry on." },
+  { key: "knee", storageKey: "strength-tracker-knee-mode", column: "knee_care_mode",
+    name: "Knee Care", short: "Knee Care", emoji: "🦵", badge: "Knee Care",
+    tag: { kind: "light", re: /\bknee care\b/i, label: "Knee Care" },
+    applies: n => KNEE_SENSITIVE_EXERCISES.has(n) || KNEE_ONLY.has(n),
+    changesNumbers: n => KNEE_SENSITIVE_EXERCISES.has(n),
+    desc: "Squat, Bulgarian Split Squat and Walking Lunge hold and drop about 10% while your knee settles. Everything else trains as normal." },
+  { key: "back", storageKey: "strength-tracker-back-mode", column: "low_back_care_mode",
+    name: "Low Back Care", short: "Back Care", emoji: "🩺", badge: "Back Care",
+    tag: { kind: "light", re: /\b(low )?back care\b/i, label: "Back Care" },
+    applies: n => LOW_BACK_SENSITIVE_EXERCISES.has(n),
+    changesNumbers: n => LOW_BACK_SENSITIVE_EXERCISES.has(n),
+    desc: "Squat, RDL, Barbell Row, Kettlebell Swings and Hip Thrust (swap to a glute bridge) hold and drop about 10% while your lower back settles. Everything else trains as normal." },
+  { key: "preseason", storageKey: "strength-tracker-preseason-mode", column: "preseason_mode",
+    name: "Preseason Prep", short: "Preseason", emoji: "🏔️", badge: "Preseason",
+    tag: { kind: "block", re: /\bpreseason\b/i, label: "Preseason" },
+    applies: (n, ex) => !!ex.preseason,
+    changesNumbers: (n, ex) => !!(ex.preseason && ex.targetRepsPreseason),
+    desc: "Adds power, lateral, lowering-phase and calf work to your lift days for the 7 to 10 week ramp into ski season. Power work goes first; stop a set when speed drops." },
+  { key: "ski", storageKey: "strength-tracker-ski-mode", column: "ski_season_mode",
+    name: "Ski Season", short: "Ski", emoji: "🎿", badge: "Ski",
+    tag: { kind: "block", re: /\bski( season)?\b/i, label: "Ski" },
+    applies: (n, ex) => !!ex.targetRepsSki,
+    changesNumbers: (n, ex) => !!ex.targetRepsSki,
+    desc: "Squat, Bulgarian Split Squat and Walking Lunge shift to lower reps with a slower lowering phase. Roughly Nov to March." },
 ];
+// The modifiers that are on and touch this lift, in registry order.
+function modifiersOn(name, ex){
+  return MODE_DEFS.filter(m => modes[m.key] && m.applies(name, ex));
+}
 const modes = {};
 MODE_DEFS.forEach(m => {
   try{ modes[m.key] = window.localStorage.getItem(m.storageKey) === "1"; }

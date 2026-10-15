@@ -57,27 +57,13 @@ function toggleCharts(){
 //            never a missed-rep or short-set flag.
 //   "block": a training block that changes the target (preseason, ski). A circle in its color with
 //            the sets x reps, judged against the block's own target, so a real miss is still red.
-const MODIFIER_TAGS = [
-  { key: "deload", kind: "light", re: /\bdeload\b/i, label: "Deload", title: "Deload Week", color: "var(--deload)" },
-  { key: "shoulder", kind: "light", re: /\b(shoulder )?rehab\b/i, label: "Rehab", color: "var(--shoulder)" },
-  { key: "knee", kind: "light", re: /\bknee care\b/i, label: "Knee Care", color: "var(--knee)" },
-  { key: "back", kind: "light", re: /\b(low )?back care\b/i, label: "Back Care", color: "var(--back)" },
-  { key: "preseason", kind: "block", re: /\bpreseason\b/i, label: "Preseason", color: "var(--preseason)" },
-  { key: "ski", kind: "block", re: /\bski( season)?\b/i, label: "Ski", color: "var(--ski)" },
-];
+const MODIFIER_TAGS = MODE_DEFS.map(m => ({ key: m.key, ...m.tag, title: m.name, color: `var(--${m.key})` }));
 // The tags a lift's sessions carry while a modifier is on and changes or notes that lift (the same
-// lifts that show its badge), in a fixed order: "Deload, Rehab, Knee Care". Pre-filled in the
+// lifts that show its badge), in registry order: "Deload, Rehab, Knee Care". Pre-filled in the
 // note and kept on log, so history, the graph and the coach all see which sessions were planned.
 function activeModifierTags(name, ex){
   if(!ex || ex.trackBy === "checklist" || isRecovery(name)) return [];
-  const on = [];
-  if(modes.deload && ex.trackBy !== "duration") on.push("deload");
-  if(isShoulderModified(name)) on.push("shoulder");
-  if(modes.knee && (KNEE_SENSITIVE_EXERCISES.has(name) || KNEE_ONLY.has(name))) on.push("knee");
-  if(modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name)) on.push("back");
-  if(modes.preseason && ex.preseason) on.push("preseason");
-  if(modes.ski && ex.targetRepsSki) on.push("ski");
-  return on.map(k => MODIFIER_TAGS.find(t => t.key === k));
+  return modifiersOn(name, ex).map(m => MODIFIER_TAGS.find(t => t.key === m.key));
 }
 // Adds whichever of these tags the note is missing, in front of what was typed.
 function withModifierTags(note, tags){

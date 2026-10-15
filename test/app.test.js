@@ -2746,6 +2746,23 @@ async function main(){
   if(!ok87) throw new Error('expected per-set reps and the weekly balance card to work, got: ' + JSON.stringify(r87));
   console.log('OK: "8 8 6" logs as 3 sets at 6 (shown 8/8/6, synced, held at 155); Weekly Balance reads pull : push 0.6 : 1 with a nudge in Coach\'s Notes and the coach payload');
 
+  console.log('=== 88: every modifier in the registry is complete, with a color in both themes ===');
+  const reg = await page.evaluate(() => {
+    const bad = [];
+    const savedTheme = darkMode;
+    MODE_DEFS.forEach(m => {
+      ['key', 'storageKey', 'column', 'name', 'short', 'emoji', 'desc'].forEach(f => { if(!m[f]) bad.push(m.key + ' missing ' + f); });
+      if(!m.badge) bad.push(m.key + ' missing badge');
+      if(!m.tag || !['light', 'block'].includes(m.tag.kind) || !(m.tag.re instanceof RegExp) || !m.tag.re.test(m.tag.label)) bad.push(m.key + ' tag');
+      if(typeof m.applies !== 'function' || typeof m.changesNumbers !== 'function') bad.push(m.key + ' rules');
+      [false, true].forEach(dark => { darkMode = dark; applyTheme(); if(!getComputedStyle(document.documentElement).getPropertyValue('--' + m.key).trim()) bad.push(m.key + ' color ' + (dark ? 'dark' : 'light')); });
+    });
+    darkMode = savedTheme; applyTheme();
+    return { bad, rows: document.querySelectorAll('.mod-row').length, keys: MODE_DEFS.map(m => m.key) };
+  });
+  if(reg.bad.length) throw new Error('expected every modifier row to be complete, got: ' + JSON.stringify(reg));
+  console.log('OK: ' + reg.keys.join(', ') + ' each carry a name, badge, tag kind, rules and a color in both themes');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

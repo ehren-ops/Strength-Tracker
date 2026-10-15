@@ -36,9 +36,10 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 ## Patterns to follow
 - A new entry field needs: `entryToRow` and `rowToEntry` in 01, a migration adding the column, and
   the mock needs nothing (it is generic).
-- A new modifier touches: `MODE_DEFS` (03) plus a `user_settings` column, badge and care line in
-  `renderExerciseCard` (06), `planModifiers` (06), `activeModifierTags` and `MODIFIER_TAGS` (07,
-  pick kind light or block), an Overview row (09), CSS color tokens (light and dark).
+- A new modifier is one row in `MODE_DEFS` (03): name, emoji, badge, tag (kind light or block),
+  `applies` / `changesNumbers` rules and the Overview text. Then add its `user_settings` column, a
+  `--<key>` color token in both themes and its `.<key>-badge` style; scenario 88 checks the row.
+  What it actually does to the numbers lives with its own logic (05, 05b, the exercise fields).
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double

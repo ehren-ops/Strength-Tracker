@@ -563,8 +563,8 @@ function collapsibleHead(key, title, summary){
 
 // One modifier: a title row with its on/off switch, then a short description.
 // The hidden label keeps "Name: ON/OFF" readable for screen readers.
-function renderModifierRow(key, emoji, name, desc, extraHtml){
-  const on = !!modes[key];
+function renderModifierRow(key, extraHtml){
+  const { emoji, name, desc } = MODE_DEFS.find(m => m.key === key), on = !!modes[key];
   return `<div class="mod-row">
       <div class="mod-head">
         <span class="mod-title">${emoji} ${name}</span>
@@ -582,9 +582,7 @@ function renderShoulderModifier(){
   if(modes.shoulder) status = `${shoulderRehab.startedOn ? `On since ${fmtShortDate(shoulderRehab.startedOn)}` : "On"} · week ${rehabWeek()}, phase ${rehabPhase()}`;
   else if(shoulderRehab.startedOn) status = `Last run: ${fmtShortDate(shoulderRehab.startedOn)} to ${fmtShortDate(shoulderRehab.endedOn || shoulderRehab.startedOn)}. Paused lifts ramp back 85, 92.5, 100%.`;
   else status = `Not started`;
-  return renderModifierRow("shoulder", "🩹", "Shoulder Rehab",
-    "Adds a daily rehab card to every day and push-ups to Upper and Full Body. Pauses flies, incline press, lateral raises and slams; bench drops to 85%, medium grip, short of the chest; curls come back as hammer curls in week 3. Rows, pushdowns, legs and riding carry on.",
-    `<div class="shoulder-status">${status}</div>`);
+  return renderModifierRow("shoulder", `<div class="shoulder-status">${status}</div>`);
 }
 
 // Deload status is always exactly two short lines, so the row stays the same size on or off.
@@ -592,8 +590,7 @@ function renderDeloadModifier(){
   const st = deloadStatus();
   let last, next;
   if(st.on){
-    const days = daysBetween(st.startedOn, todayISO()) + 1;
-    last = `On since ${fmtShortDate(st.startedOn)} · day ${days}`;
+    last = st.startedOn ? `On since ${fmtShortDate(st.startedOn)} · day ${daysBetween(st.startedOn, todayISO()) + 1}` : "On";
     next = deloadDates.plannedEndOn ? `Switches off ${fmtShortDate(deloadDates.plannedEndOn)} unless you keep it on` : `Switch off when the week is up`;
   } else {
     last = st.startedOn ? `Last deload: ${fmtShortDate(st.startedOn)} to ${fmtShortDate(st.endedOn || st.startedOn)}` : `No deload logged yet`;
@@ -602,9 +599,7 @@ function renderDeloadModifier(){
     else if(st.daysUntilDue === 0) next = `Next recommended: today`;
     else next = `Next recommended: ${fmtShortDate(st.nextDue)} · <b>due now</b>`;
   }
-  return renderModifierRow("deload", "🔋", "Deload Week",
-    "A planned lighter week so joints and tendons catch up: about 10% less weight and a third fewer sets on every lift. Lifts already cut for Knee or Back Care just lose sets. Ends itself after 7 days.",
-    `<div class="deload-status" id="deload-status"><div>${last}</div><div>${next}</div></div>`);
+  return renderModifierRow("deload", `<div class="deload-status" id="deload-status"><div>${last}</div><div>${next}</div></div>`);
 }
 
 // ---------- weekly balance ----------
@@ -806,16 +801,11 @@ function renderOverview(){
   }
   html += `</div>`;
 
-  const modNames = { deload: "Deload", ski: "Ski", preseason: "Preseason", knee: "Knee Care", back: "Back Care", shoulder: "Shoulder Rehab" };
-  const modsOn = MODE_DEFS.filter(m => modes[m.key]).map(m => modNames[m.key] || m.key);
+  const modsOn = MODE_DEFS.filter(m => modes[m.key]).map(m => m.short);
+  const modRow = m => m.key === "deload" ? renderDeloadModifier() : m.key === "shoulder" ? renderShoulderModifier() : renderModifierRow(m.key);
   html += `<div class="card">
     ${collapsibleHead("modifiers", "Training Modifiers", modsOn.length ? `On: ${modsOn.join(", ")}` : "All off")}
-    ${overviewCollapsed.modifiers ? "" : `${renderDeloadModifier()}
-    ${renderModifierRow("ski", "🎿", "Ski Season", "Squat, Bulgarian Split Squat and Walking Lunge shift to lower reps with a slower lowering phase. Roughly Nov to March.")}
-    ${renderModifierRow("preseason", "🏔️", "Preseason Prep", "Adds power, lateral, lowering-phase and calf work to your lift days for the 7 to 10 week ramp into ski season. Power work goes first; stop a set when speed drops.")}
-    ${renderModifierRow("knee", "🦵", "Knee Care", "Squat, Bulgarian Split Squat and Walking Lunge hold and drop about 10% while your knee settles. Everything else trains as normal.")}
-    ${renderModifierRow("back", "🩺", "Low Back Care", "Squat, RDL, Barbell Row, Kettlebell Swings and Hip Thrust (swap to a glute bridge) hold and drop about 10% while your lower back settles. Everything else trains as normal.")}
-    ${renderShoulderModifier()}`}
+    ${overviewCollapsed.modifiers ? "" : MODE_DEFS.map(modRow).join("")}
   </div>`;
 
   html += renderBackupSyncCard();

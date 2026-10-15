@@ -287,14 +287,7 @@ function renderChecklistCard(name, ex, opts){
 // Preseason only counts where it shifts the reps; elsewhere it adds notes, not numbers.
 function planModifiers(name, ex){
   if(ex.trackBy === "duration" || ex.trackBy === "checklist") return [];
-  const on = [];
-  if(modes.deload) on.push("Deload Week");
-  if(modes.ski && ex.targetRepsSki) on.push("Ski Season");
-  if(modes.preseason && ex.preseason && ex.targetRepsPreseason) on.push("Preseason Prep");
-  if(modes.knee && KNEE_SENSITIVE_EXERCISES.has(name)) on.push("Knee Care");
-  if(modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name)) on.push("Low Back Care");
-  if(isShoulderPaused(name) || isShoulderHeld(name)) on.push("Shoulder Rehab");
-  return on;
+  return MODE_DEFS.filter(m => modes[m.key] && m.changesNumbers(name, ex)).map(m => m.name);
 }
 
 // The Next tile: always four rows at one fixed size on every lift, so the card never shifts.
@@ -504,13 +497,9 @@ function renderExerciseCard(name, ex){
   const work = hasEntries ? lastWorking(ex) : null; // last non-deload session: where the lift stands
   const first = hasEntries ? ex.entries[0] : null;
   const suggestion = computeSuggestion(ex, name);
-  const skiActive = modes.ski && !!ex.targetRepsSki;
-  const kneeActive = modes.knee && (KNEE_SENSITIVE_EXERCISES.has(name) || KNEE_ONLY.has(name));
-  const backActive = modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name);
-  const preseasonActive = modes.preseason && !!ex.preseason;
-  const deloadActive = modes.deload && ex.trackBy !== "duration";
+  const mods = modifiersOn(name, ex), on = key => mods.some(m => m.key === key);
+  const skiActive = on("ski"), kneeActive = on("knee"), backActive = on("back"), preseasonActive = on("preseason");
   const recovery = isRecovery(name);
-  const shoulderPaused = isShoulderPaused(name), shoulderActive = isShoulderModified(name);
 
   const isCustom = !allDayNames().includes(name);
   // "+20 since first" rides in the Recent History heading, with the rest of the card's history.
@@ -528,9 +517,7 @@ function renderExerciseCard(name, ex){
   const priorHtml = prior && !recovery ? `<button type="button" class="last-line" onclick="toggleLastDate()" aria-pressed="${lastDateShown}" title="${fmtShortDate(prior.date)}">Last: ${shortValue(name, ex, prior)}${lastDateShown ? ` · ${fmtShortDate(prior.date)}` : ""}</button>` : "";
 
   // Active modifiers: badges, then their notes, under the current weight rather than above it.
-  const badges = [skiActive && '<span class="ski-badge">🎿 Ski</span>', kneeActive && '<span class="knee-badge">🦵 Knee Care</span>',
-    backActive && '<span class="back-badge">🩺 Back Care</span>', preseasonActive && '<span class="preseason-badge">🏔️ Preseason</span>',
-    deloadActive && '<span class="deload-badge">🔋 Deload</span>', shoulderActive && `<span class="shoulder-badge">🩹 ${shoulderPaused ? "Paused" : "Shoulder Rehab"}</span>`].filter(Boolean).join("");
+  const badges = mods.map(m => `<span class="${m.key}-badge">${m.emoji} ${typeof m.badge === "function" ? m.badge(name) : m.badge}</span>`).join("");
   let modHtml = badges ? `<div class="mod-badges">${badges}</div>` : "";
   if(kneeActive && KNEE_CARE_TIP[name]){
     modHtml += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
@@ -555,7 +542,7 @@ function renderExerciseCard(name, ex){
     modHtml += `<div class="preseason-line">${ex.preseasonNote}${ex.preseasonWeek3 ? ' <b>Add from week 3.</b>' : ''}</div>`;
   }
 
-  let html = `<div class="card${skiActive ? ' ski-mode' : ''}${kneeActive ? ' knee-mode' : ''}${backActive ? ' back-mode' : ''}${preseasonActive ? ' preseason-mode' : ''}${shoulderActive ? ' shoulder-mode' : ''}">`;
+  let html = `<div class="card${mods.filter(m => m.key !== "deload").map(m => ` ${m.key}-mode`).join("")}">`;
   if(isCustom && deletingExercise === name){
     html += `<div class="ex-name-row">
       <span style="color:var(--slate);font-size:0.85rem;">Delete "${escapeHtml(name)}" and all its logged history?</span>
