@@ -420,7 +420,7 @@ function hrLine(name, last){
 }
 function sessionWhat(ex, e){
   return ex.trackBy !== "weight" ? formatEntryValue(e, ex)
-    : `${e.weight > 0 ? `${e.weight} lb` : "bodyweight"}, ${repLabel(e.sets, e.reps, ex.unit)}`;
+    : `${e.weight > 0 ? `${e.weight} lb` : "bodyweight"}, ${setsText(e, ex)}`;
 }
 // The last full session's numbers and RPE (a deload session is described on its own line).
 function lastSessionLine(ex, work){
@@ -779,6 +779,9 @@ function renderHistRow(e, idx, isLatest, ex, name){
              <div class="field"><label>${repsFieldLabel(name, ex.unit)}</label><input type="number" inputmode="numeric" id="edit-reps" value="${e.reps}"></div>`
         }
       </div>
+      ${ex.trackBy !== "duration" ? `<div class="form-row">
+        <div class="field" style="flex:1 1 100%;"><label>Reps per set (optional)</label><input type="text" id="edit-perset" value="${(e.repsBySet || []).join(" ")}" placeholder="e.g. 8 8 6"></div>
+      </div>` : ""}
       <div class="form-row">
         <div class="field" style="flex:1 1 100%;"><label>Date</label><input type="date" id="edit-date" value="${e.date || todayISO()}"></div>
       </div>
@@ -895,6 +898,8 @@ function saveEditEntry(name, idx){
     const weightEl = document.getElementById("edit-weight");
     entry.sets = Number(document.getElementById("edit-sets").value) || entry.sets;
     entry.reps = Number(document.getElementById("edit-reps").value) || entry.reps;
+    const perEl = document.getElementById("edit-perset");
+    applyPerSet(entry, perEl ? (perEl.value.match(/\d+/g) || []).map(Number).filter(v => v > 0) : null);
     if(!isBodyweight && weightEl) entry.weight = Number(weightEl.value) || entry.weight;
   }
 
@@ -961,7 +966,7 @@ function renderForm(name, ex){
   const rpeField = `<div class="field field-rpe"><label>RPE</label><input type="number" inputmode="numeric" id="f-difficulty" min="1" max="10" value="7"></div>`;
   if(ex.trackBy === "weight"){
     html += `<div class="field"><label>${weightFieldLabel(name)}</label><input type="number" inputmode="decimal" id="f-weight" value="${weightDefault}"></div>`;
-    html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
+    html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}" oninput="syncPerSet()"></div>`;
     html += `<div class="field"><label>${repsFieldLabel(name, ex.unit)}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   } else if(ex.trackBy === "duration"){
     html += `<div class="field"><label>Minutes</label><input type="number" inputmode="numeric" id="f-minutes" value="${minutesDefault}"></div>`;
@@ -970,13 +975,18 @@ function renderForm(name, ex){
     if(ex.trackIncline) html += `<div class="field"><label>Incline %</label><input type="number" inputmode="decimal" step="0.5" id="f-incline"></div>`;
     if(recovery) html += `<div class="field"><label>Temp °F</label><input type="number" inputmode="numeric" id="f-temp" value="${lastLog && lastLog.tempF != null ? lastLog.tempF : RECOVERY[name].temp}"></div>`;
   } else {
-    html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}"></div>`;
+    html += `<div class="field"><label>Sets</label><input type="number" inputmode="numeric" id="f-sets" value="${setsDefault}" oninput="syncPerSet()"></div>`;
     html += `<div class="field"><label>${repsFieldLabel(name, ex.unit)}</label><input type="number" inputmode="numeric" id="f-reps" value="${repsDefault}"></div>`;
   }
   // Cardio already fills its row (minutes, miles, speed, incline), so RPE moves next to Note.
   if(ex.trackBy !== "duration") html += rpeField;
   html += `</div>`;
-  if(plan) html += `<p class="prefill-note">${mods.length ? `Pre-filled: ${mods.join(", ")} plan` : "Pre-filled: next progression"}</p>`;
+  const prefill = plan ? (mods.length ? `Pre-filled: ${mods.join(", ")} plan` : "Pre-filled: next progression") : "";
+  if(ex.trackBy !== "duration"){
+    // Optional reps for each set, for sessions where the last set fell short: "8 8 6".
+    html += `<div class="prefill-row"><span class="prefill-note">${prefill}</span><button type="button" class="perset-toggle" onclick="togglePerSet(this)">Reps per set</button></div>`;
+    html += `<div class="perset-row" id="perset-row" hidden></div>`;
+  } else if(plan) html += `<p class="prefill-note">${prefill}</p>`;
   html += `<div class="form-row">
     ${ex.trackBy === "duration" && !recovery ? rpeField : ""}<div class="field field-note">${ex.trackBy === "duration" && !recovery ? "<label>Note</label>" : ""}<input type="text" id="f-note" aria-label="Note" value="${withModifierTags("", activeModifierTags(name, ex))}" placeholder="${recovery ? 'Note, e.g. after lifting' : ex.trackBy==='duration' ? 'Note, e.g. easy spin' : 'Note, e.g. felt heavy, or next: 185'}"></div>
   </div>`;
@@ -985,6 +995,32 @@ function renderForm(name, ex){
     <button class="log" onclick="logEntry()">${recovery ? "Log session" : "Log set"}</button>
   </div>`;
   return html;
+}
+
+// The per-set reps row: one small box per set, filled with the reps above. Opening it, or changing
+// the set count while it's open, rebuilds it (keeping anything already typed).
+function togglePerSet(btn){
+  const row = document.getElementById("perset-row");
+  if(!row) return;
+  row.hidden = !row.hidden;
+  btn.textContent = row.hidden ? "Reps per set" : "Same reps each set";
+  if(!row.hidden){ row.innerHTML = ""; syncPerSet(); }
+}
+function syncPerSet(){
+  const row = document.getElementById("perset-row");
+  if(!row || row.hidden) return;
+  const n = Math.max(1, Math.min(8, Number((document.getElementById("f-sets") || {}).value) || 3));
+  const reps = (document.getElementById("f-reps") || {}).value || "";
+  const kept = [...row.querySelectorAll("input")].map(i => i.value);
+  row.innerHTML = Array.from({ length: n }, (_, i) =>
+    `<label class="perset-field"><span>Set ${i + 1}</span><input type="number" inputmode="numeric" class="perset-in" value="${kept[i] != null ? kept[i] : reps}"></label>`).join("");
+}
+// Reps from the per-set row when it's open and the sets differ; null otherwise.
+function readPerSet(){
+  const row = document.getElementById("perset-row");
+  if(!row || row.hidden) return null;
+  const reps = [...row.querySelectorAll("input")].map(i => Number(i.value)).filter(v => v > 0);
+  return reps.length ? reps : null;
 }
 
 function repeatLast(name){

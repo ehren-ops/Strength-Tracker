@@ -164,6 +164,7 @@ function entryToRow(entry, exerciseId, userId){
     note: entry.note || "",
     completed_indices: entry.completedIndices ?? null,
     temp_f: entry.tempF ?? null,
+    reps_by_set: entry.repsBySet ?? null,
     deload: !!entry.deload,
     preseason: !!entry.preseason,
     // undefined (dropped from the request) rather than null for entries logged before this
@@ -187,6 +188,7 @@ function rowToEntry(row){
     note: row.note || "",
     completedIndices: row.completed_indices || undefined,
     tempF: row.temp_f ?? undefined,
+    repsBySet: row.reps_by_set || undefined,
     deload: row.deload || undefined,
     preseason: row.preseason || undefined,
     loggedAt: row.logged_at || undefined,

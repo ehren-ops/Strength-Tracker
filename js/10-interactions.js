@@ -115,6 +115,7 @@ function logEntry(){
       note: (noteEl.value || "").trim(),
     };
   }
+  if(ex.trackBy !== "duration") applyPerSet(entry, readPerSet());
   if(modes.deload && ex.trackBy !== "duration") entry.deload = true;
   // Every modifier on for this lift keeps its tag in the note, in front of whatever was typed.
   entry.note = withModifierTags(entry.note, activeModifierTags(selected, ex));

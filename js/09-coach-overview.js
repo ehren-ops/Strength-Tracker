@@ -259,6 +259,12 @@ function recoveryLog(from, to){
   return lines.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.at < b.at ? -1 : 1).map(l => l.text);
 }
 
+// Weekly working sets per pattern and the pull-to-push ratio, for the weekly check-in.
+function balanceForCoach(){
+  const b = weeklyBalance();
+  return { thisWeek: b.week, weeklyAverage4Weeks: b.avg, pullToPushRatio4Weeks: b.ratio, targetRatio: b.target };
+}
+
 // Program lifts dropped from their last 2+ sessions for no stated reason, for the coach.
 function liftsDueForCoach(){
   const due = dueLifts();
@@ -310,7 +316,7 @@ function buildWeeklyCoachPayload(){
   const weekLogTimes = Object.fromEntries([...sessionDates].filter(d => d >= shiftISO(weekEnd, -6)).sort()
     .map(d => [d, sessionAnchors(d)]).filter(([, l]) => l.length >= 2));
   const weekSkips = Object.fromEntries(Object.keys(skips).filter(d => d >= shiftISO(weekEnd, -6) && d <= weekEnd).sort().map(d => [d, skippedOn(d)]));
-  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), skipped: weekSkips, modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd), rehab: rehabCoachBlock(), recovery: recoveryLog(shiftISO(weekEnd, -13), weekEnd), liftsDue: liftsDueForCoach() };
+  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), skipped: weekSkips, modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd), weeklySets: balanceForCoach(), rehab: rehabCoachBlock(), recovery: recoveryLog(shiftISO(weekEnd, -13), weekEnd), liftsDue: liftsDueForCoach() };
 }
 
 async function generateCoach(kind){
@@ -572,7 +578,7 @@ function renderModifierRow(key, emoji, name, desc, extraHtml){
 // paused, bench and curls held. One status line on or off.
 function renderShoulderModifier(){
   let status;
-  if(modes.shoulder) status = `On since ${fmtShortDate(shoulderRehab.startedOn)} · week ${rehabWeek()}, phase ${rehabPhase()}`;
+  if(modes.shoulder) status = `${shoulderRehab.startedOn ? `On since ${fmtShortDate(shoulderRehab.startedOn)}` : "On"} · week ${rehabWeek()}, phase ${rehabPhase()}`;
   else if(shoulderRehab.startedOn) status = `Last run: ${fmtShortDate(shoulderRehab.startedOn)} to ${fmtShortDate(shoulderRehab.endedOn || shoulderRehab.startedOn)}. Paused lifts ramp back 85, 92.5, 100%.`;
   else status = `Not started`;
   return renderModifierRow("shoulder", "🩹", "Shoulder Rehab",
@@ -598,6 +604,55 @@ function renderDeloadModifier(){
   return renderModifierRow("deload", "🔋", "Deload Week",
     "A planned lighter week so joints and tendons catch up: about 10% less weight and a third fewer sets on every lift. Lifts already cut for Knee or Back Care just lose sets. Ends itself after 7 days.",
     `<div class="deload-status" id="deload-status"><div>${last}</div><div>${next}</div></div>`);
+}
+
+// ---------- weekly balance ----------
+// Working sets per movement pattern: this week, and the weekly average over 4 weeks. Pulling
+// should at least match pressing (1.5 pull sets per press set while rehabbing a shoulder), the
+// imbalance behind most shoulder trouble.
+const BALANCE_PATTERNS = ["push", "pull", "squat", "hinge", "single-leg", "power", "calves", "carry and grip", "core"];
+function setsByPattern(from, to){
+  const out = {};
+  Object.entries(data).forEach(([name, ex]) => {
+    const p = LIFT_PATTERNS[name];
+    if(!p || ex.trackBy === "checklist" || ex.trackBy === "duration") return;
+    ex.entries.forEach(e => { if(e.date >= from && e.date <= to) out[p] = (out[p] || 0) + (Number(e.sets) || 0); });
+  });
+  return out;
+}
+function weeklyBalance(){
+  const today = todayISO();
+  const week = setsByPattern(shiftISO(today, -6), today);
+  const four = setsByPattern(shiftISO(today, -27), today);
+  const avg = Object.fromEntries(Object.entries(four).map(([p, n]) => [p, Math.round(n / 4 * 10) / 10]));
+  const push = four.push || 0, pull = four.pull || 0;
+  const target = modes.shoulder ? 1.5 : 1;
+  const ratio = push ? Math.round(pull / push * 10) / 10 : null;
+  // Extra pull sets a week that would reach the target at the current pressing volume.
+  const short = ratio != null && ratio < target ? Math.ceil((push * target - pull) / 4) : 0;
+  return { week, avg, ratio, target, short };
+}
+function renderBalanceCard(){
+  const b = weeklyBalance();
+  const rows = BALANCE_PATTERNS.filter(p => b.week[p] || b.avg[p]);
+  const ratioTxt = b.ratio == null ? "" : `Pull : push ${b.ratio} : 1`;
+  let html = `<div class="card">${collapsibleHead("balance", "Weekly Balance", ratioTxt)}`;
+  if(overviewCollapsed.balance) return html + `</div>`;
+  if(!rows.length) return html + `<p class="range-note">Sets per movement pattern show here once you log a few sessions.</p></div>`;
+  const ok = b.ratio != null && b.ratio >= b.target;
+  if(b.ratio != null){
+    html += `<p class="bal-ratio ${ok ? "bal-ok" : "bal-low"}"><b>${ratioTxt}</b> over 4 weeks · target ${b.target} : 1${modes.shoulder ? " while rehabbing" : ""}.${ok ? "" : ` About ${b.short} more pull set${b.short === 1 ? "" : "s"} a week would even it out.`}</p>`;
+  }
+  const max = Math.max(...rows.map(p => Math.max(b.week[p] || 0, b.avg[p] || 0)), 1);
+  html += `<div class="bal-head"><span></span><span></span><span>Week · avg</span></div>`;
+  rows.forEach(p => {
+    const w = b.week[p] || 0, a = b.avg[p] || 0;
+    html += `<div class="bal-row"><span class="bal-name">${p}</span>
+      <span class="bal-bar"><span style="width:${(w / max * 100).toFixed(0)}%"></span><i style="left:${(a / max * 100).toFixed(0)}%"></i></span>
+      <span class="bal-n">${w} · ${a}</span></div>`;
+  });
+  html += `<p class="range-note">Working sets per pattern. The tick marks the 4-week weekly average.</p></div>`;
+  return html;
 }
 
 // Change per lift from its first to its latest full session, over everything logged or a recent
@@ -680,6 +735,8 @@ function renderOverview(){
     html += `<div><div class="n" style="color:${color}">${d.avg===null?'-':(d.avg>0?'+':'')+d.avg.toFixed(0)+'%'}</div><div class="l">${d.title}</div><div style="font-size:0.62rem;color:var(--slate);">${d.count}/${d.total} lifts w/ data</div></div>`;
   });
   html += `</div></div></div>`;
+
+  html += renderBalanceCard();
 
   html += `<div class="card">`;
   html += `<div onclick="toggleVolumeExpanded()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">

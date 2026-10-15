@@ -256,7 +256,7 @@ function generateCoachNotes(){
 
   const total = items.length;
   const hitCount = items.filter(i => i.hit).length;
-  const increased = items.filter(i => i.trend === "increased");
+  const increased = items.filter(i => i.trend === "increased" && i.hit);
   const missed = items.filter(i => !i.hit);
   const concerns = items.filter(i => i.entry.note && CONCERN_WORDS.some(w => i.entry.note.toLowerCase().includes(w)));
 
@@ -277,6 +277,10 @@ function generateCoachNotes(){
   }
   if(!missed.length && !concerns.length && hitCount === total){
     sentences.push(increased.length ? `Clean session across the board - nothing to dial back here.` : `Solid and consistent - everything landed, nothing urgent to change.`);
+  }
+  const bal = weeklyBalance();
+  if(bal.ratio != null && bal.ratio < bal.target){
+    sentences.push(`Pulling is behind pressing (${bal.ratio} : 1 over 4 weeks, target ${bal.target} : 1) - about ${bal.short} more pull set${bal.short === 1 ? "" : "s"} a week would even it out.`);
   }
   const dueNow = Object.keys(dueLifts());
   if(dueNow.length){

@@ -169,8 +169,22 @@ function repLabel(sets, reps, unit){
   return unit === "sec" ? `${sets}x${reps}sec` : `${sets}x${reps}`;
 }
 
+// Per-set reps on an entry: when they differ, the count is the sets and the lowest is the reps, so
+// progression only counts a session where every set hit the target. Equal reps store nothing extra.
+function applyPerSet(entry, reps){
+  if(!reps || !reps.length){ delete entry.repsBySet; return entry; }
+  entry.sets = reps.length;
+  entry.reps = Math.min(...reps);
+  if(reps.every(r => r === reps[0])) delete entry.repsBySet;
+  else entry.repsBySet = reps;
+  return entry;
+}
+// Sets and reps as logged: "3x8", or each set's reps when they differed ("8/8/6").
+function setsText(e, ex){
+  return e.repsBySet && e.repsBySet.length > 1 ? e.repsBySet.join("/") + (ex.unit === "sec" ? " sec" : "") : repLabel(e.sets, e.reps, ex.unit);
+}
 function formatEntryValue(e, ex){
-  if(ex.trackBy === "weight") return `${e.weight} lb ${repLabel(e.sets, e.reps, ex.unit)}`;
+  if(ex.trackBy === "weight") return `${e.weight} lb ${setsText(e, ex)}`;
   if(ex.trackBy === "duration"){
     let s = `${e.minutes} min`;
     if(e.distance != null && e.distance !== "") s += `, ${e.distance} mi`;
@@ -185,7 +199,7 @@ function formatEntryValue(e, ex){
     if(e.tempF != null && e.tempF !== "") s += ` at ${e.tempF}°F`;
     return s;
   }
-  return repLabel(e.sets, e.reps, ex.unit);
+  return setsText(e, ex);
 }
 function niceTicks(values, forceStep){
   const nums = values.filter(v => v !== null && v !== undefined);

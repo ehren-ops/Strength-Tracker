@@ -2692,6 +2692,45 @@ async function main(){
   if(!ok86) throw new Error('expected due lifts with intentional skips, deload weeks and rehab pauses excluded, got: ' + JSON.stringify(r86));
   console.log('OK: Lat Pulldown, Face Pulls and Fly are due; Bicep Curl (skipped for injury and equipment) is not; Fly is not due while Shoulder Rehab pauses it; dot, Next line, Coach\'s Notes and the coach payload all agree');
 
+  console.log('=== 87: reps per set log as 8/8/6 and count as a miss; the Weekly Balance card compares pulling with pressing ===');
+  const r87 = await page.evaluate(() => {
+    const saved = { data, modes: JSON.stringify(modes) };
+    MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const d = n => shiftISO(todayISO(), n);
+    const mk = (n, rows) => Object.assign(newExerciseShell(n), { entries: rows.map((r, i) => ({ clientId: n + i, date: d(r[0]), weight: r[1], sets: r[2], reps: 8, difficulty: 7 })) });
+    data = { 'Bench Press': mk('Bench Press', [[-9, 150, 3], [-2, 150, 4]]), 'Barbell Row': mk('Barbell Row', [[-9, 120, 3], [-2, 120, 3]]), 'Squat': mk('Squat', [[-3, 175, 3]]) };
+    const out = {};
+    view = 'upper'; selected = 'Bench Press'; render();
+    const btn = document.querySelector('.perset-toggle');
+    btn.click();
+    out.boxes = document.querySelectorAll('#perset-row input').length;
+    document.getElementById('f-sets').value = '5'; syncPerSet();
+    out.boxes4 = document.querySelectorAll('#perset-row input').length;
+    document.getElementById('f-sets').value = '3'; syncPerSet();
+    const ins = document.querySelectorAll('#perset-row input');
+    ins[0].value = '8'; ins[1].value = '8'; ins[2].value = '6';
+    document.getElementById('f-weight').value = '155';
+    logEntry();
+    const e = data['Bench Press'].entries[data['Bench Press'].entries.length - 1];
+    out.entry = { sets: e.sets, reps: e.reps, by: e.repsBySet, row: entryToRow(e, 'x', 'y').reps_by_set };
+    selected = 'Bench Press'; render();
+    out.hist = document.querySelector('.hist-row.latest .exact').textContent;
+    out.next = computeSuggestion(data['Bench Press'], 'Bench Press').weight;
+    out.equal = applyPerSet({ sets: 3, reps: 8 }, [8, 8, 8]);
+    view = 'overview'; render();
+    out.balance = { ratio: (document.querySelector('.bal-ratio') || {}).textContent, rows: [...document.querySelectorAll('.bal-row .bal-name')].map(e => e.textContent) };
+    out.coach = buildWeeklyCoachPayload().weeklySets;
+    out.notes = generateCoachNotes() || '';
+    data = saved.data; Object.assign(modes, JSON.parse(saved.modes)); render();
+    return out;
+  });
+  const ok87 = r87.boxes === 4 && r87.boxes4 === 5 && r87.entry.sets === 3 && r87.entry.reps === 6 && JSON.stringify(r87.entry.by) === '[8,8,6]' && JSON.stringify(r87.entry.row) === '[8,8,6]' &&
+    /155 lb 8\/8\/6/.test(r87.hist) && r87.next === 155 && r87.equal.repsBySet === undefined && r87.equal.reps === 8 &&
+    /Pull : push 0\.6 : 1/.test(r87.balance.ratio || '') && r87.balance.rows.join(',') === 'push,pull,squat' &&
+    r87.coach.pullToPushRatio4Weeks === 0.6 && r87.coach.thisWeek.push === 7 && !/moved up in weight/.test(r87.notes) && /Pulling is behind pressing/.test(r87.notes);
+  if(!ok87) throw new Error('expected per-set reps and the weekly balance card to work, got: ' + JSON.stringify(r87));
+  console.log('OK: "8 8 6" logs as 3 sets at 6 (shown 8/8/6, synced, held at 155); Weekly Balance reads pull : push 0.6 : 1 with a nudge in Coach\'s Notes and the coach payload');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
