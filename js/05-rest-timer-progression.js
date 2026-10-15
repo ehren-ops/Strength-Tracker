@@ -10,6 +10,7 @@ let lastRestTimerChoiceIndex = null; // save the choice index when timer ends, t
 
 function restTimerChoicesFor(name){
   const bucket = restBucketFor(data[name]);
+  if(bucket.choices) return bucket.choices;
   // First choice: 60 sec unless exercise recommends lower
   const firstChoice = bucket.minSec < 60 ? bucket.minSec : 60;
   const raw = [firstChoice];
@@ -363,6 +364,19 @@ function applyReturn(core, ex, name, baseline){
   return core;
 }
 
+// Full Body 2+1 runs the main lifts at 4x5. The first session after a program switch (either way)
+// converts the last working set to the new reps from its estimated max. Moving to heavier, lower-rep
+// sets it starts a little under (95%), so the first week lands around RPE 7 to 8; normal
+// progression takes over from there.
+function applyProgram(s, ex, last){
+  if(!s || ex.trackBy !== "weight" || !ex.targetRepsStrength || !last || !(last.weight > 0)) return s;
+  const target = effectiveTargetReps(ex), lastTarget = entryTargetReps(ex, last);
+  const out = strengthTarget(ex) && target === strengthTarget(ex) ? { ...s, sets: STRENGTH_SETS } : s;
+  if(programOn(last.date) === program.key || target === lastTarget || modes.preseason || modes.ski) return out;
+  const weight = roundLoad(last.weight * (1 + last.reps / 30) / (1 + target / 30) * (target < lastTarget ? 0.95 : 1));
+  return { ...out, weight, reps: target, sets: strengthTarget(ex) ? STRENGTH_SETS : 3, readyToProgress: false, programStart: { from: last.weight, fromReps: last.reps } };
+}
+
 // Joint check: pain above 3 of 10 on the last session (deload or not) holds the load; 6 or more
 // drops it about 10%. Lifts without weight hold their reps instead.
 const PAIN_HOLD_ABOVE = 3, PAIN_DROP_AT = 6;
@@ -383,7 +397,7 @@ function computeSuggestion(ex, name){
   const baseline = ex.entries.filter(e => !e.deload);
   const baseEntries = baseline.length ? baseline : ex.entries;
   const lastBaseEntry = baseEntries[baseEntries.length - 1];
-  const core = applyPain(applyShoulder(applyReturn(capAtMaxWeight(applyNoteTarget(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, lastBaseEntry), ex, name, lastBaseEntry), ex, name, baseline), ex, name, baseline), ex);
+  const core = applyPain(applyShoulder(applyReturn(capAtMaxWeight(applyNoteTarget(applyProgram(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, lastBaseEntry), ex, lastBaseEntry), ex, name, lastBaseEntry), ex, name, baseline), ex, name, baseline), ex);
   if(!modes.deload || !core || ex.trackBy === "duration") return core;
   const lastBase = (baseline.length ? baseline : ex.entries)[ (baseline.length ? baseline : ex.entries).length - 1 ];
   const sets = Math.max(2, Math.round((lastBase.sets || core.sets || 3) * 2 / 3));

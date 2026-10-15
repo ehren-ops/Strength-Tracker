@@ -280,7 +280,7 @@ function recoveryLog(from, to){
 
 // Which program is running, so the coach reads the day labels and the optional C day right.
 function programForCoach(){
-  return { name: PROGRAMS[program.key].name, since: program.startedOn || null, days: Object.fromEntries(programDays().map(d => [DAY_TITLES[d], activeDayOrder(d)])) };
+  return { name: PROGRAMS[program.key].name, since: program.startedOn || null, mainLifts: program.key === "fullbody" ? "Squat, Bench Press, RDL and Barbell Row at 4x5, about 80 to 85% of max" : "3x8", days: Object.fromEntries(programDays().map(d => [DAY_TITLES[d], activeDayOrder(d)])) };
 }
 
 // Weekly working sets per pattern and the pull-to-push ratio, for the weekly check-in.

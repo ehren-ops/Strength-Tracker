@@ -1152,41 +1152,38 @@ async function main(){
   if(badgeAfterTick.trim() === '1:30') throw new Error('expected the countdown to actually tick down after ~1 second, still showed: ' + badgeAfterTick);
   console.log('OK: the countdown ticks down every second:', badgeAfterTick.trim());
 
-  // Tapping mid-countdown cycles 60 / 90 / this exercise's own upper limit -
-  // Bench Press's bucket is a flat 90 sec, so its 3 raw choices collapse to
-  // just [60, 90] once de-duped - then ONE MORE tap past the end of that
-  // cycle removes the timer entirely, covering "I pressed it by accident".
+  // Tapping mid-countdown steps through the lift's longer rests; Bench Press is a main lift, so its
+  // rest starts at 90 sec and steps to 2:00, then 3:00, then ONE MORE tap removes the timer,
+  // covering "I pressed it by accident".
   await page.click('#rest-timer-badge');
   await sleep(150);
   const badgeAfterFirstTap = await page.locator('#rest-timer-badge').textContent();
-  if(badgeAfterFirstTap.trim() !== '1:00') throw new Error('expected the first tap to cycle to 60 sec (1:00), got: ' + badgeAfterFirstTap);
+  if(badgeAfterFirstTap.trim() !== '2:00') throw new Error('expected the first tap to step a main lift to 2:00, got: ' + badgeAfterFirstTap);
   await page.click('#rest-timer-badge');
   await sleep(150);
   const badgeAfterSecondTap = await page.locator('#rest-timer-badge').textContent();
-  if(badgeAfterSecondTap.trim() !== '1:30') throw new Error('expected the second tap to cycle to 90 sec (1:30), got: ' + badgeAfterSecondTap);
+  if(badgeAfterSecondTap.trim() !== '3:00') throw new Error('expected the second tap to step to 3:00, got: ' + badgeAfterSecondTap);
   await page.click('#rest-timer-badge');
   await sleep(150);
-  if(await page.locator('#rest-timer-badge:visible').count() !== 0) throw new Error('expected a third tap (past the end of the 60/90 cycle) to remove the timer entirely');
-  console.log('OK: tapping the running badge cycles through 60/90/upper-limit, then removes the timer on the next tap');
+  if(await page.locator('#rest-timer-badge:visible').count() !== 0) throw new Error('expected a third tap (past 3:00) to remove the timer entirely');
+  console.log('OK: tapping the running badge on a main lift steps 90 sec to 2:00 to 3:00, then removes the timer on the next tap');
 
-  // The same cycle-then-remove behavior lives on the "Start Rest" button
-  // itself, not just the badge - repeatedly pressing the button you
-  // already pressed should let you back out of an accidental start.
+  // The same step-then-remove behavior lives on the "Start Rest" button itself.
   await page.click('.tab:has-text("Full Body")');
   await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
   await page.click('.rest-action-btn');
   await sleep(150);
-  if((await page.locator('#rest-timer-badge').textContent()).trim() !== '1:30') throw new Error('expected pressing Start Rest fresh to begin at the default 90 sec (1:30)');
+  if((await page.locator('#rest-timer-badge').textContent()).trim() !== '1:30') throw new Error('expected pressing Start Rest fresh to begin at 90 sec (1:30)');
   await page.click('.rest-action-btn');
   await sleep(150);
-  if((await page.locator('#rest-timer-badge').textContent()).trim() !== '1:00') throw new Error('expected a second press of Start Rest to cycle to 60 sec (1:00), same as the badge tap');
+  if((await page.locator('#rest-timer-badge').textContent()).trim() !== '2:00') throw new Error('expected a second press of Start Rest to step to 2:00, same as the badge tap');
   await page.click('.rest-action-btn');
   await sleep(150);
-  if((await page.locator('#rest-timer-badge').textContent()).trim() !== '1:30') throw new Error('expected a third press of Start Rest to cycle to 90 sec (1:30)');
+  if((await page.locator('#rest-timer-badge').textContent()).trim() !== '3:00') throw new Error('expected a third press of Start Rest to step to 3:00');
   await page.click('.rest-action-btn');
   await sleep(150);
-  if(await page.locator('#rest-timer-badge:visible').count() !== 0) throw new Error('expected a fourth press of Start Rest (past the cycle) to remove the timer');
-  console.log('OK: repeatedly pressing the Start Rest button cycles 60/90/upper-limit and then removes the timer, same as the badge');
+  if(await page.locator('#rest-timer-badge:visible').count() !== 0) throw new Error('expected a fourth press of Start Rest (past 3:00) to remove the timer');
+  console.log('OK: repeatedly pressing the Start Rest button steps a main lift 90 sec, 2:00, 3:00 and then removes the timer, same as the badge');
 
   // Start fresh again for the zero/finished-state coverage below.
   await page.click('.rest-action-btn');
@@ -3017,6 +3014,25 @@ async function main(){
     r94.bHasLateral && r94.wallSit && r94.pallof === 'Pallof Press' && r94.celebrated && r94.nextToday === 'a' && r94.coach === 'Full Body 2+1' && r94.back === 'Full Body,Upper Body,Lower Body';
   if(!ok94) throw new Error('expected the Program setting to switch day lists, finishers and tabs and back, got: ' + JSON.stringify(r94));
   console.log('OK: Full Body 2+1 shows Day A, B, C tabs; A has 7 numbered lifts then Pallof Press and Farmer\'s Carry as finishers; Wall Sit joins with Ski; the coach is told; Classic comes back untouched');
+
+  console.log('=== 95: on Full Body 2+1 the main lifts run 4x5, converted once from the last 3x8, with a 90 sec to 3 min rest ===');
+  const r95 = await page.evaluate(() => {
+    const saved = { program: JSON.stringify(program), squat: JSON.stringify(data['Squat'] || null), view, selected, modes: { ...modes } };
+    MODE_DEFS.forEach(m => setModeFlag(m.key, false));
+    data['Squat'] = Object.assign(newExerciseShell('Squat'), { entries: [{ clientId: 'q95', date: shiftISO(todayISO(), -3), weight: 180, sets: 3, reps: 8, difficulty: 7 }] });
+    setProgram('fullbody');
+    view = 'a'; selected = 'Squat'; render();
+    const out = { headline: document.querySelector('.rec-plan').textContent, desc: document.querySelector('.rec-desc').textContent, rest: document.querySelector('.rec-rest').textContent,
+      form: [document.getElementById('f-weight').value, document.getElementById('f-sets').value, document.getElementById('f-reps').value] };
+    program = JSON.parse(saved.program); saveProgram();
+    const sq = JSON.parse(saved.squat); if(sq) data['Squat'] = sq; else delete data['Squat'];
+    MODE_DEFS.forEach(m => setModeFlag(m.key, !!saved.modes[m.key]));
+    view = saved.view; selected = saved.selected; persist(); render();
+    return out;
+  });
+  if(!/4x5/.test(r95.headline) || !/^New program: 4x5 at 185 lb, worked out from your 180 lb x 8/.test(r95.desc) || r95.rest !== 'Rest 90 sec–3 min' || r95.form.join(',') !== '185,4,5')
+    throw new Error('expected the first Full Body 2+1 squat at 4x5 x 185 with a 90 sec to 3 min rest, got: ' + JSON.stringify(r95));
+  console.log('OK: switching programs turns a 3x8 at 180 into a first 4x5 at 185 (form pre-filled), with Rest 90 sec–3 min');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

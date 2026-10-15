@@ -304,6 +304,9 @@ function estimate1RM(weight, reps){
 // keeping these as two independently-edited copies is exactly the kind of
 // drift that let a stale weight number survive a text-only fix earlier.
 function restBucketFor(ex){
+  // Main lifts: start at 90 sec and stretch to 3 min when the sets are heavy (the button steps up).
+  const name = Object.keys(data).find(k => data[k] === ex);
+  if(name && COMPOUND_LIFTS.has(name)) return { minSec: 90, maxSec: 180, label: "90 sec–3 min", choices: [120, 180] };
   const tr = effectiveTargetReps(ex);
   if(tr <= 6) return { minSec: 150, maxSec: 180, label: "2.5–3 min" };
   if(tr <= 10) return { minSec: 90, maxSec: 90, label: "90 sec" };

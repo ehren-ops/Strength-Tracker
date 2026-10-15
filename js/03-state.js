@@ -13,7 +13,7 @@ const PROGRAMS = {
   classic: { name: "Classic split", short: "Classic", days: CLASSIC_DAYS,
     desc: "Full Body, Upper and Lower days, 3x8 on the main lifts." },
   fullbody: { name: "Full Body 2+1", short: "Full Body 2+1", days: FULLBODY_DAYS,
-    desc: "Two full-body days a week (A and B) plus an optional C. Every main movement twice a week, core and grip finishers." },
+    desc: "Two full-body days a week (A and B) plus an optional C. Main lifts at 4x5, every main movement twice a week, core and grip finishers." },
 };
 let program = (function(){
   try{ const p = JSON.parse(window.localStorage.getItem(PROGRAM_KEY)); return p && PROGRAMS[p.key] ? p : { key: "classic" }; }catch(e){ return { key: "classic" }; }
@@ -22,9 +22,17 @@ function saveProgram(){
   try{ window.localStorage.setItem(PROGRAM_KEY, JSON.stringify(program)); }catch(e){}
 }
 function programDays(){ return PROGRAMS[program.key].days; }
+// The program a date's sessions were logged under (Classic before the first switch).
+function programOn(date){
+  const h = (program.history || []).filter(p => p.startedOn <= date).pop();
+  return h ? h.key : "classic";
+}
+// Full Body 2+1 runs the main lifts (those with a strength target) at 4x5.
+const STRENGTH_SETS = 4;
+function strengthTarget(ex){ return program.key === "fullbody" && ex && ex.targetRepsStrength ? ex.targetRepsStrength : null; }
 function setProgram(key){
   if(key === program.key || !PROGRAMS[key]) return;
-  program = { key, startedOn: todayISO(), prev: { key: program.key, startedOn: program.startedOn || null } };
+  program = { key, startedOn: todayISO(), history: [...(program.history || []), { key, startedOn: todayISO() }] };
   saveProgram();
   if(view !== "extra" && view !== "overview"){ view = nextProgramDay(); selected = DAY_ORDER[view][0]; }
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
@@ -292,6 +300,7 @@ function activeRepRange(ex){
 }
 function entryTargetReps(ex, entry){
   if(entry && entry.preseason && ex.targetRepsPreseason) return ex.targetRepsPreseason;
+  if(entry && ex.targetRepsStrength && entry.date && programOn(entry.date) === "fullbody") return ex.targetRepsStrength;
   const m = ex.repRange && String(ex.repRange).match(/^(\d+)-/);
   return m ? Number(m[1]) : (ex.targetReps || 8);
 }
@@ -299,6 +308,7 @@ function entryTargetReps(ex, entry){
 function effectiveTargetReps(ex){
   if(modes.preseason && ex.targetRepsPreseason) return ex.targetRepsPreseason;
   if(modes.ski && ex.targetRepsSki) return ex.targetRepsSki;
+  if(strengthTarget(ex)) return strengthTarget(ex);
   const range = activeRepRange(ex);
   return range ? range[0] : (ex.targetReps || 8);
 }

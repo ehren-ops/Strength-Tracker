@@ -422,6 +422,9 @@ function renderExerciseCard(name, ex){
             ? `Shoulder Rehab: hammer curls only at ${suggestion.weight} lb, lower over 3 sec. No adding weight yet.`
             : name === "Barbell Row" ? `Rehab: ${suggestion.weight} lb${share}, palms-in grip, no shrug. Held until rehab is off.`
             : `Rehab: ${suggestion.weight} lb${share}, medium grip, short of the chest. Hold until phase 3.`;
+        } else if(suggestion.programStart && !suggestion.deloadWeek){
+          const ps = suggestion.programStart;
+          msg = `New program: ${repLabel(suggestion.sets, suggestion.reps, ex.unit)} at ${suggestion.weight} lb, worked out from your ${ps.from} lb x ${ps.fromReps}. Progresses as usual from here.`;
         } else if(suggestion.shoulderBuild && !suggestion.deloadWeek){
           msg = `Shoulder Rehab phase 3: full range, ${suggestion.weight} lb. Add 5 lb a session at 3 of 10 or less, up to ${suggestion.shoulderBuild.fullWeight} lb.`;
         } else if(suggestion.shoulderReturn && !suggestion.deloadWeek){

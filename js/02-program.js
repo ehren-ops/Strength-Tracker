@@ -197,16 +197,16 @@ const EXERCISE_DEFAULTS = {
   "Side Plank": { trackBy: "reps", unit: "sec", targetReps: 30 },
   "Dead Bug": { trackBy: "reps", targetReps: 8 },
   "Wall Sit": { trackBy: "reps", unit: "sec", targetReps: 45 },
-  "Squat": {
+  "Squat": { targetRepsStrength: 5,
     targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell",
     preseason: true, targetRepsPreseason: 5, preseasonTempo: "4 sec lowering",
   },
   "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec eccentric descent per leg", repRange: "8-12" },
   "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec controlled descent each step" },
-  "Bench Press": { equipment: "barbell" },
-  "RDL": { equipment: "barbell" },
+  "Bench Press": { equipment: "barbell", targetRepsStrength: 5 },
+  "RDL": { equipment: "barbell", targetRepsStrength: 5 },
   "Hip Thrust": { equipment: "barbell", targetReps: 10 },
-  "Barbell Row": { equipment: "barbell" },
+  "Barbell Row": { equipment: "barbell", targetRepsStrength: 5 },
   "Back Extension": { trackBy: "weight", autoloadLastReps: true, repRange: "10-15" },
   // Accessories progress by reps inside a range before adding weight (double progression): +5 lb is
   // 3% on a squat but a third of a light dumbbell, so these earn it at the top of the range.
@@ -303,10 +303,10 @@ Object.entries(EXERCISE_DEFAULTS).forEach(([exName, preset]) => {
 });
 // Defaults filled onto an exercise saved before they existed: additive metadata only, never
 // fields that would reinterpret logged sessions.
-const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange", "inSeasonNote", "rowing", "trackSpm"];
+const BACKFILL_KEYS = ["targetRepsSki", "skiTempo", "equipment", "unit", "targetReps", "trackSpeed", "preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange", "inSeasonNote", "rowing", "trackSpm", "targetRepsStrength"];
 // App-authored copy and targets (never synced, never edited in the UI): always refreshed from
 // EXERCISE_DEFAULTS, so a wording or number change reaches devices that already have the lift.
-const ALWAYS_SYNC_KEYS = ["preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange", "inSeasonNote", "rowing", "trackSpm"];
+const ALWAYS_SYNC_KEYS = ["preseason", "preseasonNote", "preseasonTempo", "targetRepsPreseason", "preseasonWeek3", "preseasonPower", "trackBy", "autoloadLastReps", "repRange", "inSeasonNote", "rowing", "trackSpm", "targetRepsStrength"];
 function newExerciseShell(name){
   return Object.assign({ trackBy: "weight", entries: [] }, EXERCISE_DEFAULTS[name]);
 }
@@ -334,6 +334,6 @@ function backfillExerciseDefaults(){
 function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v106";
+const APP_VERSION = "v107";
 const APP_UPDATED = "Oct 15, 2026";
 

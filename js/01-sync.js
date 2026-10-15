@@ -286,7 +286,7 @@ async function runOp(op){
     const { error } = await supabaseClient.from("user_settings").upsert({
       user_id: userId,
       // The JSON field is the source of truth; the per-mode columns are kept for older app versions.
-      settings: { modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), deload: deloadRecord, shoulderRehab: rehabRecord, ski: skiPhase, program: { key: program.key, startedOn: program.startedOn || null } },
+      settings: { modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), deload: deloadRecord, shoulderRehab: rehabRecord, ski: skiPhase, program: { key: program.key, startedOn: program.startedOn || null, history: program.history || [] } },
       ...Object.fromEntries(MODE_DEFS.filter(m => m.column).map(m => [m.column, modes[m.key]])),
       deload_started_on: deloadDates.startedOn || null,
       deload_ended_on: deloadDates.endedOn || null,
@@ -482,7 +482,7 @@ async function pullRemoteAndMerge(){
     : settingsRow && settingsRow.shoulder_rehab_started_on ? { startedOn: settingsRow.shoulder_rehab_started_on, endedOn: settingsRow.shoulder_rehab_ended_on, phase3: settingsRow.shoulder_rehab_phase3 } : null;
   // A device that never chose a program adopts the one chosen elsewhere.
   if(saved.program && PROGRAMS[saved.program.key] && !program.startedOn && saved.program.key !== program.key){
-    program = { key: saved.program.key, startedOn: saved.program.startedOn || null };
+    program = { key: saved.program.key, startedOn: saved.program.startedOn || null, history: saved.program.history || [] };
     saveProgram();
   }
   if(saved.ski && saved.ski.phase && !skiPhase.phase){

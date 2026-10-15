@@ -52,7 +52,10 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - Programs (`PROGRAMS`, `setProgram`, 03): Classic (`full`/`upper`/`lower`) or Full Body 2+1
   (`a`/`b`/`c`, C optional). Never hardcode day keys: use `programDays()`, `dayGroupKeys()` (08)
   and `tabOrder()` (02). Finishers (`finishersFor`, 02) sit after a day's numbered lifts and never
-  count toward completion. `nextProgramDay` picks the day the app opens on.
+  count toward completion. `nextProgramDay` picks the day the app opens on. On Full Body 2+1 the
+  lifts with `targetRepsStrength` run at 4x5 (`strengthTarget`, `applyProgram` in 05); the first
+  session after a switch converts from the estimated max. `programOn(date)` tells which program a
+  past session was logged under, so history is judged by its own reps.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double

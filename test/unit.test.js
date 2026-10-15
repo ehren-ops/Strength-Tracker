@@ -183,6 +183,23 @@ test("Full Body 2+1: A/B/C lists, year-round lateral work on B, and the A, B, op
   eq(run(`nextProgramDay()`), run(`todayISO()`) === monday ? "a" : "c", "after B: C the same week, else A");
   run(`program = { key: "classic" };`);
 });
+test("Full Body 2+1: main lifts at 4x5, converted once from the last 3x8, then normal progression", () => {
+  reset(); lift("Squat", [[10, 175, 8], [3, 180, 8]]);
+  run(`program = { key: "fullbody", startedOn: todayISO(), history: [{ key: "fullbody", startedOn: todayISO() }] };`);
+  let s = suggest("Squat");
+  eq([s.weight, s.sets, s.reps, !!s.programStart], [185, 4, 5, true], "first 4x5 (about 81% of est. max)");
+  run(`data["Squat"].entries.push({ clientId: "n", date: todayISO(), weight: 185, sets: 4, reps: 5, difficulty: 7 });`);
+  s = suggest("Squat");
+  eq([s.weight, s.sets, s.reps, !!s.programStart, run(`entryTargetReps(data["Squat"], data["Squat"].entries[2])`), run(`entryTargetReps(data["Squat"], data["Squat"].entries[1])`)], [190, 4, 5, false, 5, 8], "then +5, history judged by its own scheme");
+  run(`program = { key: "classic", startedOn: shiftISO(todayISO(), 1), history: [{ key: "fullbody", startedOn: todayISO() }, { key: "classic", startedOn: shiftISO(todayISO(), 1) }] };`);
+  s = suggest("Squat");
+  eq([s.weight, s.reps, !!s.programStart], [170, 8, true], "back to Classic: converted to 3x8");
+  run(`program = { key: "classic" };`);
+});
+test("rest: main lifts start at 90 sec and step to 2 then 3 min; accessories keep their range", () => {
+  reset(); lift("Squat", [[3, 180, 8]]); lift("Cable Chest Fly", [[3, 50, 12]]);
+  eq([run(`restTimeFor(data["Squat"])`), run(`restTimerChoicesFor("Squat")`), run(`restTimeFor(data["Cable Chest Fly"])`)], ["90 sec–3 min", [120, 180], "90 sec"], "rest");
+});
 test("modifier registry rows are complete", () => {
   const bad = run(`MODE_DEFS.filter(m => !m.key || !m.storageKey || !m.name || !m.tag || !["light", "block"].includes(m.tag.kind) || typeof m.applies !== "function").map(m => m.key)`);
   eq(bad, [], "incomplete rows");
