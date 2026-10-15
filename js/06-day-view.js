@@ -22,7 +22,7 @@ function render(){
 }
 
 function renderTabs(){
-  document.getElementById("tabs").innerHTML = TAB_ORDER.map(v =>
+  document.getElementById("tabs").innerHTML = tabOrder().map(v =>
     `<div class="tab ${view===v?'active':''}" onclick="switchView('${v}')">${v==='overview'?'Overview':DAY_TITLES[v]}</div>`
   ).join("");
   document.getElementById("page-title").textContent = view === "overview" ? "Overview" : DAY_TITLES[view];
@@ -90,16 +90,21 @@ function getDisplayOrder(day){
   return power.concat(order.filter(name => !isPower(name)));
 }
 
+// Marks where a day's finishers start in its pill row.
+const FINISHER_MARK = "__finishers__";
 function renderDay(day){
   const app = document.getElementById("app");
-  const customExercises = Object.keys(data).filter(k => k !== REHAB_NAME && !allDayNames().includes(k) && (data[k].day || "full") === day);
+  // A custom lift saved under the other program's day shows on its matching day (Full = A, Upper = B, Lower = C).
+  const homeDay = d => programDays().includes(d) ? d : { full: "a", upper: "b", lower: "c", a: "full", b: "upper", c: "lower" }[d];
+  const customExercises = Object.keys(data).filter(k => k !== REHAB_NAME && !allDayNames().includes(k) && homeDay(data[k].day || "full") === day);
   // Shoulder Rehab leads every day's row while it is on, unnumbered so the lifts keep their numbers.
   const lead = modes.shoulder ? [REHAB_NAME] : [];
   // Bridges join a day after its numbered lifts while their modifier is on: Push-Ups (Shoulder
-  // Rehab) on Upper and Full Body, Spanish Squat (Knee Care) on Lower and Full Body.
+  // Rehab) on Upper and Full Body (A and B), Spanish Squat (Knee Care) on Lower and Full Body (A and B).
   const bridge = [];
-  if(modes.shoulder && (day === "upper" || day === "full")) bridge.push(PUSHUP_NAME);
-  if(modes.knee && (day === "lower" || day === "full")) bridge.push(...KNEE_ONLY);
+  if(modes.shoulder && ["upper", "full", "a", "b"].includes(day)) bridge.push(PUSHUP_NAME);
+  if(modes.knee && ["lower", "full", "a", "b"].includes(day)) bridge.push(...KNEE_ONLY);
+  const finishers = day === "extra" ? [] : finishersFor(day);
   let list;
   let groupRow = "";
   if(day === "extra"){
@@ -112,7 +117,7 @@ function renderDay(day){
     groupRow = `<div class="group-row">${EXTRA_GROUPS.map(g => `<button type="button" class="group-chip${g.key === extraGroup ? " active" : ""}" onclick="selectExtraGroup('${g.key}')" aria-pressed="${g.key === extraGroup}">${g.label}${g.key === "mobility" && isLoggedToday(MOBILITY_NAME) ? " ✓" : ""}</button>`).join("")}</div>`;
     list = lead.concat(extraList(extraGroup));
   } else {
-    list = lead.concat(getDisplayOrder(day), bridge.filter(n => !getDisplayOrder(day).includes(n)), customExercises);
+    list = lead.concat(getDisplayOrder(day), bridge.filter(n => !getDisplayOrder(day).includes(n)), customExercises, finishers.length ? [FINISHER_MARK, ...finishers] : []);
   }
   if(selected === REHAB_NAME && !modes.shoulder) selected = activeDayOrder(day)[0];
 
@@ -122,6 +127,7 @@ function renderDay(day){
   let html = groupRow + `<div class="pill-row" id="pill-scroll"${hidePills ? ' hidden' : ''}>`;
   list.forEach((name, i) => {
     if(name === MOBILITY_NAME) return; // the group button stands in for it
+    if(name === FINISHER_MARK){ html += `<span class="pill-label">Finishers</span>`; return; }
     const loggedToday = isLoggedToday(name);
     // Preseason-flagged exercises get a light purple pill so they're
     // visible at a glance in the row, and a darker solid purple instead
@@ -132,6 +138,7 @@ function renderDay(day){
     if(name === REHAB_NAME || (name === PUSHUP_NAME && bridge.includes(name))) pillClasses.push('rehab-pill');
     if(day !== "extra" && KNEE_ONLY.has(name)) pillClasses.push('knee-pill');
     if(name === MOBILITY_NAME) pillClasses.push('cat-stretch');
+    if(finishers.includes(name)) pillClasses.push('finisher-pill');
     if(day === "extra" && EXTRA_CATEGORY[name]) pillClasses.push('cat-' + EXTRA_CATEGORY[name]);
     if(selected===name) pillClasses.push('active');
     const skipped = !loggedToday && skipReason(name);
@@ -156,7 +163,7 @@ function renderDay(day){
     return;
   }
   let ex = selected === REHAB_NAME && modes.shoulder ? ensureRehabExercise() : data[selected];
-  if(!ex && (DAY_ORDER[day].includes(selected) || bridge.includes(selected))){
+  if(!ex && (DAY_ORDER[day].includes(selected) || bridge.includes(selected) || finishers.includes(selected))){
     ex = data[selected] = newExerciseShell(selected);
     persist();
     enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name: selected } });

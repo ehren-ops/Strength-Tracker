@@ -2914,7 +2914,7 @@ async function main(){
     out.week3 = [preseasonWeek(), activeDayOrder('lower').includes('Skater Bound')];
     view = 'overview'; overviewCollapsed.modifiers = false; render();
     out.status = document.querySelector('.ski-status').textContent;
-    out.pressed = [...document.querySelectorAll('.seg-btn')].map(b => b.getAttribute('aria-pressed')).join(',');
+    out.pressed = [...document.querySelectorAll('.seg-btn:not(.prog)')].map(b => b.getAttribute('aria-pressed')).join(',');
     setSkiPhase('season');
     out.season = [modes.preseason, modes.ski, skiPhase.phase];
     toggleMode('preseason');
@@ -2979,6 +2979,44 @@ async function main(){
     /20 min · 5000 m<br>2:00\/500 · 24 spm/.test(r93.hist) && /2:00 \/500m, 203 W, 24 spm/.test(r93.text) && r93.walkMinutes === '30' && r93.owned.join(',') === '35,3';
   if(!ok93) throw new Error('expected cardio fields to fill each other and the rower to log meters, split, stroke rate and watts, got: ' + JSON.stringify(r93));
   console.log('OK: 20 min at 2:00 fills 5000 m and logs 203 W at 24 spm; 1.5 mi at 3 mph fills 30 min; typing over a filled field keeps your number');
+
+  console.log('=== 94: the Program setting swaps Classic for Full Body 2+1 (Day A, B, optional C) with finishers, keeping every lift and its history ===');
+  const r94 = await page.evaluate(() => {
+    const saved = { program: JSON.stringify(program), view, selected, modes: { ...modes }, phase: JSON.stringify(skiPhase), celebrated: JSON.stringify(celebratedToday) };
+    MODE_DEFS.forEach(m => setModeFlag(m.key, false));
+    const out = {};
+    view = 'overview'; render();
+    out.programButtons = [...document.querySelectorAll('.seg-btn.prog')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed')).join(',');
+    setProgram('fullbody');
+    out.tabs = [...document.querySelectorAll('#tabs .tab')].map(t => t.textContent).join(',');
+    view = 'a'; selected = DAY_ORDER.a[0]; render();
+    out.aPills = [...document.querySelectorAll('.pill-row .pill:not(.pill-add), .pill-row .pill-label')].map(p => p.textContent.replace(/ ✓$/, '')).join('|');
+    out.bHasLateral = activeDayOrder('b').includes('Lateral Lunge');
+    setSkiPhase('season'); out.wallSit = finishersFor('a').includes('Wall Sit'); setSkiPhase('off');
+    selected = 'Pallof Press'; render();
+    out.pallof = !!data['Pallof Press'] && document.querySelector('h2.ex-name').textContent;
+    // Completing A's numbered lifts is a complete workout; finishers never block it.
+    const d0 = todayISO(), savedEntries = {};
+    activeDayOrder('a').forEach(n => { const ex = data[n] || (data[n] = newExerciseShell(n)); savedEntries[n] = ex.entries; ex.entries = [...ex.entries, { clientId: 'p94' + n, date: d0, weight: 50, sets: 3, reps: 8 }]; });
+    celebratedToday = {}; checkCoreWorkoutComplete('a');
+    out.celebrated = celebratedToday.a === d0;
+    dismissCelebration();
+    out.nextToday = nextProgramDay();
+    Object.entries(savedEntries).forEach(([n, es]) => { data[n].entries = es; });
+    out.coach = buildWeeklyCoachPayload().program.name;
+    setProgram('classic');
+    out.back = [...document.querySelectorAll('#tabs .tab')].map(t => t.textContent).slice(0, 3).join(',');
+    program = JSON.parse(saved.program); saveProgram();
+    skiPhase = JSON.parse(saved.phase); saveSkiPhase(); MODE_DEFS.forEach(m => setModeFlag(m.key, !!saved.modes[m.key]));
+    celebratedToday = JSON.parse(saved.celebrated);
+    view = saved.view; selected = saved.selected; persist(); render();
+    return out;
+  });
+  const ok94 = r94.programButtons === 'Classic:true,Full Body 2+1:false' && r94.tabs === 'Day A,Day B,Day C,Extra / Off-Day,Overview' &&
+    r94.aPills.startsWith('1. Squat|2. Bench Press|3. Barbell Row|4. Bulgarian Split Squat|5. Face Pulls|6. Back Extension|7. Standing Calf Raise|Finishers|Pallof Press|Farmer') &&
+    r94.bHasLateral && r94.wallSit && r94.pallof === 'Pallof Press' && r94.celebrated && r94.nextToday === 'a' && r94.coach === 'Full Body 2+1' && r94.back === 'Full Body,Upper Body,Lower Body';
+  if(!ok94) throw new Error('expected the Program setting to switch day lists, finishers and tabs and back, got: ' + JSON.stringify(r94));
+  console.log('OK: Full Body 2+1 shows Day A, B, C tabs; A has 7 numbered lifts then Pallof Press and Farmer\'s Carry as finishers; Wall Sit joins with Ski; the coach is told; Classic comes back untouched');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

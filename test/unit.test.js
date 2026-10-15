@@ -171,6 +171,18 @@ test("rower split reads 2:05, 2:05.3, 2.05 and seconds; watts follow Concept2", 
   eq(run(`[fmtSplit(125), fmtSplit(125.3), fmtSplit(119.96)]`), ["2:05", "2:05.3", "2:00"], "format");
   eq(run(`rowWatts(120)`), 203, "watts at 2:00");
 });
+test("Full Body 2+1: A/B/C lists, year-round lateral work on B, and the A, B, optional C rotation", () => {
+  reset(); run(`program = { key: "fullbody", startedOn: todayISO() };`);
+  eq(run(`activeDayOrder("a")`), ["Squat", "Bench Press", "Barbell Row", "Bulgarian Split Squat", "Face Pulls", "Back Extension", "Standing Calf Raise"], "A");
+  eq(run(`activeDayOrder("b")`), ["RDL", "Incline DB Press", "Cable Lat Pulldown", "Lateral Lunge", "Hip Thrust", "Back Extension", "Seated Calf Raise"], "B");
+  eq(run(`activeDayOrder("c")`), ["Kettlebell Swings", "Walking Lunge", "Push-Ups", "Face Pulls", "Bicep Curl", "Tricep Pushdown"], "C");
+  const monday = run(`weekStartISO(todayISO())`);
+  lift("Squat", [[0, 175, 8]]); run(`data["Squat"].entries[0].date = shiftISO(todayISO(), -1); data["Bench Press"] = Object.assign(newExerciseShell("Bench Press"), { entries: [{ clientId: "x", date: shiftISO(todayISO(), -1), weight: 150, sets: 3, reps: 8 }] });`);
+  eq(run(`nextProgramDay()`), "b", "after A comes B");
+  run(`data = { RDL: Object.assign(newExerciseShell("RDL"), { entries: [{ clientId: "r", date: todayISO() === weekStartISO(todayISO()) ? shiftISO(todayISO(), -7) : shiftISO(todayISO(), -1), weight: 225, sets: 3, reps: 8 }] }), "Incline DB Press": Object.assign(newExerciseShell("Incline DB Press"), { entries: [{ clientId: "i", date: todayISO() === weekStartISO(todayISO()) ? shiftISO(todayISO(), -7) : shiftISO(todayISO(), -1), weight: 60, sets: 3, reps: 8 }] }) };`);
+  eq(run(`nextProgramDay()`), run(`todayISO()`) === monday ? "a" : "c", "after B: C the same week, else A");
+  run(`program = { key: "classic" };`);
+});
 test("modifier registry rows are complete", () => {
   const bad = run(`MODE_DEFS.filter(m => !m.key || !m.storageKey || !m.name || !m.tag || !["light", "block"].includes(m.tag.kind) || typeof m.applies !== "function").map(m => m.key)`);
   eq(bad, [], "incomplete rows");

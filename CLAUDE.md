@@ -49,6 +49,10 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   modes `preseason` and `ski`, never on together; route changes through `setSkiPhase` (or
   `toggleMode`, which calls it). `skiPhase` dates the phase (`preseasonWeek`, the week-3 lifts in
   `activeDayOrder`, `checkSkiPhasePrompt`) and syncs in `user_settings.settings.ski`.
+- Programs (`PROGRAMS`, `setProgram`, 03): Classic (`full`/`upper`/`lower`) or Full Body 2+1
+  (`a`/`b`/`c`, C optional). Never hardcode day keys: use `programDays()`, `dayGroupKeys()` (08)
+  and `tabOrder()` (02). Finishers (`finishersFor`, 02) sit after a day's numbered lifts and never
+  count toward completion. `nextProgramDay` picks the day the app opens on.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double

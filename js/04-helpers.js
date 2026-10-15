@@ -93,12 +93,12 @@ function showCelebration(msg){
 // and Extra/Off-Day isn't a "core workout" to begin with (its pills are never
 // numbered), so it's excluded entirely.
 function checkCoreWorkoutComplete(day){
-  if(day !== "full" && day !== "upper" && day !== "lower") return;
+  if(!programDays().includes(day)) return;
   // Only the day's main lifts count. Preseason-only extras (jumps, bounds,
   // Lateral Lunge, Seated Calf Raise and the rest of PRESEASON_ONLY) are
   // optional, so skipping one never blocks the popup, with Preseason Prep on or
   // off. Ski, care and deload modes change prescriptions, never this list.
-  const coreList = DAY_ORDER[day].filter(name => !PRESEASON_ONLY.has(name));
+  const coreList = DAY_ORDER[day].filter(name => !PRESEASON_ONLY.has(name) || (FULLBODY_DAYS.includes(day) && FULLBODY_YEAR_ROUND.has(name)));
   if(!coreList.every(name => isLoggedToday(name) || skipReason(name) || isShoulderPaused(name))) return;
   const today = todayISO();
   if(celebratedToday[day] === today) return;

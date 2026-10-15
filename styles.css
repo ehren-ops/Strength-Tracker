@@ -107,6 +107,8 @@
   .pill.cat-stretch{background:var(--cat-stretch-bg);border-color:var(--cat-stretch-border);color:var(--cat-stretch-text);}
   .pill.cat-stretch.active{background:var(--cat-stretch);border-color:var(--cat-stretch);color:#fff;}
   .group-row{display:flex;gap:0.3rem;margin-bottom:0.5rem;}
+  .pill-label{flex-shrink:0;align-self:center;font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);padding:0 0.1rem 0 0.35rem;}
+  .pill.finisher-pill:not(.active){border-style:dashed;}
   .range-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0.25rem;margin:0 0 0.4rem;}
   .range-chip{font:inherit;font-size:0.72rem;font-weight:600;padding:0.35rem 0;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--slate);cursor:pointer;font-variant-numeric:tabular-nums;}
   .range-chip.active{background:var(--panel-soft-active);border-color:var(--ink);color:var(--ink);box-shadow:inset 0 -2px 0 var(--ink);}
@@ -408,6 +410,7 @@
   .seg-btn.off.on{background:var(--slate);}
   .seg-btn.preseason.on{background:var(--preseason);}
   .seg-btn.season.on{background:var(--ski);}
+  .seg-btn.prog.on{background:var(--ink);color:var(--card);}
   .ski-status{font-size:0.76rem;line-height:1.45;color:var(--ink);margin:0.35rem 0 0;}
   .tool-btn.seg-yes{color:var(--seg-on-text);}
   .tool-btn.seg-yes.season{background:var(--ski);border-color:var(--ski);}

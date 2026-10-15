@@ -5,8 +5,51 @@
 let data = loadSaved() || JSON.parse(JSON.stringify(SEED));
 ensureClientIds();
 backfillExerciseDefaults();
-let view = "full";
-let selected = DAY_ORDER.full[0];
+// The program: which day lists the app runs. Classic is the split (Full Body, Upper, Lower);
+// Full Body 2+1 is two full-body days (A, B) and an optional C. Lifts and history are shared, so
+// switching (either way) loses nothing. Synced in user_settings.settings.program.
+const PROGRAM_KEY = "strength-tracker-program";
+const PROGRAMS = {
+  classic: { name: "Classic split", short: "Classic", days: CLASSIC_DAYS,
+    desc: "Full Body, Upper and Lower days, 3x8 on the main lifts." },
+  fullbody: { name: "Full Body 2+1", short: "Full Body 2+1", days: FULLBODY_DAYS,
+    desc: "Two full-body days a week (A and B) plus an optional C. Every main movement twice a week, core and grip finishers." },
+};
+let program = (function(){
+  try{ const p = JSON.parse(window.localStorage.getItem(PROGRAM_KEY)); return p && PROGRAMS[p.key] ? p : { key: "classic" }; }catch(e){ return { key: "classic" }; }
+})();
+function saveProgram(){
+  try{ window.localStorage.setItem(PROGRAM_KEY, JSON.stringify(program)); }catch(e){}
+}
+function programDays(){ return PROGRAMS[program.key].days; }
+function setProgram(key){
+  if(key === program.key || !PROGRAMS[key]) return;
+  program = { key, startedOn: todayISO(), prev: { key: program.key, startedOn: program.startedOn || null } };
+  saveProgram();
+  if(view !== "extra" && view !== "overview"){ view = nextProgramDay(); selected = DAY_ORDER[view][0]; }
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  render();
+}
+// The day the app opens on. Full Body 2+1 follows the rotation: today's session if one is logged,
+// otherwise A, then B, then C only if B was this week (C is optional), then A again.
+function nextProgramDay(){
+  const days = programDays();
+  if(program.key !== "fullbody") return days[0];
+  const dates = trainingDates(), today = todayISO();
+  if(dates[today] && days.includes(dates[today].day)) return dates[today].day;
+  const last = Object.keys(dates).filter(d => d < today && days.includes(dates[d].day)).sort().pop();
+  if(!last) return "a";
+  const lastDay = dates[last].day;
+  if(lastDay === "a") return "b";
+  if(lastDay === "b") return weekStartISO(last) === weekStartISO(today) ? "c" : "a";
+  return "a";
+}
+function weekStartISO(iso){
+  const [y, m, d] = iso.split("-").map(Number), dt = new Date(y, m - 1, d);
+  return shiftISO(iso, -((dt.getDay() + 6) % 7)); // Monday
+}
+let view = programDays()[0];
+let selected = DAY_ORDER[view][0];
 let calendarYear = new Date().getFullYear();
 let calendarMonth = new Date().getMonth();
 let calendarSelectedDate = null;

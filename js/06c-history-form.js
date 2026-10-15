@@ -100,7 +100,7 @@ function skipExercise(name, reason){
   saveSkips();
   skipPicking = null;
   enqueueOp({ id: genId(), type: "upsert_skip", payload: { date: d, name } });
-  ["full", "upper", "lower"].filter(day => day === view || DAY_ORDER[day].includes(name)).forEach(checkCoreWorkoutComplete);
+  programDays().filter(day => day === view || DAY_ORDER[day].includes(name)).forEach(checkCoreWorkoutComplete);
   // On to the next lift of the day that isn't done yet.
   if(DAY_ORDER[view]){
     const list = getDisplayOrder(view);

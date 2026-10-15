@@ -26,6 +26,8 @@ document.addEventListener("input", e => { if(e.target && /^f-/.test(e.target.id 
 
 function afterSignInSync(){ if(repairDeloadDates()) render(); ensureDeloadNotes(); ensureRehabNotes(); refreshHeartRate(); }
 
+// Full Body 2+1 opens on the next session in its rotation.
+if(program.key === "fullbody"){ view = nextProgramDay(); selected = DAY_ORDER[view][0]; }
 render();
 if(repairDeloadDates()) render();
 ensureDeloadNotes();

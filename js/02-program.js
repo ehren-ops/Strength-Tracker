@@ -16,6 +16,11 @@ const DAY_ORDER = {
   full: ["Squat","Bench Press","RDL","Barbell Row","Cable Lat Pulldown","Face Pulls","Back Extension","Seated Calf Raise"],
   upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
   lower: ["Squat","RDL","Bulgarian Split Squat","Hip Thrust","Kettlebell Swings","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound"],
+  // Full Body 2+1 (the other program): two full-body days, A and B, plus an optional C. Same lifts
+  // and history as the split; preseason power work (listed last) moves to the front when it's on.
+  a: ["Squat","Bench Press","Barbell Row","Bulgarian Split Squat","Face Pulls","Back Extension","Standing Calf Raise","Box Jumps"],
+  b: ["RDL","Incline DB Press","Cable Lat Pulldown","Lateral Lunge","Hip Thrust","Back Extension","Seated Calf Raise","Trap Bar Jump","Skater Bound"],
+  c: ["Kettlebell Swings","Walking Lunge","Push-Ups","Face Pulls","Bicep Curl","Tricep Pushdown","Med Ball Slam"],
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
   // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
@@ -26,12 +31,22 @@ const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Ska
 const IN_SEASON_KEEP = new Set(["Box Jumps"]);
 // Shown only while Knee Care is on: on Extra, and after the numbered lifts on Lower and Full Body.
 const KNEE_ONLY = new Set(["Spanish Squat"]);
+// Full Body 2+1 keeps these preseason lifts year-round: side-to-side leg work and a second calf day.
+const FULLBODY_YEAR_ROUND = new Set(["Lateral Lunge", "Seated Calf Raise"]);
+// Short, optional work after a day's numbered lifts on Full Body 2+1: core and grip, plus Wall Sit
+// while Ski is on. Not numbered and never needed for the workout-complete banner.
+const FINISHERS = { a: ["Pallof Press", "Farmer's Carry"], b: ["Side Plank", "Dead Hang"], c: ["Dead Bug"] };
+const SKI_FINISHERS = { a: ["Wall Sit"] };
+function finishersFor(day){
+  return [...(FINISHERS[day] || []), ...((modes.preseason || modes.ski) ? (SKI_FINISHERS[day] || []) : [])];
+}
 // The main barbell lifts. Only these show Est. 1RM on the card; everything else shows its rep
 // record, which is what an accessory actually progresses by.
 const COMPOUND_LIFTS = new Set(["Squat", "Bench Press", "RDL", "Barbell Row", "Hip Thrust"]);
 function activeDayOrder(day){
   const week = preseasonWeek();
-  return DAY_ORDER[day].filter(name => (modes.preseason || !PRESEASON_ONLY.has(name) || (modes.ski && IN_SEASON_KEEP.has(name))) && (modes.knee || !KNEE_ONLY.has(name))
+  const yearRound = name => FULLBODY_DAYS.includes(day) && FULLBODY_YEAR_ROUND.has(name);
+  return DAY_ORDER[day].filter(name => (modes.preseason || !PRESEASON_ONLY.has(name) || (modes.ski && IN_SEASON_KEEP.has(name)) || yearRound(name)) && (modes.knee || !KNEE_ONLY.has(name))
     && !(week != null && week < 3 && (EXERCISE_DEFAULTS[name] || {}).preseasonWeek3));
 }
 // Extra shows one group at a time, picked from buttons above its row. Mobility is a single card
@@ -50,7 +65,8 @@ function extraGroupOf(name){
   const c = EXTRA_CATEGORY[name];
   return c === "cardio" || c === "recovery" ? c : "strength"; // strength, Copenhagen Plank and custom Extra exercises
 }
-const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", extra:"Extra / Off-Day" };
+const DAY_TITLES = { full:"Full Body", upper:"Upper Body", lower:"Lower Body", a:"Day A", b:"Day B", c:"Day C", extra:"Extra / Off-Day" };
+const CLASSIC_DAYS = ["full", "upper", "lower"], FULLBODY_DAYS = ["a", "b", "c"];
 const CONCERN_WORDS = ["heavy","tender","grip","pain","sore","ache","hurt"];
 
 // Only used to color-code Extra's pill row into visual sections (strength /
@@ -111,7 +127,7 @@ const EXERCISE_TIPS = {
   "Squat": ["Brace, knees out, hips and chest rise as one.", "Goblet squat or leg press."],
   "Bench Press": ["Blades pinned, forearms vertical, legs drive.", "DB bench or Smith bench."],
   "Incline DB Press": ["30-45° bench, elbows ~45°, control the bottom.", "Landmine press or incline Smith press."],
-  "RDL": ["Soft knees, hips back, bar on legs, flat back.", "DB RDL or cable pull-through."],
+  "RDL": ["Soft knees, hips back, bar on legs, flat back.", "DB RDL, cable pull-through, or single-leg RDL (lighter, for balance and hip stability)."],
   "Bulgarian Split Squat": ["Slight forward lean, drive through the front heel.", "Reverse lunge or split squat, back foot down."],
   "Hip Thrust": ["Upper back on bench, ribs down, 1 sec squeeze.", "Floor glute bridge with the bar, or Smith hip thrust."],
   "Barbell Row": ["Hinge ~45°, brace, pull to low ribs, no jerk.", "Chest-supported DB row or seated cable row."],
@@ -134,6 +150,10 @@ const EXERCISE_TIPS = {
   "Push-Ups": ["Hands shoulder width, elbows ~45°, body straight.", "Incline push-up on a bench, or from the knees."],
   "Farmer's Carry": ["Tall posture, shoulders packed, short quick steps.", "Suitcase carry or trap bar hold."],
   "Dead Hang": ["Active shoulders, full grip, steady breathing.", "Assisted hang with feet on a box."],
+  "Pallof Press": ["Side-on to the cable at chest height. Press out, hold 2 sec, don't let it turn you.", "Band Pallof press."],
+  "Side Plank": ["Elbow under shoulder, hips high, body in one straight line.", "Knees-down side plank."],
+  "Dead Bug": ["Low back pressed down; reach opposite arm and leg slowly, breathe out.", "Feet-on-floor heel taps."],
+  "Wall Sit": ["Thighs parallel, back flat on the wall, weight in the heels.", "Higher sit, knees at 60 degrees."],
   "Copenhagen Plank": ["Hips high, body straight, top leg does the work.", "Knee-on-bench version or side plank."],
   "Lateral Raise": ["Slight lean, lead with elbows, stop at shoulder.", "Cable or machine lateral raise."],
   "Zone 2 Ride": ["Conversational pace, steady cadence.", "Rower or incline walk at the same effort."],
@@ -157,6 +177,9 @@ const EXERCISE_SIDES = {
   "Cable Chest Fly": { weight: "hand" },
   "Skater Bound": { reps: "side" },
   "Copenhagen Plank": { reps: "side" },
+  "Pallof Press": { reps: "side" },
+  "Side Plank": { reps: "side" },
+  "Dead Bug": { reps: "side" },
 };
 
 // Every value ex.trackBy can hold. Must match the exercises_track_by_check constraint in the
@@ -170,6 +193,10 @@ const EXERCISE_DEFAULTS = {
   "Zone 2 Ride": { trackBy: "duration", trackDistance: true, trackSpeed: true },
   "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true, trackSpeed: true },
   "C2 Row": { trackBy: "duration", trackDistance: true, trackSpeed: true, rowing: true, trackSpm: true },
+  "Pallof Press": { trackBy: "weight", targetReps: 10, repRange: "10-15" },
+  "Side Plank": { trackBy: "reps", unit: "sec", targetReps: 30 },
+  "Dead Bug": { trackBy: "reps", targetReps: 8 },
+  "Wall Sit": { trackBy: "reps", unit: "sec", targetReps: 45 },
   "Squat": {
     targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell",
     preseason: true, targetRepsPreseason: 5, preseasonTempo: "4 sec lowering",
@@ -303,9 +330,10 @@ function backfillExerciseDefaults(){
   });
 }
 
-const TAB_ORDER = ["full","upper","lower","extra","overview"];
+// Tabs follow the program: its lift days, then Extra and Overview.
+function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v105";
+const APP_VERSION = "v106";
 const APP_UPDATED = "Oct 15, 2026";
 

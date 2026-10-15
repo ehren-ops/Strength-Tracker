@@ -54,6 +54,7 @@ const LIFT_PATTERNS = {
   "Box Jumps": "power", "Trap Bar Jump": "power", "Skater Bound": "power", "Med Ball Slam": "power",
   "Standing Calf Raise": "calves", "Seated Calf Raise": "calves",
   "Farmer's Carry": "carry and grip", "Copenhagen Plank": "core", "5-Minute Core Routine": "core",
+  "Pallof Press": "core", "Side Plank": "core", "Dead Bug": "core", "Wall Sit": "squat",
 };
 
 // Pre-computed trend signals, so the model reasons over patterns instead of re-reading raw logs.
@@ -277,6 +278,11 @@ function recoveryLog(from, to){
   return lines.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.at < b.at ? -1 : 1).map(l => l.text);
 }
 
+// Which program is running, so the coach reads the day labels and the optional C day right.
+function programForCoach(){
+  return { name: PROGRAMS[program.key].name, since: program.startedOn || null, days: Object.fromEntries(programDays().map(d => [DAY_TITLES[d], activeDayOrder(d)])) };
+}
+
 // Weekly working sets per pattern and the pull-to-push ratio, for the weekly check-in.
 function balanceForCoach(){
   const b = weeklyBalance();
@@ -313,7 +319,7 @@ function buildSessionCoachPayload(date){
   });
   const dayGuess = guessDayForNames(exercises.map(e => e.name));
   const daysSincePrevious = prevDate ? Math.round((new Date(date) - new Date(prevDate)) / 86400000) : null;
-  return { date, tz: coachTz(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date, new Set(exercises.map(e => LIFT_PATTERNS[e.name] || "other"))), skipped: skippedOn(date), rehab: rehabCoachBlock(), recovery: recoveryLog(shiftISO(date, -6), date), liftsDue: liftsDueForCoach() };
+  return { date, tz: coachTz(), program: programForCoach(), dayLabel: dayGuess ? DAY_TITLES[dayGuess] : "Session", daysSincePrevious, modes: activeModes(), deload: deloadStatus(), order: sessionOrder(date), logTimes: sessionAnchors(date), compareSession: previousComparableSession(date), exercises, patterns: patternSummary(date, new Set(exercises.map(e => LIFT_PATTERNS[e.name] || "other"))), skipped: skippedOn(date), rehab: rehabCoachBlock(), recovery: recoveryLog(shiftISO(date, -6), date), liftsDue: liftsDueForCoach() };
 }
 
 // The past week plus 4 weeks of history per lift: the trend window. The deload status carries the
@@ -336,7 +342,7 @@ function buildWeeklyCoachPayload(){
   const weekLogTimes = Object.fromEntries([...sessionDates].filter(d => d >= shiftISO(weekEnd, -6)).sort()
     .map(d => [d, sessionAnchors(d)]).filter(([, l]) => l.length >= 2));
   const weekSkips = Object.fromEntries(Object.keys(skips).filter(d => d >= shiftISO(weekEnd, -6) && d <= weekEnd).sort().map(d => [d, skippedOn(d)]));
-  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), skipped: weekSkips, modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd), weeklySets: balanceForCoach(), rehab: rehabCoachBlock(), recovery: recoveryLog(shiftISO(weekEnd, -13), weekEnd), liftsDue: liftsDueForCoach() };
+  return { weekStart: shiftISO(weekEnd, -6), weekEnd, tz: coachTz(), program: programForCoach(), skipped: weekSkips, modes: activeModes(), deload: deloadStatus(), sessionDates: [...sessionDates].sort(), sessionOrders, weekLogTimes, exercises, patterns: patternSummary(weekEnd), weeklySets: balanceForCoach(), rehab: rehabCoachBlock(), recovery: recoveryLog(shiftISO(weekEnd, -13), weekEnd), liftsDue: liftsDueForCoach() };
 }
 
 async function generateCoach(kind){

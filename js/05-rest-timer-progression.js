@@ -542,6 +542,6 @@ function computeSuggestionCore(ex, name){
 }
 
 function allDayNames(){
-  return Object.keys(DAY_ORDER).flatMap(k => DAY_ORDER[k]);
+  return [...Object.keys(DAY_ORDER).flatMap(k => DAY_ORDER[k]), ...Object.values(FINISHERS).flat(), ...Object.values(SKI_FINISHERS).flat()];
 }
 

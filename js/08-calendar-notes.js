@@ -2,16 +2,17 @@
 // Classic script sharing one global scope with the other js/NN-*.js files, run in order.
 
 // ---------- overview ----------
-const DAY_GROUP_KEYS = ["full","upper","lower","extra"];
+// The program's lift days plus Extra: what a session can be read as.
+function dayGroupKeys(){ return [...programDays(), "extra"]; }
 // How strongly a logged lift points at a day type: one on a single day list is strong evidence,
 // one shared across lists (Squat on Full and Lower) counts proportionally less.
 function daySpecificityWeight(name){
-  const memberships = DAY_GROUP_KEYS.filter(d => DAY_ORDER[d].includes(name)).length;
+  const memberships = dayGroupKeys().filter(d => DAY_ORDER[d].includes(name)).length;
   return memberships > 0 ? 1 / memberships : 0;
 }
 function guessDayForNames(names){
   let best = null, bestScore = 0;
-  DAY_GROUP_KEYS.forEach(d => {
+  dayGroupKeys().forEach(d => {
     const score = names.reduce((sum, n) => sum + (DAY_ORDER[d].includes(n) ? daySpecificityWeight(n) : 0), 0);
     // "Extra" wins ties outright (>=) rather than only strictly beating the
     // leader (>) - a one-off exercise that happens to also moonlight in a
@@ -51,8 +52,8 @@ function getSessionsByDate(){
 }
 
 const CAL_MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const CAL_DAY_LETTERS = { full:"F", upper:"U", lower:"L", extra:"E" };
-const CAL_DAY_COLORS = { full:"var(--accent-2)", upper:"var(--amber)", lower:"var(--emerald)", extra:"var(--slate)" };
+const CAL_DAY_LETTERS = { full:"F", upper:"U", lower:"L", a:"A", b:"B", c:"C", extra:"E" };
+const CAL_DAY_COLORS = { full:"var(--accent-2)", upper:"var(--amber)", lower:"var(--emerald)", a:"var(--accent-2)", b:"var(--amber)", c:"var(--emerald)", extra:"var(--slate)" };
 
 function prevMonth(){
   calendarMonth--;
@@ -138,7 +139,7 @@ function renderCalendar(){
 
     const legendTitles = { ...DAY_TITLES, extra: "Extra" };
     html += `<div class="cal-legend">`;
-    Object.keys(CAL_DAY_LETTERS).forEach(d => {
+    dayGroupKeys().forEach(d => {
       html += `<span><span class="cal-badge" style="background:${CAL_DAY_COLORS[d]};">${CAL_DAY_LETTERS[d]}</span> ${legendTitles[d]}</span>`;
     });
     html += `</div>`;
@@ -198,11 +199,11 @@ function dueLifts(){
   const dates = trainingDates(), today = todayISO();
   const sorted = Object.keys(dates).filter(d => d < today).sort();
   const due = {};
-  ["full", "upper", "lower"].forEach(day => activeDayOrder(day).forEach(name => {
+  programDays().forEach(day => activeDayOrder(day).forEach(name => {
     if(name in due) return;
     due[name] = null;
     if(isShoulderPaused(name)) return;
-    const homes = ["full", "upper", "lower"].filter(d => activeDayOrder(d).includes(name));
+    const homes = programDays().filter(d => activeDayOrder(d).includes(name));
     const ex = data[name];
     // Never logged: not part of the routine yet, so never due.
     if(!ex || !ex.entries.length) return;

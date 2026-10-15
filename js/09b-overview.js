@@ -59,6 +59,19 @@ function keepDeloadOn(){
   render();
 }
 
+// Program: which day lists the app runs. Lifts and history are shared, so switching loses nothing.
+function renderProgramCard(){
+  const p = PROGRAMS[program.key];
+  const since = program.startedOn ? ` Since ${fmtShortDate(program.startedOn)}.` : "";
+  return `<div class="card">
+    <div class="mod-head"><h3 class="section" style="margin:0;">Program</h3>
+      <div class="seg" role="group" aria-label="Program">${Object.entries(PROGRAMS).map(([k, v]) =>
+        `<button class="seg-btn prog${k === program.key ? " on" : ""}" aria-pressed="${k === program.key}" onclick="setProgram('${k}')">${v.short}</button>`).join("")}</div>
+    </div>
+    <p class="mod-desc">${p.desc}${since}</p>
+  </div>`;
+}
+
 // Ski: one row, a three-way phase control and one status line.
 const SKI_PHASES = [["off", "Off"], ["preseason", "Preseason"], ["season", "In season"]];
 function renderSkiModifier(){
@@ -261,7 +274,7 @@ function renderOverview(){
   const holding = overviewData.filter(o=>o.pct===0).length;
   const declining = overviewData.filter(o=>o.pct<0).length;
 
-  const dayAgg = ["full","upper","lower"].map(day => {
+  const dayAgg = programDays().map(day => {
     const names = activeDayOrder(day);
     const relevant = overviewData.filter(o => names.includes(o.name));
     const avg = relevant.length ? relevant.reduce((s,o)=>s+o.pct,0)/relevant.length : null;
@@ -317,7 +330,7 @@ function renderOverview(){
   </div>`;
   if(!volumeExpanded){
     html += `<div style="margin-top:0.5rem;">`;
-    ["full","upper","lower"].forEach(day => {
+    programDays().forEach(day => {
       const history = calcDayVolumeHistory(day);
       const latest = history.length ? history[history.length-1].weight : null;
       const prev = history.length > 1 ? history[history.length-2].weight : null;
@@ -332,7 +345,7 @@ function renderOverview(){
     });
     html += `</div>`;
   } else {
-    ["full","upper","lower"].forEach(day => {
+    programDays().forEach(day => {
       const history = calcDayVolumeHistory(day);
       html += `<div style="margin-top:0.9rem;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
@@ -377,6 +390,7 @@ function renderOverview(){
   }
   html += `</div>`;
 
+  html += renderProgramCard();
   const modsOn = MODE_DEFS.filter(m => modes[m.key]).map(m => m.short);
   // Preseason and Ski share one row (renderSkiModifier), shown where Preseason sits in the registry.
   const modRow = m => m.key === "deload" ? renderDeloadModifier() : m.key === "shoulder" ? renderShoulderModifier()
