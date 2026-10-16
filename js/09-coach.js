@@ -26,6 +26,7 @@ function compactEntry(e, ex){
   if(e.difficulty) s += ` @${e.difficulty}`;
   if(e.pain != null) s += ` pain ${e.pain}/10${e.painArea ? " " + e.painArea : ""}`;
   if(e.note) s += ` "${String(e.note).slice(0, 100)}"`;
+  if(ex.targetRepsStrength && e.heavy != null) s += e.heavy ? " [heavy]" : " [volume]";
   if(e.deload) s += " [deload]";
   else if(prFlags(ex)[ex.entries.indexOf(e)]) s += " [rep PR]";
   return s;
@@ -280,7 +281,9 @@ function recoveryLog(from, to){
 
 // Which program is running, so the coach reads the day labels and the optional C day right.
 function programForCoach(){
-  return { name: PROGRAMS[program.key].name, since: program.startedOn || null, mainLifts: program.key === "fullbody" ? "Squat, Bench Press, RDL and Barbell Row at 4x5, about 80 to 85% of max" : "3x8", days: Object.fromEntries(programDays().map(d => [DAY_TITLES[d], activeDayOrder(d)])) };
+  return { name: PROGRAMS[program.key].name, since: program.startedOn || null, mainLifts: program.key === "fullbody"
+    ? "Squat, Bench Press, RDL and Barbell Row: heavy days 4x5 (about 80 to 85% of max), volume days 3x8. Squat and Bench Press and Barbell Row heavy on Day A, RDL heavy on Day B; Squat and RDL volume on the other day."
+    : "Squat, Bench Press, RDL and Barbell Row twice a week: the first session of the week heavy (4x5, about 80 to 85% of max), the second volume (3x8). Each progresses on its own.", days: Object.fromEntries(programDays().map(d => [DAY_TITLES[d], activeDayOrder(d)])) };
 }
 
 // Weekly working sets per pattern and the pull-to-push ratio, for the weekly check-in.

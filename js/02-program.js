@@ -14,29 +14,34 @@ const SEED = {
 // hidden while Preseason Prep is off (activeDayOrder).
 const DAY_ORDER = {
   full: ["Squat","Bench Press","RDL","Barbell Row","Cable Lat Pulldown","Face Pulls","Back Extension","Seated Calf Raise"],
-  upper: ["Bench Press","Incline DB Press","Cable Chest Fly","Barbell Row","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
-  lower: ["Squat","RDL","Bulgarian Split Squat","Hip Thrust","Kettlebell Swings","Walking Lunge","Standing Calf Raise","Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound"],
+  upper: ["Bench Press","Incline DB Press","Push-Ups","Barbell Row","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
+  lower: ["Squat","RDL","Bulgarian Split Squat","Hip Thrust","Kettlebell Swings","Walking Lunge","Lateral Lunge","Standing Calf Raise","Box Jumps","Trap Bar Jump","Skater Bound"],
   // Full Body 2+1 (the other program): two full-body days, A and B, plus an optional C. Same lifts
   // and history as the split; preseason power work (listed last) moves to the front when it's on.
-  a: ["Squat","Bench Press","Barbell Row","Bulgarian Split Squat","Face Pulls","Back Extension","Standing Calf Raise","Box Jumps"],
-  b: ["RDL","Incline DB Press","Cable Lat Pulldown","Lateral Lunge","Hip Thrust","Back Extension","Seated Calf Raise","Trap Bar Jump","Skater Bound"],
+  a: ["Squat","Bench Press","RDL","Barbell Row","Bulgarian Split Squat","Face Pulls","Back Extension","Standing Calf Raise","Box Jumps"],
+  b: ["RDL","Squat","Incline DB Press","Cable Lat Pulldown","Lateral Lunge","Hip Thrust","Back Extension","Seated Calf Raise","Trap Bar Jump","Skater Bound"],
   c: ["Kettlebell Swings","Walking Lunge","Push-Ups","Face Pulls","Bicep Curl","Tricep Pushdown","Med Ball Slam"],
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
   // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
-  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Incline Treadmill Walk","Zone 2 Ride","C2 Row","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
+  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Cable Chest Fly","Incline Treadmill Walk","Zone 2 Ride","C2 Row","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
 };
 const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
 // Preseason lifts that stay on in season, once a week, to keep power without leg fatigue.
 const IN_SEASON_KEEP = new Set(["Box Jumps"]);
 // Shown only while Knee Care is on: on Extra, and after the numbered lifts on Lower and Full Body.
 const KNEE_ONLY = new Set(["Spanish Squat"]);
-// Full Body 2+1 keeps these preseason lifts year-round: side-to-side leg work and a second calf day.
-const FULLBODY_YEAR_ROUND = new Set(["Lateral Lunge", "Seated Calf Raise"]);
-// Short, optional work after a day's numbered lifts on Full Body 2+1: core and grip, plus Wall Sit
-// while Ski is on. Not numbered and never needed for the workout-complete banner.
-const FINISHERS = { a: ["Pallof Press", "Farmer's Carry"], b: ["Side Plank", "Dead Hang"], c: ["Dead Bug"] };
-const SKI_FINISHERS = { a: ["Wall Sit"] };
+// Preseason lifts kept on year-round on some days: side-to-side leg work on Lower, and on Full Body
+// 2+1 that plus a second calf day.
+const YEAR_ROUND = { lower: ["Lateral Lunge"], a: ["Lateral Lunge", "Seated Calf Raise"], b: ["Lateral Lunge", "Seated Calf Raise"], c: ["Lateral Lunge", "Seated Calf Raise"] };
+function isYearRound(day, name){ return (YEAR_ROUND[day] || []).includes(name); }
+// Short, optional work after a day's numbered lifts: core and grip, plus Wall Sit while Ski is on.
+// Not numbered, a color of their own in the pill row, never needed for the workout-complete banner.
+const FINISHERS = {
+  full: ["Pallof Press", "Farmer's Carry"], upper: ["Dead Hang"], lower: ["Side Plank"],
+  a: ["Pallof Press", "Farmer's Carry"], b: ["Side Plank", "Dead Hang"], c: ["Dead Bug"],
+};
+const SKI_FINISHERS = { lower: ["Wall Sit"], a: ["Wall Sit"] };
 function finishersFor(day){
   return [...(FINISHERS[day] || []), ...((modes.preseason || modes.ski) ? (SKI_FINISHERS[day] || []) : [])];
 }
@@ -45,8 +50,7 @@ function finishersFor(day){
 const COMPOUND_LIFTS = new Set(["Squat", "Bench Press", "RDL", "Barbell Row", "Hip Thrust"]);
 function activeDayOrder(day){
   const week = preseasonWeek();
-  const yearRound = name => FULLBODY_DAYS.includes(day) && FULLBODY_YEAR_ROUND.has(name);
-  return DAY_ORDER[day].filter(name => (modes.preseason || !PRESEASON_ONLY.has(name) || (modes.ski && IN_SEASON_KEEP.has(name)) || yearRound(name)) && (modes.knee || !KNEE_ONLY.has(name))
+  return DAY_ORDER[day].filter(name => (modes.preseason || !PRESEASON_ONLY.has(name) || (modes.ski && IN_SEASON_KEEP.has(name)) || isYearRound(day, name)) && (modes.knee || !KNEE_ONLY.has(name))
     && !(week != null && week < 3 && (EXERCISE_DEFAULTS[name] || {}).preseasonWeek3));
 }
 // Extra shows one group at a time, picked from buttons above its row. Mobility is a single card
@@ -77,6 +81,7 @@ const EXTRA_CATEGORY = {
   "Dead Hang": "strength",
   "Spanish Squat": "strength",
   "Push-Ups": "strength",
+  "Cable Chest Fly": "strength",
   "Zone 2 Ride": "cardio",
   "Incline Treadmill Walk": "cardio",
   "C2 Row": "cardio",
@@ -147,7 +152,7 @@ const EXERCISE_TIPS = {
   "Trap Bar Jump": ["Jump tall, land soft, reset before each rep.", "DB jump or bodyweight squat jump."],
   "Skater Bound": ["Push sideways off the outside leg, stick the landing.", "Lateral line hops or lateral step-ups."],
   "Spanish Squat": ["Band behind knees, sit straight down, 3 sec hold.", "Wall sit or slow box squat."],
-  "Push-Ups": ["Hands shoulder width, elbows ~45°, body straight.", "Incline push-up on a bench, or from the knees."],
+  "Push-Ups": ["Hands shoulder width, elbows ~45°, body straight.", "Cable Chest Fly is the alternative (Extra, Strength), 10-15 reps. Incline or knee push-ups to scale."],
   "Farmer's Carry": ["Tall posture, shoulders packed, short quick steps.", "Suitcase carry or trap bar hold."],
   "Dead Hang": ["Active shoulders, full grip, steady breathing.", "Assisted hang with feet on a box."],
   "Pallof Press": ["Side-on to the cable at chest height. Press out, hold 2 sec, don't let it turn you.", "Band Pallof press."],
@@ -334,6 +339,6 @@ function backfillExerciseDefaults(){
 function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v107";
+const APP_VERSION = "v108";
 const APP_UPDATED = "Oct 15, 2026";
 

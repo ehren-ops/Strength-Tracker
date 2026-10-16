@@ -279,7 +279,7 @@ async function main(){
   const recBox = await page.textContent('.rec-box');
   console.log('recommendation shown:', recBox.replace(/\s+/g, ' ').trim());
   if(!recBox.toLowerCase().includes('tender')) throw new Error('expected the concerning note to be surfaced in the recommendation, got: ' + recBox);
-  const nextWeightMatch = recBox.match(/Next(?: time)?:\s*(\d+)\s*lb\b/);
+  const nextWeightMatch = recBox.match(/Next(?: time| heavy day| volume day)?:\s*(\d+)\s*lb\b/);
   if(!nextWeightMatch || Number(nextWeightMatch[1]) !== 150) throw new Error('expected next weight to hold at 150 despite two clean hits, got: ' + (nextWeightMatch && nextWeightMatch[1]));
   console.log('OK: progression held at 150 lbs and the note was surfaced, instead of blindly advancing on reps/RPE alone');
 
@@ -423,7 +423,7 @@ async function main(){
   await page.click('button.log:has-text("Log set")');
   const careRec = await page.textContent('.rec-box');
   console.log('recommendation shown:', careRec.replace(/\s+/g, ' ').trim());
-  const careNextMatch = careRec.match(/Next(?: time)?:\s*(\d+(?:\.\d+)?)\s*lb\b/);
+  const careNextMatch = careRec.match(/Next(?: time| heavy day| volume day)?:\s*(\d+(?:\.\d+)?)\s*lb\b/);
   if(!careNextMatch || Number(careNextMatch[1]) !== 45) throw new Error('expected next weight to be cut to 45 lbs (10% off 50), got: ' + (careNextMatch && careNextMatch[1]));
   if(!careRec.includes('Knee Care: ~10% lighter, holding')) throw new Error('expected the knee care message in the recommendation');
   const tipText = await page.locator('.knee-care-line').textContent();
@@ -442,7 +442,7 @@ async function main(){
   const deloadRec = await page.textContent('.rec-box');
   console.log('recommendation shown:', deloadRec.replace(/\s+/g, ' ').trim());
   if(!deloadRec.includes('sessions straight')) throw new Error('expected the deload message to win over the knee/back care message, got: ' + deloadRec);
-  const deloadNextMatch = deloadRec.match(/Next(?: time)?:\s*(\d+(?:\.\d+)?)\s*lb\b/);
+  const deloadNextMatch = deloadRec.match(/Next(?: time| heavy day| volume day)?:\s*(\d+(?:\.\d+)?)\s*lb\b/);
   if(!deloadNextMatch || Number(deloadNextMatch[1]) !== 170) throw new Error('expected the standard 15% deload (170 lbs from 200), not the 10% care-mode cut, got: ' + (deloadNextMatch && deloadNextMatch[1]));
   console.log('OK: deload logic still wins over care-mode reduction when both would apply');
 
@@ -1340,7 +1340,9 @@ async function main(){
   console.log('OK: Date and Log Set sit on the same row for both a standard exercise and a duration-tracked one');
 
   console.log('=== 51: Cable Chest Fly progression is not permanently locked by one old miss buried in a same-weight streak ===');
-  await page.click('.tab:has-text("Upper Body")');
+  // The fly lives on Extra (Strength) now; Push-Ups took its place on Upper.
+  await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Strength")');
   await page.evaluate(() => {
     const mk = (i, reps) => ({ clientId: 'cf'+i, label: 'S'+i, date: '2026-08-'+(String(10+i).padStart(2,'0')), confirmed: true, weight: 50, sets: 3, reps, difficulty: 6, note: '' });
     data['Cable Chest Fly'] = { trackBy: 'weight', entries: [mk(1,6), mk(2,8), mk(3,8), mk(4,8), mk(5,8)] };
@@ -1491,7 +1493,8 @@ async function main(){
   // historical (non-today) dates to test the progression-lock fix. Log it
   // fresh today, then clear today's "already celebrated" flag and re-run
   // the check directly rather than re-logging all 11 exercises.
-  await page.click('.tab:has-text("Upper Body")');
+  await page.click('.tab:has-text("Extra")');
+  await page.click('.group-chip:has-text("Strength")');
   await page.locator('.pill').filter({ hasText: /Cable Chest Fly/ }).click();
   await sleep(150);
   await page.fill('#f-weight', '55');
@@ -1730,7 +1733,7 @@ async function main(){
   await page.click('.tab:has-text("Lower Body")');
   await sleep(150);
   const lowerPillsOff = await page.evaluate(() => [...document.querySelectorAll('.pill-row .pill:not(.pill-add):not(.knee-pill)')].map(p => p.textContent));
-  if(lowerPillsOff.some(t => /Box Jumps|Trap Bar Jump|Skater Bound|Spanish Squat|Lateral Lunge/.test(t))) throw new Error('expected preseason-only lifts hidden with Preseason Prep off, got: ' + lowerPillsOff.join(' | '));
+  if(lowerPillsOff.some(t => /Box Jumps|Trap Bar Jump|Skater Bound|Spanish Squat/.test(t)) || !lowerPillsOff.some(t => /Lateral Lunge/.test(t))) throw new Error('expected preseason-only lifts hidden with Preseason Prep off (Lateral Lunge stays year-round), got: ' + lowerPillsOff.join(' | '));
   await page.evaluate(() => toggleMode('preseason'));
   await sleep(150);
   const lowerPillsOn = await page.evaluate(() => [...document.querySelectorAll('.pill-row .pill:not(.pill-add)')].map(p => p.textContent));
@@ -1845,6 +1848,8 @@ async function main(){
   const comeback = await page.evaluate(() => {
     const savedData = data, savedModes = { ...modes };
     MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    // The comeback rules on the volume track only; heavy and volume days are unit tested.
+    const savedPlannedHeavy = plannedHeavy; plannedHeavy = () => false;
     const day = n => shiftISO(todayISO(), n);
     const mk = (name, rows) => Object.assign(newExerciseShell(name), { entries: rows.map((r, i) => ({ clientId: name + i, date: day(r[0]), weight: r[1], sets: r[2] || 3, reps: r[3] || 8, difficulty: 7, deload: r[4] || undefined, label: 'x' })) });
     const out = {};
@@ -1871,6 +1876,7 @@ async function main(){
     data['Kettlebell Swings'].targetReps = 12;
     const kb = computeSuggestion(data['Kettlebell Swings'], 'Kettlebell Swings');
     out.skipped = !!kb.reentry;
+    plannedHeavy = savedPlannedHeavy;
     data = savedData; Object.assign(modes, savedModes);
     return out;
   });
@@ -2084,7 +2090,7 @@ async function main(){
       walk: read('Walking Lunge'), lateral: read('Lateral Lunge'), walkUnits: sidesText('Walking Lunge') };
   });
   if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lb\/hand · 3x9\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
-  if(!sides.squat.labels.includes('Lb total') || !/^\d+ lb · 3x8/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
+  if(!sides.squat.labels.includes('Lb total') || !/^[\d.]+ lb · (Heavy · 4x5|Volume · 3x8)/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
   if(!sides.fly.labels.includes('Lb / hand')) throw new Error('expected Cable Chest Fly labeled per hand (each stack), got: ' + JSON.stringify(sides.fly));
   if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
   if(!sides.walk.labels.includes('Lb / hand') || !sides.walk.labels.includes('Steps total') || !/lb\/hand · 3x8 steps/.test(sides.walk.next) || !/total steps/.test(sides.walkUnits)) throw new Error('expected Walking Lunge per hand with total steps, got: ' + JSON.stringify([sides.walk, sides.walkUnits]));
@@ -2099,7 +2105,7 @@ async function main(){
       if(modes.preseason !== preseasonOn) toggleMode('preseason');
       data = JSON.parse(saved);
       Object.keys(data).forEach(n => { data[n].entries = data[n].entries.filter(e => e.date !== t); });
-      DAY_ORDER.lower.filter(n => !PRESEASON_ONLY.has(n)).forEach(n => {
+      DAY_ORDER.lower.filter(n => !PRESEASON_ONLY.has(n) || isYearRound('lower', n)).forEach(n => {
         (data[n] ||= newExerciseShell(n)).entries.push({ clientId: 'gate-' + n, date: t, weight: 50, sets: 3, reps: 8 });
       });
       celebratedToday = {};
@@ -2227,9 +2233,10 @@ async function main(){
     const ex = data['Squat'];
     const saved = ex.entries;
     ex.entries = [{date: shiftISO(todayISO(), -7), weight: 165, sets: 3, reps: 8, difficulty: 7}, {date: shiftISO(todayISO(), -3), weight: 175, sets: 3, reps: 8, difficulty: 7}];
+    const savedPlannedHeavy = plannedHeavy; plannedHeavy = () => false; // a volume day, whatever the weekday
     const div = document.createElement('div');
     div.innerHTML = renderExerciseCard('Squat', ex);
-    ex.entries = saved;
+    ex.entries = saved; plannedHeavy = savedPlannedHeavy;
     const d = div.querySelector('.delta-line');
     const c = div.querySelector('.last-line');
     const w = div.querySelector('.weight-row');
@@ -2238,7 +2245,7 @@ async function main(){
       next: w && w.nextElementSibling && w.nextElementSibling.className };
   });
   if(!head.cornerInTitle || !/^Last: 175 lb$/.test(head.corner) || !head.deltaInHistory || head.text !== '+10 lb since first' || head.label !== 'Today' || !/^180 lb/.test(head.big)
-    || head.plan !== '3x8 · +5 lb' || !/^Load 180 lb = /.test(head.load) || head.next !== 'rec-box') throw new Error('expected today\'s 180 big, "Last: 175" top right, "3x8 · +5 lbs", the load total before the plates and +10 since first in Recent History, got: ' + JSON.stringify(head));
+    || head.plan !== 'Volume · 3x8 · +5 lb' || !/^Load 180 lb = /.test(head.load) || head.next !== 'rec-box') throw new Error('expected today\'s 180 big, "Last: 175" top right, "3x8 · +5 lbs", the load total before the plates and +10 since first in Recent History, got: ' + JSON.stringify(head));
   console.log('OK: TODAY 180 lbs, "' + head.corner + '" top right, "' + head.plan + '", "' + head.load + '", and +10 since first in the Recent History heading');
 
   console.log('=== 76: heart rate per lift arrives after the fact and shows in history, the breakdown and the Next tile ===');
@@ -2380,7 +2387,7 @@ async function main(){
     delete data[REHAB_NAME];
     const pills = () => [...document.querySelectorAll('#pill-scroll .pill:not(.pill-add)')].map(p => p.textContent.trim());
     view = 'upper'; selected = 'Bench Press'; render();
-    out.off = { first: pills()[0], rehabPill: !!document.querySelector('.pill.rehab-pill'), bench: computeSuggestion(data['Bench Press'], 'Bench Press').weight, pushupsOnUpper: pills().includes('Push-Ups') };
+    out.off = { first: pills()[0], rehabPill: !!document.querySelector('.pill.rehab-pill'), bench: computeSuggestion(data['Bench Press'], 'Bench Press').weight, pushupsOnUpper: pills().some(p => /Push-Ups/.test(p)) };
     view = 'extra'; selected = DAY_ORDER.extra[0]; render();
     out.off.pushupsOnExtra = pills().some(p => /^Push-Ups/.test(p));
     view = 'upper'; selected = 'Bench Press'; render();
@@ -2397,7 +2404,7 @@ async function main(){
     out.benchDeload = computeSuggestion(data['Bench Press'], 'Bench Press').weight;
     modes.deload = false;
     data['Bench Press'].entries.pop();
-    out.pushups = ['upper', 'full', 'lower'].map(d => { view = d; selected = DAY_ORDER[d][0]; render(); const ps = pills(); return ps.includes('Push-Ups') ? ps.indexOf('Push-Ups') : -1; });
+    out.pushups = ['upper', 'full', 'lower'].map(d => { view = d; selected = DAY_ORDER[d][0]; render(); return pills().findIndex(p => /Push-Ups/.test(p)); });
     out.pushupsLen = (() => { view = 'upper'; render(); return activeDayOrder('upper').length + 1; })();
     selected = 'Push-Ups'; render();
     out.pushupCard = { tip: (document.querySelector('.shoulder-care-line') || {}).textContent, note: document.getElementById('f-note') && document.getElementById('f-note').value, exists: !!data['Push-Ups'] };
@@ -2460,10 +2467,10 @@ async function main(){
   const ok79 =
     r79.off.first.startsWith('1. Bench Press') && !r79.off.rehabPill && r79.off.bench === 190 &&
     r79.firstPills.every((p, i) => p[0] === 'Shoulder Rehab' && (i === 3 ? !/^\d/.test(p[1]) : /^1\. /.test(p[1]))) &&
-    /Cable Chest Fly/.test(r79.flyPill || '') &&
+    /Incline DB Press|Bicep Curl/.test(r79.flyPill || '') &&
     r79.bench.weight === 157.5 && r79.bench.hold && r79.bench.badge && /85%/.test(r79.bench.tip || '') &&
-    r79.benchAfter150 === 150 && r79.benchDeload === 150 && !r79.off.pushupsOnUpper && r79.off.pushupsOnExtra &&
-    r79.pushups[0] === r79.pushupsLen && r79.pushups[1] > 0 && r79.pushups[2] === -1 &&
+    r79.benchAfter150 === 150 && r79.benchDeload === 150 && r79.off.pushupsOnUpper && r79.off.pushupsOnExtra &&
+    r79.pushups[0] === 3 && r79.pushups[1] > 0 && r79.pushups[2] === -1 &&
     /incline/.test(r79.pushupCard.tip || '') && r79.pushupCard.note === 'Rehab' && r79.pushupCard.exists &&
     r79.benchP3.first === 157.5 && r79.benchP3.build && r79.benchP3.next === 155 &&
     r79.fly && r79.curlWeek1 && /paused/i.test(r79.flyCard.next) && !r79.flyCard.skip && /Right arm/.test(r79.flyCard.tip) &&
@@ -2710,12 +2717,12 @@ async function main(){
     return out;
   });
   const due86 = Object.keys(r86.due).sort();
-  const ok86 = JSON.stringify(due86) === JSON.stringify(['Cable Chest Fly', 'Face Pulls', 'Incline DB Press']) &&
-    r86.due['Incline DB Press'].missedSessions === 2 && !r86.dueRehab.includes('Cable Chest Fly') &&
+  const ok86 = JSON.stringify(due86) === JSON.stringify(['Face Pulls', 'Incline DB Press']) &&
+    r86.due['Incline DB Press'].missedSessions === 2 && !r86.dueRehab.includes('Incline DB Press') &&
     /Incline DB Press/.test(r86.pill || '') && /missed its last 2 sessions/.test(r86.pillTitle || '') && /^Due: missed its last 2 sessions/.test(r86.guide || '') &&
     /Due: .*Incline DB Press/.test(r86.notes) && Array.isArray(r86.coach) && r86.coach.some(l => l.name === 'Incline DB Press');
   if(!ok86) throw new Error('expected due lifts with intentional skips, deload weeks and rehab pauses excluded, got: ' + JSON.stringify(r86));
-  console.log('OK: Incline DB Press, Face Pulls and Fly are due; Bicep Curl (skipped for injury and equipment) is not; Fly is not due while Shoulder Rehab pauses it; dot, Next line, Coach\'s Notes and the coach payload all agree');
+  console.log('OK: Incline DB Press and Face Pulls are due (the fly lives on Extra now, so never due); Bicep Curl (skipped for injury and equipment) is not; Incline is not due while Shoulder Rehab pauses it; dot, Next line, Coach\'s Notes and the coach payload all agree');
 
   console.log('=== 87: reps per set log as 8/8/6 and count as a miss; the Weekly Balance card compares pulling with pressing ===');
   const r87 = await page.evaluate(() => {
@@ -2807,6 +2814,7 @@ async function main(){
   const r90 = await page.evaluate(() => {
     const saved = JSON.stringify({ squat: data['Squat'], bench: data['Bench Press'] }), savedModes = { ...modes }, savedView = view, savedSel = selected;
     MODE_DEFS.forEach(m => { modes[m.key] = false; });
+    const savedPlannedHeavy = plannedHeavy; plannedHeavy = () => false; // one track, whatever the weekday
     const d = n => shiftISO(todayISO(), n);
     data['Squat'] = Object.assign(newExerciseShell('Squat'), { entries: [{ clientId: 'j1', date: d(-7), weight: 175, sets: 3, reps: 8, difficulty: 7 }] });
     data['Bench Press'] = Object.assign(newExerciseShell('Bench Press'), { entries: [{ clientId: 'j2', date: d(-5), weight: 150, sets: 3, reps: 8, difficulty: 7 }] });
@@ -2841,6 +2849,7 @@ async function main(){
     const restore = JSON.parse(saved);
     data['Squat'] = restore.squat; data['Bench Press'] = restore.bench;
     if(!restore.squat) delete data['Squat']; if(!restore.bench) delete data['Bench Press'];
+    plannedHeavy = savedPlannedHeavy;
     Object.assign(modes, savedModes); view = savedView; selected = savedSel; persist(); render();
     return out;
   });
@@ -2987,11 +2996,14 @@ async function main(){
     setProgram('fullbody');
     out.tabs = [...document.querySelectorAll('#tabs .tab')].map(t => t.textContent).join(',');
     view = 'a'; selected = DAY_ORDER.a[0]; render();
-    out.aPills = [...document.querySelectorAll('.pill-row .pill:not(.pill-add), .pill-row .pill-label')].map(p => p.textContent.replace(/ ✓$/, '')).join('|');
+    out.aPills = [...document.querySelectorAll('.pill-row .pill:not(.pill-add)')].map(p => p.textContent.replace(/ ✓$/, '')).join('|');
+    out.finisherPills = [...document.querySelectorAll('.pill-row .pill.finisher-pill')].map(p => p.textContent.replace(/ ✓$/, '')).join('|');
+    out.label = !!document.querySelector('.pill-label');
     out.bHasLateral = activeDayOrder('b').includes('Lateral Lunge');
     setSkiPhase('season'); out.wallSit = finishersFor('a').includes('Wall Sit'); setSkiPhase('off');
     selected = 'Pallof Press'; render();
     out.pallof = !!data['Pallof Press'] && document.querySelector('h2.ex-name').textContent;
+    out.finTip = (document.querySelector('.finisher-tip') || {}).textContent || '';
     // Completing A's numbered lifts is a complete workout; finishers never block it.
     const d0 = todayISO(), savedEntries = {};
     activeDayOrder('a').forEach(n => { const ex = data[n] || (data[n] = newExerciseShell(n)); savedEntries[n] = ex.entries; ex.entries = [...ex.entries, { clientId: 'p94' + n, date: d0, weight: 50, sets: 3, reps: 8 }]; });
@@ -3003,6 +3015,8 @@ async function main(){
     out.coach = buildWeeklyCoachPayload().program.name;
     setProgram('classic');
     out.back = [...document.querySelectorAll('#tabs .tab')].map(t => t.textContent).slice(0, 3).join(',');
+    view = 'upper'; selected = 'Bench Press'; render();
+    out.upperFinisher = [...document.querySelectorAll('.pill-row .pill.finisher-pill')].map(p => p.textContent.replace(/ ✓$/, '')).join('|');
     program = JSON.parse(saved.program); saveProgram();
     skiPhase = JSON.parse(saved.phase); saveSkiPhase(); MODE_DEFS.forEach(m => setModeFlag(m.key, !!saved.modes[m.key]));
     celebratedToday = JSON.parse(saved.celebrated);
@@ -3010,29 +3024,31 @@ async function main(){
     return out;
   });
   const ok94 = r94.programButtons === 'Classic:true,Full Body 2+1:false' && r94.tabs === 'Day A,Day B,Day C,Extra / Off-Day,Overview' &&
-    r94.aPills.startsWith('1. Squat|2. Bench Press|3. Barbell Row|4. Bulgarian Split Squat|5. Face Pulls|6. Back Extension|7. Standing Calf Raise|Finishers|Pallof Press|Farmer') &&
+    r94.aPills.startsWith('1. Squat|2. Bench Press|3. RDL|4. Barbell Row|5. Bulgarian Split Squat|6. Face Pulls|7. Back Extension|8. Standing Calf Raise|Pallof Press|Farmer') &&
+    r94.finisherPills === "Pallof Press|Farmer's Carry" && !r94.label && /^Finisher Optional/.test(r94.finTip) && r94.upperFinisher === 'Dead Hang' &&
     r94.bHasLateral && r94.wallSit && r94.pallof === 'Pallof Press' && r94.celebrated && r94.nextToday === 'a' && r94.coach === 'Full Body 2+1' && r94.back === 'Full Body,Upper Body,Lower Body';
   if(!ok94) throw new Error('expected the Program setting to switch day lists, finishers and tabs and back, got: ' + JSON.stringify(r94));
-  console.log('OK: Full Body 2+1 shows Day A, B, C tabs; A has 7 numbered lifts then Pallof Press and Farmer\'s Carry as finishers; Wall Sit joins with Ski; the coach is told; Classic comes back untouched');
+  console.log('OK: Full Body 2+1 shows Day A, B, C tabs; A has 8 numbered lifts then Pallof Press and Farmer\'s Carry as finisher-colored pills with a Finisher note; Classic Upper ends with Dead Hang; Wall Sit joins with Ski; the coach is told; Classic comes back untouched');
 
-  console.log('=== 95: on Full Body 2+1 the main lifts run 4x5, converted once from the last 3x8, with a 90 sec to 3 min rest ===');
+  console.log('=== 95: on Full Body 2+1 Squat is heavy (4x5) on Day A and volume (3x8) on Day B, each from its own sessions, with a 90 sec to 3 min rest ===');
   const r95 = await page.evaluate(() => {
     const saved = { program: JSON.stringify(program), squat: JSON.stringify(data['Squat'] || null), view, selected, modes: { ...modes } };
     MODE_DEFS.forEach(m => setModeFlag(m.key, false));
     data['Squat'] = Object.assign(newExerciseShell('Squat'), { entries: [{ clientId: 'q95', date: shiftISO(todayISO(), -3), weight: 180, sets: 3, reps: 8, difficulty: 7 }] });
     setProgram('fullbody');
-    view = 'a'; selected = 'Squat'; render();
-    const out = { headline: document.querySelector('.rec-plan').textContent, desc: document.querySelector('.rec-desc').textContent, rest: document.querySelector('.rec-rest').textContent,
-      form: [document.getElementById('f-weight').value, document.getElementById('f-sets').value, document.getElementById('f-reps').value] };
+    const read = day => { view = day; selected = 'Squat'; render(); return { headline: document.querySelector('.rec-plan').textContent, desc: document.querySelector('.rec-desc').textContent, rest: document.querySelector('.rec-rest').textContent,
+      form: [document.getElementById('f-weight').value, document.getElementById('f-sets').value, document.getElementById('f-reps').value].join(',') }; };
+    const out = { a: read('a'), b: read('b') };
     program = JSON.parse(saved.program); saveProgram();
     const sq = JSON.parse(saved.squat); if(sq) data['Squat'] = sq; else delete data['Squat'];
     MODE_DEFS.forEach(m => setModeFlag(m.key, !!saved.modes[m.key]));
     view = saved.view; selected = saved.selected; persist(); render();
     return out;
   });
-  if(!/4x5/.test(r95.headline) || !/^New program: 4x5 at 185 lb, worked out from your 180 lb x 8/.test(r95.desc) || r95.rest !== 'Rest 90 sec–3 min' || r95.form.join(',') !== '185,4,5')
-    throw new Error('expected the first Full Body 2+1 squat at 4x5 x 185 with a 90 sec to 3 min rest, got: ' + JSON.stringify(r95));
-  console.log('OK: switching programs turns a 3x8 at 180 into a first 4x5 at 185 (form pre-filled), with Rest 90 sec–3 min');
+  if(!/^Heavy · 4x5/.test(r95.a.headline) || !/^First heavy day: 185 lb, worked out from your 180 lb x 8/.test(r95.a.desc) || !/Heavy on Day A, volume on Day B/.test(r95.b.desc) || r95.a.rest !== 'Rest 90 sec–3 min' || r95.a.form !== '185,4,5'
+    || !/^Volume · 3x8 · \+5 lb/.test(r95.b.headline) || r95.b.form !== '185,3,8')
+    throw new Error('expected Squat heavy on A (first 4x5 at 185 from 180x8) and volume on B (3x8 at 185), got: ' + JSON.stringify(r95));
+  console.log('OK: Day A squat is a first heavy 4x5 at 185 (worked out from 180x8, form pre-filled), Day B a volume 3x8 at 185, Rest 90 sec–3 min');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

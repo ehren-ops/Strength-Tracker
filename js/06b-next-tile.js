@@ -31,7 +31,7 @@ function guidanceHtml(msg, pool){
 }
 function composeGuidance(msg, name, ex, last, work, suggestion){
   return guidanceHtml(msg, [
-    dueLine(name), lastSessionLine(ex, work), ...noteInsights(ex.entries), deloadSessionLine(ex, last), hrLine(name, last), ...trendLine(name, ex),
+    dueLine(name), trackLine(name, suggestion), lastSessionLine(ex, work), ...noteInsights(ex.entries), deloadSessionLine(ex, last), hrLine(name, last), ...trendLine(name, ex),
     repRecordLine(name, ex, suggestion), bestLine(ex, work), progressionRule(name, ex), effortLine(ex), daysSinceLine(last), LOG_TIMING_TIP, NOTE_TIP,
   ]);
 }
@@ -100,6 +100,15 @@ function repRecordLine(name, ex, s){
   return rec ? `Rep PR at ${rec.weight} lb: ${rec.reps} reps, ${fmtShortDate(rec.date)}.` : "";
 }
 // How this lift moves up, in one line.
+// Main lifts: why today is the heavy or the volume day.
+function trackLine(name, s){
+  if(!s || s.heavy == null || s.deloadWeek || isLoggedToday(name)) return "";
+  if(program.key === "fullbody" && HEAVY_DAY[name]){
+    const other = FULLBODY_DAYS.find(d => d !== HEAVY_DAY[name] && DAY_ORDER[d].includes(name));
+    return other ? `Heavy on Day ${HEAVY_DAY[name].toUpperCase()}, volume on Day ${other.toUpperCase()}.` : `Heavy every Day ${HEAVY_DAY[name].toUpperCase()}.`;
+  }
+  return s.heavy ? "First time this week, so heavy; the next one is volume." : "Second time this week, so volume; heavy again next week.";
+}
 function progressionRule(name, ex){
   const target = effectiveTargetReps(ex);
   if(ex.trackBy === "duration") return "Add time first; push the pace only once it feels easy.";
@@ -216,6 +225,8 @@ function renderRecoveryTile(name, ex){
 // One line of form, one line of swap, under the chart.
 function renderTips(name){
   const t = EXERCISE_TIPS[name];
-  if(!t) return "";
-  return `<div class="ex-tips"><div><b>Form</b> ${t[0]}</div><div><b>Swap</b> ${t[1]}</div></div>`;
+  const fin = programDays().includes(view) && finishersFor(view).includes(name)
+    ? `<div class="finisher-tip"><b>Finisher</b> Optional, after the numbered lifts. Doesn't count toward finishing the day.</div>` : "";
+  if(!t && !fin) return "";
+  return `<div class="ex-tips">${t ? `<div><b>Form</b> ${t[0]}</div><div><b>Swap</b> ${t[1]}</div>` : ""}${fin}</div>`;
 }

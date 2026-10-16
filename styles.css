@@ -107,8 +107,10 @@
   .pill.cat-stretch{background:var(--cat-stretch-bg);border-color:var(--cat-stretch-border);color:var(--cat-stretch-text);}
   .pill.cat-stretch.active{background:var(--cat-stretch);border-color:var(--cat-stretch);color:#fff;}
   .group-row{display:flex;gap:0.3rem;margin-bottom:0.5rem;}
-  .pill-label{flex-shrink:0;align-self:center;font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);padding:0 0.1rem 0 0.35rem;}
-  .pill.finisher-pill:not(.active){border-style:dashed;}
+  /* Finishers: optional core and grip work after the numbered lifts, in the core color. */
+  .pill.finisher-pill{background:var(--cat-core-bg);border-color:var(--cat-core-border);color:var(--cat-core-text);}
+  .pill.finisher-pill.active{background:var(--cat-core);border-color:var(--cat-core);color:#fff;}
+  .ex-tips .finisher-tip b{color:var(--cat-core-text);}
   .range-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0.25rem;margin:0 0 0.4rem;}
   .range-chip{font:inherit;font-size:0.72rem;font-weight:600;padding:0.35rem 0;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--slate);cursor:pointer;font-variant-numeric:tabular-nums;}
   .range-chip.active{background:var(--panel-soft-active);border-color:var(--ink);color:var(--ink);box-shadow:inset 0 -2px 0 var(--ink);}
@@ -422,6 +424,7 @@
   :root[data-theme="dark"] .pill.cat-strength.active,
   :root[data-theme="dark"] .pill.cat-cardio.active,
   :root[data-theme="dark"] .pill.cat-core.active,
+  :root[data-theme="dark"] .pill.finisher-pill.active,
   :root[data-theme="dark"] .pill.cat-stretch.active,
   :root[data-theme="dark"] .pill.cat-recovery.active{color:#050308;}
 /* Unclamped while fitGuidance() measures how many sentences fill two lines. */

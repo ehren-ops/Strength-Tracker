@@ -278,7 +278,7 @@ function applyShoulder(core, ex, name, baseline){
     return { ...core, weight: Math.min(core.weight, cap), readyToProgress: false, shoulderHold: { pct: SHOULDER_HOLD_PCT[name], fullWeight: pre ? pre.weight : null } };
   }
   if(!shoulderRehab.startedOn || !SHOULDER_RETURN.has(name)) return core;
-  if((core.careFlags && core.careFlags.length) || core.noteTarget != null || core.reentry) return core;
+  if((core.careFlags && core.careFlags.length) || core.noteTarget != null || core.reentry || core.trackStart) return core;
   const end = shoulderRehab.endedOn || shoulderRehab.startedOn;
   if(daysBetween(end, todayISO()) > SHOULDER_RETURN_WINDOW_DAYS) return core;
   const pre = baseline.filter(e => e.date < shoulderRehab.startedOn).pop();

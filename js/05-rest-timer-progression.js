@@ -329,7 +329,8 @@ function applyReturn(core, ex, name, baseline){
   const lastAny = lastTrainingDate();
   const off = lastAny ? daysBetween(lastAny, todayISO()) : 0;
   if(off >= BREAK_DAYS){
-    const pre = baseline[baseline.length - 1];
+    // A main lift starting a new track restarts from its converted weight, not the other track's.
+    const pre = core.trackStart ? { weight: core.weight } : baseline[baseline.length - 1];
     if(!(pre.weight > 0)) return core;
     const weight = Math.min(core.weight, roundLoad(pre.weight * REENTRY_STEPS[0]));
     return { ...core, weight, reps: effectiveTargetReps(ex), readyToProgress: false, reentry: { step: 1, daysOff: off, fullWeight: pre.weight } };
@@ -339,7 +340,7 @@ function applyReturn(core, ex, name, baseline){
   for(let i = all.length - 1; i > 0 && i >= all.length - REENTRY_STEPS.length + 1; i--){
     if(daysBetween(all[i - 1].date, all[i].date) >= BREAK_DAYS && !trainedBetween(all[i - 1].date, all[i].date)){ gapAt = i; break; }
   }
-  if(gapAt > 0 && !careHeld && core.noteTarget == null){
+  if(gapAt > 0 && !careHeld && core.noteTarget == null && !core.trackStart){
     const before = all.slice(0, gapAt).filter(e => !e.deload), since = all.slice(gapAt);
     const pre = before[before.length - 1];
     const step = since.length + 1; // the session being planned
@@ -352,7 +353,7 @@ function applyReturn(core, ex, name, baseline){
   // First session back from a deload: back to the pre-deload weight, and the next step up only when
   // that last full session was clean (every rep, RPE 7 or easier, no concern in its note). Pressing
   // lifts always repeat it once, for the shoulders. A weight set in that note still wins.
-  if(last.deload && !modes.deload && core.noteTarget == null){
+  if(last.deload && !modes.deload && core.noteTarget == null && !core.trackStart){
     const pre = baseline[baseline.length - 1];
     const flagged = CONCERN_WORDS.find(w => (pre.note || "").toLowerCase().includes(w));
     const why = LIFT_PATTERNS[name] === "push" ? "pressing repeats it once"
@@ -364,47 +365,58 @@ function applyReturn(core, ex, name, baseline){
   return core;
 }
 
-// Full Body 2+1 runs the main lifts at 4x5. The first session after a program switch (either way)
-// converts the last working set to the new reps from its estimated max. Moving to heavier, lower-rep
-// sets it starts a little under (95%), so the first week lands around RPE 7 to 8; normal
-// progression takes over from there.
-function applyProgram(s, ex, last){
-  if(!s || ex.trackBy !== "weight" || !ex.targetRepsStrength || !last || !(last.weight > 0)) return s;
+// A main lift's first session on a track it has never done (its first heavy day, or its first
+// volume day after only heavy ones) works out from the last working set's estimated max. Moving to
+// heavier, lower-rep sets it starts a little under (95%), so it lands around RPE 7 to 8.
+function startTrack(ex, last){
   const target = effectiveTargetReps(ex), lastTarget = entryTargetReps(ex, last);
-  const out = strengthTarget(ex) && target === strengthTarget(ex) ? { ...s, sets: STRENGTH_SETS } : s;
-  if(programOn(last.date) === program.key || target === lastTarget || modes.preseason || modes.ski) return out;
   const weight = roundLoad(last.weight * (1 + last.reps / 30) / (1 + target / 30) * (target < lastTarget ? 0.95 : 1));
-  return { ...out, weight, reps: target, sets: strengthTarget(ex) ? STRENGTH_SETS : 3, readyToProgress: false, programStart: { from: last.weight, fromReps: last.reps } };
+  return { weight, sets: ex.heavyPlanned ? HEAVY_SETS : 3, reps: target, hitTarget: false, readyToProgress: false,
+    streak: 0, requiredStreak: ex.conservative ? 2 : 1, difficultyNote: null, noteConcern: null, deload: false,
+    trackStart: { from: last.weight, fromReps: last.reps } };
 }
 
 // Joint check: pain above 3 of 10 on the last session (deload or not) holds the load; 6 or more
 // drops it about 10%. Lifts without weight hold their reps instead.
 const PAIN_HOLD_ABOVE = 3, PAIN_DROP_AT = 6;
-function applyPain(s, ex){
-  const last = ex.entries[ex.entries.length - 1];
-  if(!s || !last || !(last.pain > PAIN_HOLD_ABOVE) || ex.trackBy === "duration") return s;
-  const hold = { pain: last.pain, area: last.painArea || "", drop: last.pain >= PAIN_DROP_AT, from: last.weight };
-  if(ex.trackBy !== "weight" || !(last.weight > 0)) return { ...s, reps: Math.min(s.reps, last.reps), readyToProgress: false, painHold: hold };
+// For a main lift the pain is read from its last session either way, and the load held is this
+// track's own last weight.
+function applyPain(s, ex, full){
+  const hurt = (full || ex).entries[(full || ex).entries.length - 1];
+  const last = ex.entries[ex.entries.length - 1] || hurt;
+  if(!s || !hurt || !(hurt.pain > PAIN_HOLD_ABOVE) || ex.trackBy === "duration") return s;
+  const hold = { pain: hurt.pain, area: hurt.painArea || "", drop: hurt.pain >= PAIN_DROP_AT, from: last.weight };
+  if(ex.trackBy !== "weight" || !(last.weight > 0)) return { ...s, reps: Math.min(s.reps, hurt.reps), readyToProgress: false, painHold: hold };
   const cap = hold.drop ? roundLoad(last.weight * 0.9) : last.weight;
   return { ...s, weight: Math.min(s.weight, cap), readyToProgress: false, painHold: hold };
 }
 // The full suggestion: the core progression, then the note target, the equipment cap, the comeback
 // rules, Shoulder Rehab and the joint check, with Deload Week last (about 10% lighter, a third
 // fewer sets; a lift already cut keeps its weight and only loses sets). Deload-week sessions are
-// skipped here, so progression resumes from the pre-deload weights.
-function computeSuggestion(ex, name){
-  if(!ex.entries.length || isRecovery(name)) return null;
+// skipped here, so progression resumes from the pre-deload weights. A main lift plans from the
+// sessions on today's track (heavy or volume) only.
+function computeSuggestion(full, name){
+  if(!full.entries.length || isRecovery(name)) return null;
+  let ex = full, fresh = false;
+  if(full.targetRepsStrength && full.trackBy === "weight"){
+    const heavy = plannedHeavy(name, full);
+    const track = full.entries.filter(e => isHeavyEntry(full, e) === heavy);
+    fresh = !track.some(e => !e.deload) && full.entries.some(e => !e.deload && e.weight > 0);
+    ex = { ...full, entries: fresh ? full.entries : track, heavyPlanned: heavy };
+  }
   const baseline = ex.entries.filter(e => !e.deload);
   const baseEntries = baseline.length ? baseline : ex.entries;
   const lastBaseEntry = baseEntries[baseEntries.length - 1];
-  const core = applyPain(applyShoulder(applyReturn(capAtMaxWeight(applyNoteTarget(applyProgram(computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name), ex, lastBaseEntry), ex, lastBaseEntry), ex, name, lastBaseEntry), ex, name, baseline), ex, name, baseline), ex);
+  const start = fresh ? startTrack(ex, lastBaseEntry) : computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name);
+  let core = applyPain(applyShoulder(applyReturn(capAtMaxWeight(fresh ? start : applyNoteTarget(start, ex, lastBaseEntry), ex, name, lastBaseEntry), ex, name, baseline), ex, name, baseline), ex, full);
+  if(core && ex.heavyPlanned != null) core = { ...core, heavy: ex.heavyPlanned, sets: ex.heavyPlanned ? HEAVY_SETS : core.sets };
   if(!modes.deload || !core || ex.trackBy === "duration") return core;
-  const lastBase = (baseline.length ? baseline : ex.entries)[ (baseline.length ? baseline : ex.entries).length - 1 ];
-  const sets = Math.max(2, Math.round((lastBase.sets || core.sets || 3) * 2 / 3));
+  const lastBase = lastBaseEntry;
+  const sets = Math.max(2, Math.round(((core.trackStart ? core.sets : lastBase.sets) || core.sets || 3) * 2 / 3));
   if(ex.trackBy !== "weight") return { ...core, sets, reps: lastBase.reps, deloadWeek: true };
   const alreadyReduced = !!(core.careFlags && core.careFlags.length) || !!core.shoulderHold || !!(core.painHold && core.painHold.drop) || core.deload || (core.noteTarget != null && core.noteTarget < lastBase.weight);
-  const weight = alreadyReduced ? core.weight : Math.round((lastBase.weight * 0.9) / 2.5) * 2.5;
-  return { ...core, weight, sets, reps: ex.targetReps || core.reps, readyToProgress: false, deloadWeek: true, deloadKeptReduction: alreadyReduced };
+  const weight = alreadyReduced ? core.weight : Math.round(((core.trackStart ? core.weight : lastBase.weight) * 0.9) / 2.5) * 2.5;
+  return { ...core, weight, sets, reps: ex.heavyPlanned != null ? core.reps : (ex.targetReps || core.reps), readyToProgress: false, deloadWeek: true, deloadKeptReduction: alreadyReduced };
 }
 
 function computeSuggestionCore(ex, name){

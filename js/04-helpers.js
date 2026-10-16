@@ -98,7 +98,7 @@ function checkCoreWorkoutComplete(day){
   // Lateral Lunge, Seated Calf Raise and the rest of PRESEASON_ONLY) are
   // optional, so skipping one never blocks the popup, with Preseason Prep on or
   // off. Ski, care and deload modes change prescriptions, never this list.
-  const coreList = DAY_ORDER[day].filter(name => !PRESEASON_ONLY.has(name) || (FULLBODY_DAYS.includes(day) && FULLBODY_YEAR_ROUND.has(name)));
+  const coreList = DAY_ORDER[day].filter(name => !PRESEASON_ONLY.has(name) || isYearRound(day, name));
   if(!coreList.every(name => isLoggedToday(name) || skipReason(name) || isShoulderPaused(name))) return;
   const today = todayISO();
   if(celebratedToday[day] === today) return;

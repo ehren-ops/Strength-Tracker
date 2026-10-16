@@ -11,9 +11,9 @@ backfillExerciseDefaults();
 const PROGRAM_KEY = "strength-tracker-program";
 const PROGRAMS = {
   classic: { name: "Classic split", short: "Classic", days: CLASSIC_DAYS,
-    desc: "Full Body, Upper and Lower days, 3x8 on the main lifts." },
+    desc: "Full Body, Upper and Lower days. Each main lift twice a week: heavy (4x5) the first time, volume (3x8) the second. Short core and grip finishers." },
   fullbody: { name: "Full Body 2+1", short: "Full Body 2+1", days: FULLBODY_DAYS,
-    desc: "Two full-body days a week (A and B) plus an optional C. Main lifts at 4x5, every main movement twice a week, core and grip finishers." },
+    desc: "Two full-body days a week (A and B) plus an optional C. Squat and RDL on both days, one heavy (4x5) and one volume (3x8); bench and row heavy on A. Core and grip finishers." },
 };
 let program = (function(){
   try{ const p = JSON.parse(window.localStorage.getItem(PROGRAM_KEY)); return p && PROGRAMS[p.key] ? p : { key: "classic" }; }catch(e){ return { key: "classic" }; }
@@ -22,14 +22,43 @@ function saveProgram(){
   try{ window.localStorage.setItem(PROGRAM_KEY, JSON.stringify(program)); }catch(e){}
 }
 function programDays(){ return PROGRAMS[program.key].days; }
-// The program a date's sessions were logged under (Classic before the first switch).
+// The program a date's sessions were logged under (Classic before the first switch). Only used to
+// read v107 entries, logged at 4x5 on Full Body 2+1 before entries carried a heavy flag.
 function programOn(date){
   const h = (program.history || []).filter(p => p.startedOn <= date).pop();
   return h ? h.key : "classic";
 }
-// Full Body 2+1 runs the main lifts (those with a strength target) at 4x5.
-const STRENGTH_SETS = 4;
-function strengthTarget(ex){ return program.key === "fullbody" && ex && ex.targetRepsStrength ? ex.targetRepsStrength : null; }
+// Heavy and volume days for the main lifts (those with targetRepsStrength), on either program:
+// heavy is 4 sets of targetRepsStrength (5), volume the usual 3x8. Classic: the first session of a
+// lift in a week (Monday on) is heavy, any later one volume. Full Body 2+1: fixed by day, so A and B
+// each carry one heavy lower-body lift. Each track progresses from its own sessions.
+const HEAVY_SETS = 4;
+const HEAVY_DAY = { "Squat": "a", "Bench Press": "a", "Barbell Row": "a", "RDL": "b" };
+function liftName(ex){ return Object.keys(data).find(n => data[n] === ex); }
+function isHeavyEntry(ex, e){
+  if(!ex || !ex.targetRepsStrength || !e) return false;
+  if(e.heavy != null) return !!e.heavy;
+  return !e.preseason && !!e.date && programOn(e.date) === "fullbody";
+}
+// Whether the session on this date (today by default) is the heavy one. Never while a preseason or
+// in-season target sets the reps, or while Shoulder Rehab holds or pauses the lift. A session
+// already logged that day keeps its own call.
+function plannedHeavy(name, ex, date){
+  if(!ex || !ex.targetRepsStrength || ex.trackBy !== "weight") return false;
+  if((modes.preseason && ex.targetRepsPreseason) || (modes.ski && ex.targetRepsSki)) return false;
+  if(modes.shoulder && typeof isShoulderHeld === "function" && (isShoulderHeld(name) || isShoulderPaused(name))) return false;
+  date = date || todayISO();
+  const done = ex.entries.filter(e => e.date === date).pop();
+  if(done) return isHeavyEntry(ex, done);
+  if(program.key === "fullbody" && HEAVY_DAY[name]){
+    // The day on screen when the lift is on it, else its only day, else the next day in the rotation.
+    const days = FULLBODY_DAYS.filter(d => DAY_ORDER[d].includes(name));
+    const day = days.includes(view) ? view : days.length === 1 ? days[0] : nextProgramDay();
+    return HEAVY_DAY[name] === day;
+  }
+  const wk = weekStartISO(date);
+  return !ex.entries.some(e => e.date >= wk && e.date < date);
+}
 function setProgram(key){
   if(key === program.key || !PROGRAMS[key]) return;
   program = { key, startedOn: todayISO(), history: [...(program.history || []), { key, startedOn: todayISO() }] };
@@ -109,7 +138,7 @@ const MODE_DEFS = [
     tag: { kind: "light", re: /\b(shoulder )?rehab\b/i, label: "Rehab" },
     applies: n => isShoulderModified(n),
     changesNumbers: n => isShoulderPaused(n) || isShoulderHeld(n),
-    desc: "Adds a daily rehab card to every day and push-ups to Upper and Full Body. Pauses flies, incline press, lateral raises and slams; bench drops to 85%, medium grip, short of the chest; curls come back as hammer curls in week 3; rows drop to 85% with a palms-in grip. Pushdowns, legs and riding carry on." },
+    desc: "Adds a daily rehab card to every day and push-ups to Full Body. Pauses flies, incline press, lateral raises and slams; bench drops to 85%, medium grip, short of the chest; curls come back as hammer curls in week 3; rows drop to 85% with a palms-in grip. Pushdowns, legs and riding carry on." },
   { key: "knee", storageKey: "strength-tracker-knee-mode", column: "knee_care_mode",
     name: "Knee Care", short: "Knee Care", emoji: "🦵", badge: "Knee Care",
     tag: { kind: "light", re: /\bknee care\b/i, label: "Knee Care" },
@@ -300,7 +329,7 @@ function activeRepRange(ex){
 }
 function entryTargetReps(ex, entry){
   if(entry && entry.preseason && ex.targetRepsPreseason) return ex.targetRepsPreseason;
-  if(entry && ex.targetRepsStrength && entry.date && programOn(entry.date) === "fullbody") return ex.targetRepsStrength;
+  if(entry && isHeavyEntry(ex, entry)) return ex.targetRepsStrength;
   const m = ex.repRange && String(ex.repRange).match(/^(\d+)-/);
   return m ? Number(m[1]) : (ex.targetReps || 8);
 }
@@ -308,7 +337,7 @@ function entryTargetReps(ex, entry){
 function effectiveTargetReps(ex){
   if(modes.preseason && ex.targetRepsPreseason) return ex.targetRepsPreseason;
   if(modes.ski && ex.targetRepsSki) return ex.targetRepsSki;
-  if(strengthTarget(ex)) return strengthTarget(ex);
+  if(ex.targetRepsStrength && (ex.heavyPlanned != null ? ex.heavyPlanned : plannedHeavy(liftName(ex), ex))) return ex.targetRepsStrength;
   const range = activeRepRange(ex);
   return range ? range[0] : (ex.targetReps || 8);
 }

@@ -133,11 +133,16 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     svg += `<text x="${padL-6}" y="${y+3}" font-size="8" fill="var(--chart-axis)" text-anchor="end" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${v}</text>`;
   });
 
-  // solid line through actual points
-  if(points.length > 1){
-    const path = points.map((p,i) => `${i===0?'M':'L'}${xAt(i).toFixed(1)},${yAt(p.y).toFixed(1)}`).join(" ");
-    svg += `<path d="${path}" fill="none" stroke="var(--chart-line)" stroke-width="2.5"/>`;
-  }
+  // Solid line through actual points. A main lift with heavy days gets two: heavy (bold) and
+  // volume (thin), so the two loads never read as a zigzag.
+  const heavyOf = p => isHeavyEntry(ex, p.entry);
+  const tracked = isRealExercise && ex.trackBy === "weight" && !!ex.targetRepsStrength && points.some(heavyOf);
+  const lines = tracked ? [true, false].map(h => ({ h, idx: points.map((p, i) => i).filter(i => heavyOf(points[i]) === h) })) : [{ h: null, idx: points.map((p, i) => i) }];
+  lines.forEach(({ h, idx }) => {
+    if(idx.length < 2) return;
+    const path = idx.map((i, k) => `${k===0?'M':'L'}${xAt(i).toFixed(1)},${yAt(points[i].y).toFixed(1)}`).join(" ");
+    svg += `<path d="${path}" fill="none" stroke="var(--chart-line)" stroke-width="${h === false ? 1.5 : 2.5}"${h === false ? ' opacity="0.55"' : ""} class="track-line${h ? " heavy-line" : h === false ? " volume-line" : ""}"/>`;
+  });
   // dots + x labels for actual points - deload gets a hollow red marker,
   // under 3 sets gets dark red, missed target reps gets red, extra reps/sets
   // (that actually hit target) gets green - each with a small sets×reps label
@@ -158,8 +163,8 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     const isUnder = isRealExercise && !isPlanned && !isDeload && ex.trackBy !== "duration" && p.entry.sets < 3;
     const isMissed = isRealExercise && !isPlanned && !isDeload && !isUnder && ex.trackBy !== "duration" && p.entry.reps < targetReps;
     const isExtra = isRealExercise && !tag && !isDeload && !isUnder && !isMissed && ex.trackBy !== "duration" &&
-      (p.entry.reps > targetReps || p.entry.sets > 3);
-    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${p.entry.note?" - "+p.entry.note:""}${isPlanned?` - ${tag.title || tag.label} (planned)`:""}${isDeload?" - dropped after missed sessions":""}${isBlock?` - ${tag.label} target ${targetReps} reps`:""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
+      (p.entry.reps > targetReps || p.entry.sets > (isHeavyEntry(ex, p.entry) ? HEAVY_SETS : 3));
+    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${tracked ? (heavyOf(p) ? " (heavy)" : " (volume)") : ""}${p.entry.note?" - "+p.entry.note:""}${isPlanned?` - ${tag.title || tag.label} (planned)`:""}${isDeload?" - dropped after missed sessions":""}${isBlock?` - ${tag.label} target ${targetReps} reps`:""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
 
     function labelWithHalo(text, color){
       // Above the point when there's room, otherwise just below it so it never covers the dot.
@@ -196,8 +201,10 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
 
   // dashed projection segment
   if(hasProjection && points.length){
-    const lastP = points[points.length-1];
-    const x1 = xAt(points.length-1), y1 = yAt(lastP.y);
+    // From the last session on the same track as the plan.
+    const from = tracked && suggestion.heavy != null ? (lines.find(l => l.h === suggestion.heavy).idx.slice(-1)[0] ?? points.length - 1) : points.length - 1;
+    const lastP = points[from];
+    const x1 = xAt(from), y1 = yAt(lastP.y);
     const x2 = xAt(points.length), y2 = yAt(projY);
     svg += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="var(--chart-line)" stroke-width="2" stroke-dasharray="5 4"/>`;
     const projLabel = ex.trackBy==="weight" ? `${suggestion.weight} lb ${repLabel(suggestion.sets,suggestion.reps,ex.unit)}` : ex.trackBy==="duration" ? `${suggestion.minutes} min` : repLabel(suggestion.sets,suggestion.reps,ex.unit);

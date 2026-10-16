@@ -51,11 +51,19 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   `activeDayOrder`, `checkSkiPhasePrompt`) and syncs in `user_settings.settings.ski`.
 - Programs (`PROGRAMS`, `setProgram`, 03): Classic (`full`/`upper`/`lower`) or Full Body 2+1
   (`a`/`b`/`c`, C optional). Never hardcode day keys: use `programDays()`, `dayGroupKeys()` (08)
-  and `tabOrder()` (02). Finishers (`finishersFor`, 02) sit after a day's numbered lifts and never
-  count toward completion. `nextProgramDay` picks the day the app opens on. On Full Body 2+1 the
-  lifts with `targetRepsStrength` run at 4x5 (`strengthTarget`, `applyProgram` in 05); the first
-  session after a switch converts from the estimated max. `programOn(date)` tells which program a
-  past session was logged under, so history is judged by its own reps.
+  and `tabOrder()` (02). Finishers (`finishersFor`, 02) sit after a day's numbered lifts in the
+  core color (`.finisher-pill`), carry a "Finisher" line in the card tips, and never count toward
+  completion. `nextProgramDay` picks the day the app opens on. `YEAR_ROUND` / `isYearRound` (02)
+  keep some preseason lifts on all year by day (Lateral Lunge on Lower and the 2+1 days).
+- Heavy and volume days (03, 05): lifts with `targetRepsStrength` (Squat, Bench, RDL, Row) run
+  heavy (`HEAVY_SETS` x 5) or volume (3x8) on both programs. `plannedHeavy(name, ex, date)`:
+  Classic = first session of the lift in the Monday week; 2+1 = `HEAVY_DAY` by day. Never heavy
+  under a preseason/ski target or Shoulder Rehab hold/pause. `logEntry` stores `entry.heavy`
+  (column `heavy`); `isHeavyEntry` reads it (v107 2+1 entries without it count as heavy via
+  `programOn`). `computeSuggestion` plans from the matching track only, and `startTrack` converts
+  an empty track from the estimated max. Read reps through `effectiveTargetReps` /
+  `entryTargetReps`, which know the track. Browser scenarios that test other rules on a main lift
+  stub `plannedHeavy = () => false` so they do not depend on the weekday.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double

@@ -90,8 +90,6 @@ function getDisplayOrder(day){
   return power.concat(order.filter(name => !isPower(name)));
 }
 
-// Marks where a day's finishers start in its pill row.
-const FINISHER_MARK = "__finishers__";
 function renderDay(day){
   const app = document.getElementById("app");
   // A custom lift saved under the other program's day shows on its matching day (Full = A, Upper = B, Lower = C).
@@ -100,7 +98,7 @@ function renderDay(day){
   // Shoulder Rehab leads every day's row while it is on, unnumbered so the lifts keep their numbers.
   const lead = modes.shoulder ? [REHAB_NAME] : [];
   // Bridges join a day after its numbered lifts while their modifier is on: Push-Ups (Shoulder
-  // Rehab) on Upper and Full Body (A and B), Spanish Squat (Knee Care) on Lower and Full Body (A and B).
+  // Rehab) on Full Body (A and B; Upper has them already), Spanish Squat (Knee Care) on Lower and Full Body (A and B).
   const bridge = [];
   if(modes.shoulder && ["upper", "full", "a", "b"].includes(day)) bridge.push(PUSHUP_NAME);
   if(modes.knee && ["lower", "full", "a", "b"].includes(day)) bridge.push(...KNEE_ONLY);
@@ -117,7 +115,7 @@ function renderDay(day){
     groupRow = `<div class="group-row">${EXTRA_GROUPS.map(g => `<button type="button" class="group-chip${g.key === extraGroup ? " active" : ""}" onclick="selectExtraGroup('${g.key}')" aria-pressed="${g.key === extraGroup}">${g.label}${g.key === "mobility" && isLoggedToday(MOBILITY_NAME) ? " ✓" : ""}</button>`).join("")}</div>`;
     list = lead.concat(extraList(extraGroup));
   } else {
-    list = lead.concat(getDisplayOrder(day), bridge.filter(n => !getDisplayOrder(day).includes(n)), customExercises, finishers.length ? [FINISHER_MARK, ...finishers] : []);
+    list = lead.concat(getDisplayOrder(day), bridge.filter(n => !getDisplayOrder(day).includes(n)), customExercises, finishers);
   }
   if(selected === REHAB_NAME && !modes.shoulder) selected = activeDayOrder(day)[0];
 
@@ -127,7 +125,6 @@ function renderDay(day){
   let html = groupRow + `<div class="pill-row" id="pill-scroll"${hidePills ? ' hidden' : ''}>`;
   list.forEach((name, i) => {
     if(name === MOBILITY_NAME) return; // the group button stands in for it
-    if(name === FINISHER_MARK){ html += `<span class="pill-label">Finishers</span>`; return; }
     const loggedToday = isLoggedToday(name);
     // Preseason-flagged exercises get a light purple pill so they're
     // visible at a glance in the row, and a darker solid purple instead
@@ -135,7 +132,7 @@ function renderDay(day){
     const isPreseasonPill = modes.preseason && !!(EXERCISE_DEFAULTS[name] && EXERCISE_DEFAULTS[name].preseason);
     const pillClasses = ['pill'];
     if(isPreseasonPill) pillClasses.push('preseason-pill');
-    if(name === REHAB_NAME || (name === PUSHUP_NAME && bridge.includes(name))) pillClasses.push('rehab-pill');
+    if(name === REHAB_NAME || (name === PUSHUP_NAME && bridge.includes(name) && !activeDayOrder(day).includes(name))) pillClasses.push('rehab-pill');
     if(day !== "extra" && KNEE_ONLY.has(name)) pillClasses.push('knee-pill');
     if(name === MOBILITY_NAME) pillClasses.push('cat-stretch');
     if(finishers.includes(name)) pillClasses.push('finisher-pill');
@@ -323,6 +320,10 @@ function renderExerciseCard(name, ex){
   const todayLog = recovery ? null : [...ex.entries].reverse().find(e => e.date === today) || null;
   const prs = prFlags(ex);
   const prior = [...ex.entries].reverse().find(e => e.date < today && !e.deload) || null;
+  // A main lift's heavy and volume days are judged against the last session on the same track.
+  const onTrack = e => !suggestion || suggestion.heavy == null || isHeavyEntry(ex, e) === suggestion.heavy;
+  const trackPrior = [...ex.entries].reverse().find(e => e.date < today && !e.deload && onTrack(e)) || null;
+  const trackWork = (hasEntries && [...ex.entries].reverse().find(e => !e.deload && onTrack(e))) || work;
   // Just the weight; a tap adds the date, on every card, until tapped again.
   const priorHtml = prior && !recovery ? `<button type="button" class="last-line" onclick="toggleLastDate()" aria-pressed="${lastDateShown}" title="${fmtShortDate(prior.date)}">Last: ${shortValue(name, ex, prior)}${lastDateShown ? ` · ${fmtShortDate(prior.date)}` : ""}</button>` : "";
 
@@ -402,8 +403,8 @@ function renderExerciseCard(name, ex){
         // When the prior session's actual reps beat the target, call that out by
         // name with the real number instead of flattening it to a plain "hit
         // target" - going over is a stronger, more specific signal than a bare hit.
-        const wentOverTarget = suggestion.hitTarget && !suggestion.range && !suggestion.deload && !suggestion.deloadWeek && work.reps > suggestion.reps;
-        const actualAmt = ex.unit === "sec" ? `${work.reps} sec` : `${work.reps} reps`;
+        const wentOverTarget = suggestion.hitTarget && !suggestion.range && !suggestion.deload && !suggestion.deloadWeek && trackWork.reps > suggestion.reps;
+        const actualAmt = ex.unit === "sec" ? `${trackWork.reps} sec` : `${trackWork.reps} reps`;
         const targetAmt = ex.unit === "sec" ? `${suggestion.reps} sec` : `${suggestion.reps} reps`;
         const hitLeadIn = wentOverTarget
           ? `Went over target ${unitWord} (did ${actualAmt}, target is ${targetAmt})`
@@ -422,9 +423,9 @@ function renderExerciseCard(name, ex){
             ? `Shoulder Rehab: hammer curls only at ${suggestion.weight} lb, lower over 3 sec. No adding weight yet.`
             : name === "Barbell Row" ? `Rehab: ${suggestion.weight} lb${share}, palms-in grip, no shrug. Held until rehab is off.`
             : `Rehab: ${suggestion.weight} lb${share}, medium grip, short of the chest. Hold until phase 3.`;
-        } else if(suggestion.programStart && !suggestion.deloadWeek){
-          const ps = suggestion.programStart;
-          msg = `New program: ${repLabel(suggestion.sets, suggestion.reps, ex.unit)} at ${suggestion.weight} lb, worked out from your ${ps.from} lb x ${ps.fromReps}. Progresses as usual from here.`;
+        } else if(suggestion.trackStart && !suggestion.deloadWeek && !suggestion.reentry){
+          const ts = suggestion.trackStart;
+          msg = `First ${suggestion.heavy ? "heavy" : "volume"} day: ${suggestion.weight} lb, worked out from your ${ts.from} lb x ${ts.fromReps}. Progresses on its own from here.`;
         } else if(suggestion.shoulderBuild && !suggestion.deloadWeek){
           msg = `Shoulder Rehab phase 3: full range, ${suggestion.weight} lb. Add 5 lb a session at 3 of 10 or less, up to ${suggestion.shoulderBuild.fullWeight} lb.`;
         } else if(suggestion.shoulderReturn && !suggestion.deloadWeek){
@@ -505,9 +506,9 @@ function renderExerciseCard(name, ex){
       // Before today's log the weight is the big number, so the headline is the sets and reps and the
       // step from the last full session. Once today is logged, it plans the next session in full.
       let headline;
-      if(todayLog) headline = `Next time: ${nextLabel}`;
+      if(todayLog) headline = suggestion.heavy != null ? `Next ${suggestion.heavy ? "heavy" : "volume"} day: ${nextLabel}` : `Next time: ${nextLabel}`;
       else if(suggestion.shoulderPaused) headline = "Paused today";
-      else headline = [planShape(name, ex, suggestion), stepText(ex, suggestion, prior)].filter(Boolean).join(" · ");
+      else headline = [suggestion.heavy != null ? (suggestion.heavy ? "Heavy" : "Volume") : "", planShape(name, ex, suggestion), suggestion.trackStart ? "" : stepText(ex, suggestion, trackPrior)].filter(Boolean).join(" · ");
       recHtml = renderNextTile(headline, ex, composeGuidance(msg, name, ex, last, work, suggestion), suggestion.shoulderPaused ? "No load today" : loadText(name, ex, suggestion));
     }
 

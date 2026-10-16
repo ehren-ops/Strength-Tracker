@@ -180,6 +180,8 @@ function entryToRow(entry, exerciseId, userId){
     updated_at: entry.updatedAt || undefined,
     deload: !!entry.deload,
     preseason: !!entry.preseason,
+    // Main lifts: heavy (4x5) or volume (3x8). Null on everything else and on older entries.
+    heavy: entry.heavy ?? null,
     // undefined (dropped from the request) rather than null for entries logged before this
     // existed, so an edit never wipes the time the server backfilled.
     logged_at: entry.loggedAt || undefined,
@@ -207,6 +209,7 @@ function rowToEntry(row){
     painArea: row.pain_area || undefined,
     deload: row.deload || undefined,
     preseason: row.preseason || undefined,
+    heavy: row.heavy ?? undefined,
     loggedAt: row.logged_at || undefined,
     updatedAt: row.updated_at || undefined,
     synced: true,

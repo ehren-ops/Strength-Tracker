@@ -208,7 +208,7 @@ function renderForm(name, ex){
   const mods = planModifiers(name, ex);
   const plan = ex.entries.length ? computeSuggestion(ex, name) : null;
   let repsDefault = (ex.autoloadLastReps && ex.entries.length) ? ex.entries[ex.entries.length - 1].reps : effectiveTargetReps(ex);
-  let setsDefault = 3;
+  let setsDefault = ex.targetRepsStrength && plannedHeavy(name, ex) ? HEAVY_SETS : 3;
   let weightDefault = "";
   let minutesDefault = "";
   // Recovery starts on the last session's minutes and temperature, or the usual dose.

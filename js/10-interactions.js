@@ -114,6 +114,9 @@ function logEntry(){
     if(pain) Object.assign(entry, pain);
   }
   if(modes.deload && ex.trackBy !== "duration") entry.deload = true;
+  // Main lifts: whether this was the heavy (4x5) or the volume (3x8) session, so each track
+  // progresses from its own sessions. Volume reps logged on a heavy day make it a volume session.
+  if(ex.targetRepsStrength && ex.trackBy === "weight") entry.heavy = plannedHeavy(selected, ex, entry.date) && entry.reps < (ex.targetReps || 8);
   // Every modifier on for this lift keeps its tag in the note, in front of whatever was typed.
   entry.note = withModifierTags(entry.note, activeModifierTags(selected, ex));
   // Logged at the preseason target (Squat: 5 reps, 4 sec lowering), so charts judge it against that.

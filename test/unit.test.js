@@ -115,9 +115,9 @@ test("first session after a deload: pressing repeats its weight", () => {
   eq([s.weight, !!s.postDeloadHold], [170, true], "bench");
 });
 test("after 14+ days off, lifts restart near 90%", () => {
-  reset(); lift("Squat", [[27, 170, 8], [20, 180, 8]]);
-  const s = suggest("Squat");
-  eq([s.weight, s.reentry && s.reentry.step], [162.5, 1], "squat");
+  reset(); lift("Hip Thrust", [[27, 170, 8], [20, 180, 8]]);
+  const s = suggest("Hip Thrust");
+  eq([s.weight, s.reentry && s.reentry.step], [162.5, 1], "hip thrust");
 });
 test("shoulder rehab holds Barbell Row at 85% of its pre-rehab weight", () => {
   reset(); lift("Barbell Row", [[14, 135, 8], [9, 135, 8]]);
@@ -147,7 +147,8 @@ test("trend line for the coach is one short sentence", () => {
 test("day lists: about 7 lifts each, Back Extension on Full and Upper, Lat Pulldown on Full", () => {
   reset();
   eq(run(`activeDayOrder("full")`), ["Squat", "Bench Press", "RDL", "Barbell Row", "Cable Lat Pulldown", "Face Pulls", "Back Extension"], "full");
-  eq(run(`activeDayOrder("upper")`), ["Bench Press", "Incline DB Press", "Cable Chest Fly", "Barbell Row", "Face Pulls", "Bicep Curl", "Tricep Pushdown", "Back Extension"], "upper");
+  eq(run(`activeDayOrder("upper")`), ["Bench Press", "Incline DB Press", "Push-Ups", "Barbell Row", "Face Pulls", "Bicep Curl", "Tricep Pushdown", "Back Extension"], "upper");
+  eq(run(`[activeDayOrder("lower").includes("Lateral Lunge"), extraList("strength").includes("Cable Chest Fly"), finishersFor("full"), finishersFor("upper"), finishersFor("lower")]`), [true, true, ["Pallof Press", "Farmer's Carry"], ["Dead Hang"], ["Side Plank"]], "Lateral Lunge year-round on Lower, fly on Extra, finishers");
 });
 test("ski phases are exclusive and preseason adds its week-3 lifts in week 3", () => {
   reset(); run(`skiPhase = {}; setSkiPhase("preseason");`);
@@ -156,7 +157,8 @@ test("ski phases are exclusive and preseason adds its week-3 lifts in week 3", (
   eq(run(`[preseasonWeek(), activeDayOrder("lower").includes("Trap Bar Jump")]`), [3, true], "week 3");
   run(`setSkiPhase("season");`);
   eq(run(`[modes.preseason, modes.ski]`), [false, true], "in season");
-  eq(run(`[getDisplayOrder("lower")[0], activeDayOrder("lower").filter(n => PRESEASON_ONLY.has(n))]`), ["Box Jumps", ["Box Jumps"]], "box jumps stay in season, first");
+  eq(run(`[getDisplayOrder("lower")[0], activeDayOrder("lower").filter(n => PRESEASON_ONLY.has(n))]`), ["Box Jumps", ["Lateral Lunge", "Box Jumps"]], "box jumps stay in season, first");
+  eq(run(`finishersFor("lower")`), ["Side Plank", "Wall Sit"], "wall sit on Lower with Ski on");
 });
 test("cardio: any two of time, distance and pace give the third (bike and rower)", () => {
   eq(run(`solveCardio(30, 6, null, false)`), { minutes: 30, distance: 6, speed: 12 }, "bike speed");
@@ -173,8 +175,8 @@ test("rower split reads 2:05, 2:05.3, 2.05 and seconds; watts follow Concept2", 
 });
 test("Full Body 2+1: A/B/C lists, year-round lateral work on B, and the A, B, optional C rotation", () => {
   reset(); run(`program = { key: "fullbody", startedOn: todayISO() };`);
-  eq(run(`activeDayOrder("a")`), ["Squat", "Bench Press", "Barbell Row", "Bulgarian Split Squat", "Face Pulls", "Back Extension", "Standing Calf Raise"], "A");
-  eq(run(`activeDayOrder("b")`), ["RDL", "Incline DB Press", "Cable Lat Pulldown", "Lateral Lunge", "Hip Thrust", "Back Extension", "Seated Calf Raise"], "B");
+  eq(run(`activeDayOrder("a")`), ["Squat", "Bench Press", "RDL", "Barbell Row", "Bulgarian Split Squat", "Face Pulls", "Back Extension", "Standing Calf Raise"], "A");
+  eq(run(`activeDayOrder("b")`), ["RDL", "Squat", "Incline DB Press", "Cable Lat Pulldown", "Lateral Lunge", "Hip Thrust", "Back Extension", "Seated Calf Raise"], "B");
   eq(run(`activeDayOrder("c")`), ["Kettlebell Swings", "Walking Lunge", "Push-Ups", "Face Pulls", "Bicep Curl", "Tricep Pushdown"], "C");
   const monday = run(`weekStartISO(todayISO())`);
   lift("Squat", [[0, 175, 8]]); run(`data["Squat"].entries[0].date = shiftISO(todayISO(), -1); data["Bench Press"] = Object.assign(newExerciseShell("Bench Press"), { entries: [{ clientId: "x", date: shiftISO(todayISO(), -1), weight: 150, sets: 3, reps: 8 }] });`);
@@ -183,18 +185,41 @@ test("Full Body 2+1: A/B/C lists, year-round lateral work on B, and the A, B, op
   eq(run(`nextProgramDay()`), run(`todayISO()`) === monday ? "a" : "c", "after B: C the same week, else A");
   run(`program = { key: "classic" };`);
 });
-test("Full Body 2+1: main lifts at 4x5, converted once from the last 3x8, then normal progression", () => {
-  reset(); lift("Squat", [[10, 175, 8], [3, 180, 8]]);
-  run(`program = { key: "fullbody", startedOn: todayISO(), history: [{ key: "fullbody", startedOn: todayISO() }] };`);
-  let s = suggest("Squat");
-  eq([s.weight, s.sets, s.reps, !!s.programStart], [185, 4, 5, true], "first 4x5 (about 81% of est. max)");
-  run(`data["Squat"].entries.push({ clientId: "n", date: todayISO(), weight: 185, sets: 4, reps: 5, difficulty: 7 });`);
-  s = suggest("Squat");
-  eq([s.weight, s.sets, s.reps, !!s.programStart, run(`entryTargetReps(data["Squat"], data["Squat"].entries[2])`), run(`entryTargetReps(data["Squat"], data["Squat"].entries[1])`)], [190, 4, 5, false, 5, 8], "then +5, history judged by its own scheme");
-  run(`program = { key: "classic", startedOn: shiftISO(todayISO(), 1), history: [{ key: "fullbody", startedOn: todayISO() }, { key: "classic", startedOn: shiftISO(todayISO(), 1) }] };`);
-  s = suggest("Squat");
-  eq([s.weight, s.reps, !!s.programStart], [170, 8, true], "back to Classic: converted to 3x8");
-  run(`program = { key: "classic" };`);
+// Heavy and volume tests run on a fixed Thursday (2026-10-15; the week starts Monday the 12th).
+function onDay(iso, fn){
+  run(`__today = todayISO; todayISO = () => "${iso}";`);
+  try{ return fn(); } finally { run(`todayISO = __today;`); }
+}
+const at = (date, weight, reps, extra) => Object.assign({ clientId: "h" + date + weight, date, weight, sets: 3, reps, difficulty: 7 }, extra || {});
+test("Classic: main lifts heavy (4x5) first in the week, volume (3x8) after, each on its own track", () => {
+  reset(); run(`program = { key: "classic" }; view = "full";`);
+  lift("Squat", []); run(`data["Squat"].entries = ${JSON.stringify([at("2026-10-01", 175, 8), at("2026-10-06", 180, 8)])};`);
+  let s = onDay("2026-10-15", () => suggest("Squat"));
+  eq([s.heavy, s.weight, s.sets, s.reps, !!s.trackStart], [true, 185, 4, 5, true], "first heavy day: worked out from 180x8");
+  run(`data["Squat"].entries.push(${JSON.stringify(at("2026-10-13", 185, 5, { sets: 4, heavy: true }))});`);
+  s = onDay("2026-10-15", () => suggest("Squat"));
+  eq([s.heavy, s.weight, s.sets, s.reps, !!s.trackStart], [false, 185, 3, 8, false], "second session that week: volume, +5 from the last volume day");
+  s = onDay("2026-10-19", () => suggest("Squat"));
+  eq([s.heavy, s.weight, s.sets, s.reps], [true, 190, 4, 5], "next week: heavy, +5 from the last heavy day");
+  eq(run(`data["Squat"].entries.map(e => entryTargetReps(data["Squat"], e))`), [8, 8, 5], "history judged by its own reps");
+  run(`modes.deload = true;`);
+  s = onDay("2026-10-19", () => suggest("Squat"));
+  eq([s.weight, s.sets, s.reps, s.deloadWeek], [167.5, 3, 5, true], "deload heavy day: 10% under the last heavy, fewer sets");
+  run(`modes.deload = false; modes.preseason = true;`);
+  eq(onDay("2026-10-19", () => suggest("Squat").heavy), false, "never heavy while a preseason target sets the reps");
+  run(`modes.preseason = false;`);
+});
+test("Full Body 2+1: heavy by day (Squat, Bench, Row on A; RDL on B); v107 entries count as heavy", () => {
+  reset(); run(`program = { key: "fullbody", startedOn: "2026-10-10", history: [{ key: "fullbody", startedOn: "2026-10-10" }] };`);
+  lift("Squat", [[30, 180, 8]]); lift("RDL", [[30, 225, 8]]); lift("Bench Press", [[30, 150, 8]]);
+  const heavyOn = day => onDay("2026-10-15", () => run(`view = "${day}"; ["Squat", "RDL", "Bench Press"].map(n => computeSuggestion(data[n], n).heavy)`));
+  eq(heavyOn("a"), [true, false, true], "Day A");
+  eq(heavyOn("b"), [false, true, true], "Day B (bench stays heavy; it only runs on A)");
+  run(`modes.shoulder = true; shoulderRehab = { startedOn: "2026-10-14", endedOn: null };`);
+  eq(heavyOn("a")[2], false, "never heavy while Shoulder Rehab holds the lift");
+  run(`modes.shoulder = false; shoulderRehab = {}; data["Squat"].entries.push(${JSON.stringify(at("2026-10-11", 185, 5, { sets: 4 }))});`);
+  eq(run(`isHeavyEntry(data["Squat"], data["Squat"].entries[1])`), true, "a v107 Full Body 2+1 entry with no flag is heavy");
+  run(`program = { key: "classic" }; view = "full";`);
 });
 test("rest: main lifts start at 90 sec and step to 2 then 3 min; accessories keep their range", () => {
   reset(); lift("Squat", [[3, 180, 8]]); lift("Cable Chest Fly", [[3, 50, 12]]);
