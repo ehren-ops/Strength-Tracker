@@ -1776,9 +1776,9 @@ async function main(){
   await page.locator('.pill').filter({ hasText: /^2\.\s*Bench Press/ }).click();
   await sleep(100);
   if(await page.locator('.mod-badges .deload-badge').count() !== 1) throw new Error('expected a Deload badge on the exercise card');
-  // Modifier badges sit under the current weight, not in the title.
-  const badgePlace = await page.evaluate(() => { const m = document.querySelector('.mod-badges'); return { prev: m.previousElementSibling && m.previousElementSibling.className, inTitle: !!document.querySelector('.ex-name .deload-badge') }; });
-  if(badgePlace.prev !== 'weight-row' || badgePlace.inTitle) throw new Error('expected modifier badges right under the weight row, got: ' + JSON.stringify(badgePlace));
+  // Modifier badges sit last in the card head's side column (under Last and the record), not in the title.
+  const badgePlace = await page.evaluate(() => { const m = document.querySelector('.mod-badges'); return { parent: m.parentElement.className, last: m === m.parentElement.lastElementChild, inTitle: !!document.querySelector('.ex-name .deload-badge') }; });
+  if(badgePlace.parent !== 'card-head-side' || !badgePlace.last || badgePlace.inTitle) throw new Error('expected modifier badges last in the card head side column, got: ' + JSON.stringify(badgePlace));
   // A Deload Week session charts as a planned deload (diamond, Deload color), not a short-set flag.
   const deloadMark = await page.evaluate(() => {
     const ex = Object.assign(newExerciseShell('Squat'), { entries: [
@@ -2228,7 +2228,7 @@ async function main(){
   if(short.length) throw new Error('expected two full lines of whole-sentence guidance on every tile, got: ' + JSON.stringify(short));
   console.log('OK: guidance fills exactly two lines at 300px and 400px, e.g. "' + guide[0].text + '"');
 
-  // "+N since first" sits at the right end of the title row; the Next tile follows the weight row directly.
+  // "Last" heads the card head side column; the Next tile follows the card head directly.
   const head = await page.evaluate(() => {
     const ex = data['Squat'];
     const saved = ex.entries;
@@ -2239,8 +2239,8 @@ async function main(){
     ex.entries = saved; plannedHeavy = savedPlannedHeavy;
     const d = div.querySelector('.delta-line');
     const c = div.querySelector('.last-line');
-    const w = div.querySelector('.weight-row');
-    return { cornerInTitle: !!(c && c.parentElement.classList.contains('ex-title-row')), corner: c && c.textContent, deltaInHistory: !!(d && /Recent History/.test(d.parentElement.textContent)), text: d && d.textContent,
+    const w = div.querySelector('.card-head');
+    return { cornerInTitle: !!(c && c.parentElement.classList.contains('card-head-side') && c === c.parentElement.firstElementChild), corner: c && c.textContent, deltaInHistory: !!(d && /Recent History/.test(d.parentElement.textContent)), text: d && d.textContent,
       big: div.querySelector('.big-val').textContent, label: div.querySelector('.big-label').textContent, plan: div.querySelector('.rec-plan').textContent, load: div.querySelector('.rec-load').textContent,
       next: w && w.nextElementSibling && w.nextElementSibling.className };
   });

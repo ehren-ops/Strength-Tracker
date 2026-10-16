@@ -134,10 +134,11 @@
   .bal-table + .range-note{margin-top:0.5rem;}
   .prefill-row{display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;margin:0.15rem 0 0.4rem;}
   .prefill-row .prefill-note{margin:0;}
-  .perset-toggle{background:none;border:none;padding:0;font:inherit;font-size:0.68rem;font-weight:600;color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto;}
+  /* Dotted underline and a little height so they read as tappable without becoming buttons. */
+  .perset-toggle{background:none;border:none;padding:0.35rem 0;font:inherit;font-size:0.68rem;font-weight:600;color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto;text-decoration:underline dotted;text-underline-offset:3px;}
   .perset-row{display:flex;gap:0.35rem;margin:0 0 0.5rem;}
   .perset-row[hidden]{display:none;}
-  .form-toggles{display:flex;gap:0.8rem;margin-left:auto;flex-shrink:0;}
+  .form-toggles{display:flex;gap:1.3rem;margin-left:auto;flex-shrink:0;}
   .form-toggles .perset-toggle{margin-left:0;}
   .pain-row{display:flex;gap:0.35rem;margin:0 0 0.5rem;}
   .pain-row[hidden]{display:none;}
@@ -178,6 +179,13 @@
   .delta-line.delta-down{color:color-mix(in srgb, var(--amber) 40%, var(--slate));}
   .side-tag{font-size:0.5em;font-weight:600;color:var(--slate);margin-left:0.15rem;letter-spacing:0;}
   .plate-line{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.72rem;color:var(--slate);margin-top:0.15rem;}
+  /* Card head: name and weight on the left; Last, the record and modifier badges stacked right. */
+  .card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:0.8rem;align-items:start;}
+  .card-head .ex-title-row{margin:0 0 0.2rem;}
+  .card-head .ex-name{line-height:1;}
+  .card-head-side{display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;padding-top:0.3rem;text-align:right;}
+  .card-head-side .last-line{margin-left:0;}
+  .card-head-side .mod-badges{justify-content:flex-end;margin:0;max-width:10rem;}
   .weight-row{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:0.4rem 0.9rem;}
   .weight-main{display:flex;flex-direction:column;align-items:flex-start;}
   .big-label{display:block;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);white-space:nowrap;line-height:1.2;}

@@ -329,7 +329,10 @@ function renderExerciseCard(name, ex){
 
   // Active modifiers: badges, then their notes, under the current weight rather than above it.
   const badges = mods.map(m => `<span class="${m.key}-badge">${m.emoji} ${typeof m.badge === "function" ? m.badge(name) : m.badge}</span>`).join("");
-  let modHtml = badges ? `<div class="mod-badges">${badges}</div>` : "";
+  // The badges ride in the card head's side column (under Last and the record) once there is
+  // history; the care and tempo lines stay full width under it.
+  const badgeHtml = badges ? `<div class="mod-badges">${badges}</div>` : "";
+  let modHtml = "";
   if(kneeActive && KNEE_CARE_TIP[name]){
     modHtml += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
   }
@@ -357,8 +360,9 @@ function renderExerciseCard(name, ex){
   }
 
   let html = `<div class="card${mods.filter(m => m.key !== "deload").map(m => ` ${m.key}-mode`).join("")}">`;
+  let titleHtml;
   if(isCustom && deletingExercise === name){
-    html += `<div class="ex-name-row">
+    titleHtml = `<div class="ex-name-row">
       <span style="color:var(--slate);font-size:0.85rem;">Delete "${escapeHtml(name)}" and all its logged history?</span>
       <span class="row-actions">
         <button class="danger-btn" onclick="confirmDeleteExercise('${name.replace(/'/g,"\\'")}')">Yes, delete</button>
@@ -366,10 +370,10 @@ function renderExerciseCard(name, ex){
       </span>
     </div>`;
   } else {
-    html += `<div class="ex-title-row"><h2 class="ex-name">${name}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>${priorHtml}</div>`;
+    titleHtml = `<div class="ex-title-row"><h2 class="ex-name">${name}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2></div>`;
   }
   if(!hasEntries){
-    html += modHtml;
+    html += titleHtml + badgeHtml + modHtml;
     // Same tile as every other lift, so the card never changes shape.
     html += recovery ? renderRecoveryTile(name, ex) : renderNextTile("Next: first session", ex, firstSessionGuidance(name, ex), loadText(name, ex, null));
     html += renderTips(name);
@@ -384,12 +388,18 @@ function renderExerciseCard(name, ex){
     else if(suggestion){ bigVal = bigOf(suggestion); bigLabel = "Today"; }
     else { bigVal = bigOf(work); bigLabel = "Last"; }
 
-    html += `<div class="weight-row">
-      <div class="weight-main">
-        <span class="big-val">${bigVal}</span>
-        <span class="big-label${todayLog ? " locked" : ""}">${bigLabel}</span>
+    // Card head: the name and today's weight on the left; Last, the record and the active modifier
+    // badges stacked on the right, so a name that wraps never leaves an empty corner.
+    html += `<div class="card-head">
+      <div class="card-head-main">${titleHtml}
+        <div class="weight-row">
+          <div class="weight-main">
+            <span class="big-val">${bigVal}</span>
+            <span class="big-label${todayLog ? " locked" : ""}">${bigLabel}</span>
+          </div>
+        </div>
       </div>
-      ${topRightSlot(name, ex, work, todayLog || suggestion || work, isCustom)}
+      <div class="card-head-side">${priorHtml}${topRightSlot(name, ex, work, todayLog || suggestion || work, isCustom)}${badgeHtml}</div>
     </div>`;
     html += modHtml;
 
