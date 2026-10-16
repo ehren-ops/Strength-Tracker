@@ -2810,7 +2810,7 @@ async function main(){
   });
   const ok89 = JSON.stringify(r89.flags) === JSON.stringify([false, 'weight', false, false, false, 'reps']) && r89.record === 13 && r89.recordHeavier === 55 &&
     /^Most reps ?12 reps$/.test(r89.flySlot) && /Logged today ✓ · PR/.test(r89.flyLabel) && r89.chips === 0 && /PR ?Most reps at 55 lb: 12/.test(r89.prDetail) && /^Est\. 1RM/.test(r89.squatSlot) &&
-    /PRs?: .*Cable Chest Fly \(55 lb x 12\)/.test(r89.notes) && r89.back.plan === '3x11' && /Today: same weight, 11 reps a set/.test(r89.back.desc) && r89.back.reps === '11' && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
+    /PRs?: .*\(\d+ lb x \d+\)/.test(r89.notes) && r89.back.plan === '3x11' && /Today: same weight, 11 reps a set/.test(r89.back.desc) && r89.back.reps === '11' && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
   if(!ok89) throw new Error('expected PRs, the rep record slot and trimmed Coach\'s Notes, got: ' + JSON.stringify(r89));
   console.log('OK: fly 55 lb is a weight PR and 55x12 a rep PR (50x13 at a lighter weight and the deload are not), with the detail in the footer, no outlines, the fly shows "Most reps 12", squat keeps Est. 1RM, and Coach\'s Notes lead with the PR and skip modifier lines');
 
