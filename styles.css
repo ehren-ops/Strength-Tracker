@@ -54,7 +54,7 @@
     --cat-core:#39FF6A; --cat-core-bg:rgba(57,255,106,0.12); --cat-core-border:#39FF6A; --cat-core-text:#A8FFC0;
     --cat-stretch:#2DD4BF; --cat-stretch-bg:rgba(45,212,191,0.12); --cat-stretch-border:#2DD4BF; --cat-stretch-text:#99F6EC;
     --cat-recovery:#FFC48A; --cat-recovery-bg:rgba(255,196,138,0.12); --cat-recovery-border:#FFC48A; --cat-recovery-text:#FFE0C2;
-    --font-display:'Orbitron',sans-serif; --name-size:1.72rem; --font-body:'Rajdhani',sans-serif;
+    --font-display:'Space Grotesk',sans-serif; --name-size:1.58rem; --font-body:'Rajdhani',sans-serif;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--stone);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom);}
@@ -170,7 +170,7 @@
   .delta{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.82rem;font-weight:600;}
   .ex-title-row{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:0.2rem 0.6rem;margin:0 0 0.6rem;}
   /* Name capitals match the current weight's digits (1.7rem body font): Fjalla One's capitals run
-     about 15% taller than IBM Plex Sans digits, Orbitron's about the same as Rajdhani's. */
+     about 15% taller than IBM Plex Sans digits, Space Grotesk's about 8% taller than Rajdhani's. */
   .ex-title-row .ex-name{margin:0;flex:1 1 0;}
   .delta-line{font-variant-numeric:tabular-nums;color:var(--slate);}
   /* Muted, so it sits with the grey heading: a hint of green up, of amber down. */
