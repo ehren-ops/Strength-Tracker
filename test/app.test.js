@@ -3072,7 +3072,7 @@ async function main(){
     out.done = text();
     out.form = [document.getElementById('f-sets').value, document.getElementById('f-reps').value].join(',');
     clearHoldTimer();
-    out.hidden = clock().hidden;
+    out.hidden = getComputedStyle(clock()).display === 'none';
     // Stop early: one tap arms, the second stops; the partial hold counts.
     startHoldTimer('Dead Hang');
     step();
@@ -3082,6 +3082,15 @@ async function main(){
     clock().click();
     out.stopped = text();
     out.formStopped = [document.getElementById('f-sets').value, document.getElementById('f-reps').value].join(',');
+    clock().click(); // a tap on the stopped clock clears it
+    out.closed = !holdTimer && getComputedStyle(clock()).display === 'none';
+    // The handle shrinks it to a slim bar that keeps running, and brings it back.
+    startHoldTimer('Dead Hang');
+    const h0 = clock().getBoundingClientRect().height;
+    clock().querySelector('.hc-handle').click();
+    out.compact = { cls: clock().className, h: Math.round(clock().getBoundingClientRect().height), h0: Math.round(h0), running: !!holdTimer && !holdTimer.finished };
+    clock().querySelector('.hc-handle').click();
+    out.expanded = !/compact/.test(clock().className);
     clearHoldTimer();
     const hang = JSON.parse(saved.hang); if(hang) data['Dead Hang'] = hang; else delete data['Dead Hang'];
     view = saved.view; selected = saved.selected; render();
@@ -3089,9 +3098,9 @@ async function main(){
   });
   if(r96.btn !== '3x42' || r96.restBtn || !/Each hold 42 sec today: 2 sec longer than last time/.test(r96.desc) || !/^Get ready 5 Set 1 of 3/.test(r96.start)
     || JSON.stringify(r96.kinds) !== JSON.stringify(['hold', 'rest', 'ready', 'hold']) || !/^Rest 40 Next: set 2 of 3/.test(r96.rest)
-    || !/^Done 3x42/.test(r96.done) || r96.form !== '3,42' || !r96.hidden || !/Tap again to stop/.test(r96.armed) || !/^Stopped 1x22/.test(r96.stopped) || r96.formStopped !== '1,22')
+    || !/^Done 3x42/.test(r96.done) || r96.form !== '3,42' || !r96.hidden || !/Tap again to stop/.test(r96.armed) || !/^Stopped 1x22/.test(r96.stopped) || r96.formStopped !== '1,22' || !r96.closed || !/compact/.test(r96.compact.cls) || !r96.compact.running || r96.compact.h >= r96.compact.h0 / 2 || !r96.expanded)
     throw new Error('expected the Dead Hang hold timer to run 3x42 with a count-in and 45 sec rest, fill the form, and stop on two taps, got: ' + JSON.stringify(r96));
-  console.log('OK: Dead Hang shows a 3x42 hold button instead of rest ("2 sec longer than last time"); Get ready 5, Hold, Rest 40 + 5 count-in; Done fills 3 x 42; two taps stop and keep the 22 sec held');
+  console.log('OK: Dead Hang shows a 3x42 hold button instead of rest ("2 sec longer than last time"); Get ready 5, Hold, Rest 40 + 5 count-in; Done fills 3 x 42; two taps stop and keep the 22 sec held; a tap clears the stopped clock; the handle shrinks it to a bar that keeps running');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

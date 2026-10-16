@@ -259,18 +259,31 @@
   .hold-action-btn{background:var(--emerald);border:1.5px solid var(--emerald);color:var(--card);font-weight:700;border-radius:7px;cursor:pointer;}
   .hold-action-btn .btn-icon{stroke-width:2;}
   .action-row .hold-action-btn{height:var(--input-h);width:100%;margin:0;padding:0 0.3rem;display:flex;align-items:center;justify-content:center;font-size:0.8rem;white-space:nowrap;}
-  .hold-clock{--phase:var(--slate);position:fixed;inset:0 0 auto 0;height:calc(50vh + env(safe-area-inset-top, 0px));padding-top:env(safe-area-inset-top, 0px);z-index:70;
-    background:var(--pine);color:var(--header-text);border-bottom:5px solid var(--phase);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3rem;
-    font-family:var(--font-body);cursor:pointer;user-select:none;-webkit-user-select:none;box-shadow:0 6px 24px rgba(0,0,0,0.35);}
+  .hold-clock{--phase:var(--slate);position:fixed;inset:0 0 auto 0;height:calc(30vh + env(safe-area-inset-top, 0px));min-height:calc(13rem + env(safe-area-inset-top, 0px));padding-top:env(safe-area-inset-top, 0px);z-index:70;
+    background:var(--pine);color:var(--header-text);border-bottom:5px solid var(--phase);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.15rem;
+    font-family:var(--font-body);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 6px 24px rgba(0,0,0,0.35);}
   .hold-clock.ready{--phase:var(--amber-light);} .hold-clock.hold{--phase:var(--emerald);} .hold-clock.rest{--phase:var(--amber);} .hold-clock.done{--phase:var(--emerald);}
   .hc-phase{font-size:1rem;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--phase);}
-  .hc-time{font-size:clamp(5rem, 28vw, 9rem);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;}
+  .hc-time{font-size:clamp(4rem, 20vw, 7rem);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;}
   .hc-set{font-size:1rem;opacity:0.85;}
   .hc-dots{display:flex;gap:0.5rem;margin-top:0.2rem;}
   .hc-dots i{width:0.7rem;height:0.7rem;border-radius:50%;border:2px solid rgba(241,239,231,0.6);}
   .hc-dots i.done{background:var(--phase);border-color:var(--phase);}
   .hc-stop{font-size:0.8rem;opacity:0.7;margin-top:0.4rem;}
   .hc-stop.armed{opacity:1;color:var(--phase);font-weight:700;}
+  .hold-clock[hidden]{display:none;}
+  .hc-handle, .hc-close{position:absolute;background:none;border:none;color:inherit;opacity:0.75;font-size:1.1rem;line-height:1;padding:0.5rem 0.9rem;cursor:pointer;}
+  .hc-handle{left:50%;bottom:0.35rem;transform:translateX(-50%);}
+  .hc-close{top:calc(env(safe-area-inset-top, 0px) + 0.3rem);right:0.3rem;font-size:1.2rem;}
+  /* The slim bar: one row, phase, time and set, still tappable to stop. */
+  .hold-clock.compact{height:auto;min-height:0;flex-direction:row;gap:0.7rem;padding:calc(env(safe-area-inset-top, 0px) + 0.45rem) 3rem 0.55rem 1rem;justify-content:flex-start;}
+  .hold-clock.compact .hc-time{font-size:1.9rem;}
+  .hold-clock.compact .hc-phase{font-size:0.8rem;}
+  .hold-clock.compact .hc-set{font-size:0.8rem;}
+  .hold-clock.compact .hc-dots, .hold-clock.compact .hc-stop{display:none;}
+  .hold-clock.compact .hc-stop.armed{display:block;margin:0;}
+  .hold-clock.compact .hc-handle{left:auto;right:0.2rem;bottom:auto;top:calc(env(safe-area-inset-top, 0px) + 0.35rem);transform:none;}
+  .hold-clock.compact .hc-close{top:calc(env(safe-area-inset-top, 0px) + 0.35rem);}
   .hc-bar{position:absolute;left:0;bottom:0;height:5px;background:var(--phase);transition:width 0.2s linear;}
   .hist-toggle{background:none;border:none;padding:0;margin-top:0.6rem;font-size:0.74rem;color:var(--amber);font-weight:600;text-decoration:underline;cursor:pointer;}
   .hist{display:none;margin-top:0.5rem;border-top:1px dashed var(--line);padding-top:0.5rem;}

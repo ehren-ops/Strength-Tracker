@@ -1,5 +1,6 @@
-// Hold timer for timed lifts (Dead Hang, Side Plank, Wall Sit, Farmer's Carry): the top half of the
-// screen turns into a big clock. A 5 second count-in, the hold counting down, then the lift's
+// Hold timer for timed lifts (Dead Hang, Side Plank, Wall Sit, Farmer's Carry): the top 30% of the
+// screen turns into a big clock; swipe it up (or tap the handle) for a slim bar that keeps running.
+// When it ends or is stopped, a tap or the close button clears it. A 5 second count-in, the hold counting down, then the lift's
 // shortest suggested rest, for every set on its own. Lifts done per side hold each side in turn
 // before the rest. Two taps on the clock within 2 seconds stop it, so a bump never does. At the end
 // the form holds the sets and seconds; Log is still one tap. Like the rest timer it runs on
@@ -8,6 +9,7 @@
 
 const HOLD_COUNT_IN = 5;
 const HOLD_STOP_WINDOW = 2000;
+let holdCompact = false; // the slim bar instead of the big clock; kept between runs this visit
 let holdTimer = null; // { name, sets, secs, steps, idx, endAt, held: [[sec per side]], intervalId, lastTap, beeped, wake }
 
 function isHoldLift(ex){ return !!ex && ex.unit === "sec" && ex.trackBy !== "duration" && ex.trackBy !== "checklist"; }
@@ -83,7 +85,8 @@ function recordHold(set, secs){
 
 // Tap the clock once to arm, again within 2 seconds to stop.
 function tapHoldClock(){
-  if(!holdTimer || holdTimer.finished) return;
+  if(!holdTimer) return;
+  if(holdTimer.finished){ clearHoldTimer(); return; }
   const now = Date.now();
   if(now - holdTimer.lastTap < HOLD_STOP_WINDOW){ stopHoldTimer(false); return; }
   holdTimer.lastTap = now;
@@ -141,15 +144,30 @@ function renderHoldClock(){
     el.id = "hold-clock";
     el.className = "hold-clock";
     el.setAttribute("role", "timer");
-    el.onclick = tapHoldClock;
+    el.onclick = e => {
+      if(el._swiped){ el._swiped = false; return; }
+      const act = e.target.closest("[data-hc]");
+      if(act){ e.stopPropagation(); if(act.dataset.hc === "close") clearHoldTimer(); else toggleHoldCompact(); return; }
+      tapHoldClock();
+    };
+    // Swipe up for the slim bar, down for the big clock.
+    el.addEventListener("touchstart", e => { el._y = e.touches[0].clientY; }, { passive: true });
+    el.addEventListener("touchend", e => {
+      const dy = e.changedTouches[0].clientY - (el._y ?? e.changedTouches[0].clientY);
+      if(Math.abs(dy) < 30 || !holdTimer) return;
+      el._swiped = true;
+      if((dy < 0) !== holdCompact) toggleHoldCompact();
+    });
     document.body.appendChild(el);
   }
   el.hidden = false;
   const t = holdTimer, step = t.steps[Math.min(t.idx, t.steps.length - 1)];
   const dots = Array.from({ length: t.sets }, (_, i) => `<i class="${(t.held[i] || []).length >= t.sides ? "done" : ""}"></i>`).join("");
+  const size = holdCompact ? " compact" : "";
+  const handle = `<button type="button" class="hc-handle" data-hc="size" aria-label="${holdCompact ? "Show the big clock" : "Shrink to a bar"}">${holdCompact ? "▾" : "▴"}</button>`;
   if(t.finished){
-    el.className = "hold-clock done";
-    el.innerHTML = `<div class="hc-phase">${t.result.startsWith("Done") ? "Done" : "Stopped"}</div><div class="hc-time">${t.summary}</div><div class="hc-set">${t.result.replace(/^(Done|Stopped): ?/, "")}</div><div class="hc-dots">${dots}</div>`;
+    el.className = "hold-clock done" + size;
+    el.innerHTML = `<div class="hc-phase">${t.result.startsWith("Done") ? "Done" : "Stopped"}</div><div class="hc-time">${t.summary}</div><div class="hc-set">${t.result.replace(/^(Done|Stopped): ?/, "")}</div><div class="hc-dots">${dots}</div><div class="hc-stop">Tap to close</div><button type="button" class="hc-close" data-hc="close" aria-label="Close">✕</button>`;
     return;
   }
   const left = Math.max(0, Math.ceil((t.endAt - Date.now()) / 1000));
@@ -157,10 +175,11 @@ function renderHoldClock(){
   const setLine = step.kind === "rest" ? `Next: set ${step.set + 1} of ${t.sets}` : `Set ${step.set} of ${t.sets}${step.side ? ` · ${step.side}` : ""}`;
   const armed = Date.now() - t.lastTap < HOLD_STOP_WINDOW;
   const pct = Math.min(100, Math.max(0, 100 * (1 - (t.endAt - Date.now()) / (step.secs * 1000))));
-  el.className = `hold-clock ${step.kind}`;
+  el.className = `hold-clock ${step.kind}${size}`;
   el.setAttribute("aria-label", `${phase}, ${left} seconds, ${setLine}`);
-  el.innerHTML = `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${setLine}</div><div class="hc-dots">${dots}</div><div class="hc-stop${armed ? " armed" : ""}">${armed ? "Tap again to stop" : "Tap twice to stop"}</div><div class="hc-bar" style="width:${pct}%"></div>`;
+  el.innerHTML = `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${setLine}</div><div class="hc-dots">${dots}</div><div class="hc-stop${armed ? " armed" : ""}">${armed ? "Tap again to stop" : "Tap twice to stop"}</div><div class="hc-bar" style="width:${pct}%"></div>${handle}`;
 }
+function toggleHoldCompact(){ holdCompact = !holdCompact; renderHoldClock(); }
 
 // Sound needs a tap to start on phones; the Start tap creates the context, later beeps reuse it.
 let holdAudioCtx = null;
