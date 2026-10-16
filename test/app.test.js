@@ -2243,7 +2243,7 @@ async function main(){
       next: w && w.nextElementSibling && w.nextElementSibling.className };
   });
   if(!head.cornerInTitle || !/^Last: 175 lb$/.test(head.corner) || !head.deltaInHistory || head.text !== '+10 lb since first' || head.label !== 'Today' || !/^180 lb/.test(head.big)
-    || head.plan !== 'Volume · 3x8 · +5 lb' || !/^Load 180 lb = /.test(head.load) || head.next !== 'rec-box') throw new Error('expected today\'s 180 big, "Last: 175" top right, "3x8 · +5 lbs", the load total before the plates and +10 since first in Recent History, got: ' + JSON.stringify(head));
+    || head.plan !== 'Volume · 3x8' || !/^Load 180 lb = /.test(head.load) || head.next !== 'rec-box') throw new Error('expected today\'s 180 big, "Last: 175" top right, "3x8 · +5 lbs", the load total before the plates and +10 since first in Recent History, got: ' + JSON.stringify(head));
   console.log('OK: TODAY 180 lbs, "' + head.corner + '" top right, "' + head.plan + '", "' + head.load + '", and +10 since first in the Recent History heading');
 
   console.log('=== 76: heart rate per lift arrives after the fact and shows in history, the breakdown and the Next tile ===');
@@ -2801,7 +2801,7 @@ async function main(){
     const savedBack = data['Back Extension'] ? JSON.stringify(data['Back Extension']) : null;
     data['Back Extension'] = mk('Back Extension', [[-7, 25, 10]]);
     c = card('Back Extension');
-    out.back = { plan: c.querySelector('.rec-plan').textContent, reps: c.querySelector('#f-reps').value };
+    out.back = { plan: c.querySelector('.rec-plan').textContent, desc: c.querySelector('.rec-desc').textContent, reps: c.querySelector('#f-reps').value };
     if(savedBack) data['Back Extension'] = JSON.parse(savedBack); else delete data['Back Extension'];
     const restore = JSON.parse(saved);
     ['Cable Chest Fly', 'Squat'].forEach((n, i) => { const v = i ? restore.squat : restore.fly; if(v) data[n] = v; else delete data[n]; });
@@ -2810,7 +2810,7 @@ async function main(){
   });
   const ok89 = JSON.stringify(r89.flags) === JSON.stringify([false, 'weight', false, false, false, 'reps']) && r89.record === 13 && r89.recordHeavier === 55 &&
     /^Most reps ?12 reps$/.test(r89.flySlot) && /Logged today ✓ · PR/.test(r89.flyLabel) && r89.chips === 2 && /PR ?Most reps at 55 lb: 12/.test(r89.prDetail) && /^Est\. 1RM/.test(r89.squatSlot) &&
-    /PRs?: .*Cable Chest Fly \(55 lb x 12\)/.test(r89.notes) && /3x11 · \+1 rep/.test(r89.back.plan) && r89.back.reps === '11' && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
+    /PRs?: .*Cable Chest Fly \(55 lb x 12\)/.test(r89.notes) && r89.back.plan === '3x11' && /Today: same weight, 11 reps a set/.test(r89.back.desc) && r89.back.reps === '11' && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
   if(!ok89) throw new Error('expected PRs, the rep record slot and trimmed Coach\'s Notes, got: ' + JSON.stringify(r89));
   console.log('OK: fly 55 lb is a weight PR and 55x12 a rep PR (50x13 at a lighter weight and the deload are not), outlined with the detail in the footer, the fly shows "Most reps 12", squat keeps Est. 1RM, and Coach\'s Notes lead with the PR and skip modifier lines');
 
@@ -3050,9 +3050,48 @@ async function main(){
     return out;
   });
   if(!/^Heavy · 4x5/.test(r95.a.headline) || !/^First heavy day: 185 lb, worked out from your 180 lb x 8/.test(r95.a.desc) || !/Heavy on Day A, volume on Day B/.test(r95.b.desc) || r95.a.rest !== 'Rest 90 sec–3 min' || r95.a.form !== '185,4,5'
-    || !/^Volume · 3x8 · \+5 lb/.test(r95.b.headline) || r95.b.form !== '185,3,8')
+    || r95.b.headline !== 'Volume · 3x8' || !/5 lb heavier today/.test(r95.b.desc) || r95.b.form !== '185,3,8')
     throw new Error('expected Squat heavy on A (first 4x5 at 185 from 180x8) and volume on B (3x8 at 185), got: ' + JSON.stringify(r95));
   console.log('OK: Day A squat is a first heavy 4x5 at 185 (worked out from 180x8, form pre-filled), Day B a volume 3x8 at 185, Rest 90 sec–3 min');
+
+  console.log('=== 96: timed lifts get the hold timer: count-in, hold, rest for every set, two taps to stop, the form filled in ===');
+  const r96 = await page.evaluate(() => {
+    const saved = { hang: JSON.stringify(data['Dead Hang'] || null), view, selected };
+    data['Dead Hang'] = Object.assign(newExerciseShell('Dead Hang'), { entries: [{ clientId: 'h96', date: shiftISO(todayISO(), -4), weight: 0, sets: 3, reps: 40, difficulty: 7 }] });
+    view = 'extra'; selected = 'Dead Hang'; render();
+    const out = { btn: (document.querySelector('.hold-action-btn') || {}).textContent, restBtn: !!document.querySelector('.rest-action-btn'), desc: document.querySelector('.rec-desc').textContent };
+    const clock = () => document.getElementById('hold-clock');
+    const text = () => [...clock().children].map(c => c.textContent).filter(Boolean).join(' ');
+    startHoldTimer('Dead Hang');
+    out.start = text();
+    const step = () => { holdTimer.endAt = Date.now() - 1; tickHoldTimer(); return holdTimer && !holdTimer.finished ? holdTimer.steps[holdTimer.idx].kind : 'done'; };
+    out.kinds = [step(), step()];
+    out.rest = text();
+    out.kinds.push(step(), step());
+    while(step() !== 'done');
+    out.done = text();
+    out.form = [document.getElementById('f-sets').value, document.getElementById('f-reps').value].join(',');
+    clearHoldTimer();
+    out.hidden = clock().hidden;
+    // Stop early: one tap arms, the second stops; the partial hold counts.
+    startHoldTimer('Dead Hang');
+    step();
+    holdTimer.endAt = Date.now() + 20000; // 22 of 42 sec held
+    clock().click();
+    out.armed = text();
+    clock().click();
+    out.stopped = text();
+    out.formStopped = [document.getElementById('f-sets').value, document.getElementById('f-reps').value].join(',');
+    clearHoldTimer();
+    const hang = JSON.parse(saved.hang); if(hang) data['Dead Hang'] = hang; else delete data['Dead Hang'];
+    view = saved.view; selected = saved.selected; render();
+    return out;
+  });
+  if(r96.btn !== '3x42' || r96.restBtn || !/Each hold 42 sec today: 2 sec longer than last time/.test(r96.desc) || !/^Get ready 5 Set 1 of 3/.test(r96.start)
+    || JSON.stringify(r96.kinds) !== JSON.stringify(['hold', 'rest', 'ready', 'hold']) || !/^Rest 40 Next: set 2 of 3/.test(r96.rest)
+    || !/^Done 3x42/.test(r96.done) || r96.form !== '3,42' || !r96.hidden || !/Tap again to stop/.test(r96.armed) || !/^Stopped 1x22/.test(r96.stopped) || r96.formStopped !== '1,22')
+    throw new Error('expected the Dead Hang hold timer to run 3x42 with a count-in and 45 sec rest, fill the form, and stop on two taps, got: ' + JSON.stringify(r96));
+  console.log('OK: Dead Hang shows a 3x42 hold button instead of rest ("2 sec longer than last time"); Get ready 5, Hold, Rest 40 + 5 count-in; Done fills 3 x 42; two taps stop and keep the 22 sec held');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

@@ -138,10 +138,20 @@ test("PRs: heavier than ever, or more reps at the top weight; never more reps at
   eq(run(`repRecord(data["Cable Chest Fly"], 50).reps`), 15, "record at 50");
   eq(run(`repRecord(data["Cable Chest Fly"], 55).weight`), 55, "record at 55");
 });
-test("rep range: the Next tile says +1 rep, not same as last, at the same weight", () => {
-  reset(); lift("Back Extension", [[7, 25, 10]]);
-  eq(run(`stepText(data["Back Extension"], { weight: 25, reps: 11 }, data["Back Extension"].entries[0])`), "+1 rep", "step");
-  eq(run(`stepText(data["Back Extension"], { weight: 30, reps: 10 }, data["Back Extension"].entries[0])`), "+5 lb", "weight step");
+test("Next tile change in words: heavier, lighter, more reps, longer holds, same", () => {
+  reset(); lift("Back Extension", [[7, 25, 10]]); lift("Dead Hang", [[7, 0, 40]]);
+  const be = `data["Back Extension"]`, dh = `data["Dead Hang"]`;
+  eq(run(`stepText(${be}, { weight: 25, reps: 11 }, ${be}.entries[0])`), "same weight, 1 more rep", "rep");
+  eq(run(`stepText(${be}, { weight: 30, reps: 10 }, ${be}.entries[0])`), "5 lb heavier", "heavier");
+  eq(run(`stepText(${be}, { weight: 20, reps: 10 }, ${be}.entries[0])`), "5 lb lighter", "lighter");
+  eq(run(`stepText(${be}, { weight: 25, reps: 10 }, ${be}.entries[0])`), "same weight", "same");
+  eq(run(`stepText(${dh}, { reps: 45 }, ${dh}.entries[0])`), "5 sec longer", "hold");
+});
+test("hold timer: count-in, each side, rest between sets, none after the last", () => {
+  reset();
+  const steps = run(`holdSteps(2, 30, 45, ["Left side", "Right side"]).map(s => s.kind + s.secs + (s.side ? s.side[0] : ""))`);
+  eq(steps, ["ready5L", "hold30L", "ready5R", "hold30R", "rest40", "ready5L", "hold30L", "ready5R", "hold30R"], "steps");
+  eq(run(`[isHoldLift(EXERCISE_DEFAULTS["Dead Hang"]), isHoldLift(EXERCISE_DEFAULTS["Back Extension"])]`), [true, false], "which lifts");
 });
 test("reps per set: logs the lowest set and keeps the list only when sets differ", () => {
   eq(run(`applyPerSet({}, [8, 8, 6])`), { sets: 3, reps: 6, repsBySet: [8, 8, 6] }, "uneven");

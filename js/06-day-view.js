@@ -406,6 +406,10 @@ function renderExerciseCard(name, ex){
     let recHtml = "";
     if(suggestion){
       const unitWord = ex.unit === "sec" ? "hold time" : "reps";
+      // Today's change from the last full session, in words ("5 lb heavier", "same weight"), so the
+      // call says what to do with this set instead of "add" or "hold".
+      const chg = stepText(ex, suggestion, trackPrior) || (ex.trackBy === "weight" ? "same weight" : ex.trackBy === "duration" ? "same time" : "same reps");
+      const vsLast = /^same/.test(chg) ? "same as last time" : `${chg} than last time`;
       let msg;
       let nextLabel;
       if(ex.trackBy === "weight"){
@@ -466,59 +470,60 @@ function renderExerciseCard(name, ex){
         } else if(suggestion.noteConcern){
           const flagged = CONCERN_WORDS.find(w => suggestion.noteConcern.toLowerCase().includes(w)) || "a concern";
           msg = suggestion.hitTarget
-            ? `${hitLeadIn}, but your note flagged ${flagged}: hold.`
-            : `Missed target ${unitWord} and your note flagged ${flagged}: hold.`;
+            ? `${hitLeadIn}, but your note flagged ${flagged}: ${chg} today.`
+            : `Missed target ${unitWord} and your note flagged ${flagged}: ${chg} today.`;
         } else if(suggestion.careFlags && suggestion.careFlags.length){
           const flagLabel = suggestion.careFlags.map(f => f === "knee" ? "Knee Care" : "Low Back Care").join(" + ");
           msg = suggestion.noteTarget != null
             ? `${flagLabel}: your note's lighter ${suggestion.noteTarget} lb.`
             : `${flagLabel}: ~10% lighter, holding.`;
         } else if(suggestion.noteCue === "hold"){
-          msg = `${hitLeadIn}; holding, as your note said.`;
+          msg = `${hitLeadIn}; ${chg} today, as your note said.`;
         } else if(suggestion.noteCue === "up"){
-          msg = `${hitLeadIn}; adding weight, as your note said.`;
+          msg = `${hitLeadIn}; ${chg} today, as your note said.`;
         } else if(suggestion.difficultyNote === "hard"){
-          msg = `${hitLeadIn}, but rated 9-10: hold.`;
+          msg = `${hitLeadIn}, but rated 9-10: ${chg} today.`;
         } else if(suggestion.difficultyNote === "easy"){
-          msg = `${hitLeadIn}, felt easy: add weight early.`;
+          msg = `${hitLeadIn} and it felt easy: ${chg} today.`;
         } else if(suggestion.range && !suggestion.deloadWeek){
           const [lo, hi] = suggestion.range;
-          msg = suggestion.readyToProgress ? `Top of the ${lo}-${hi} range: add weight, back to ${lo} reps.`
-            : suggestion.hitTarget ? `${work.reps} reps, inside ${lo}-${hi}: same weight, aim for ${suggestion.reps}.`
-            : `Under ${lo} reps: same weight, build back into ${lo}-${hi}.`;
+          msg = suggestion.readyToProgress ? `Every set reached ${hi} reps: ${chg} today, back to ${lo} reps a set.`
+            : suggestion.hitTarget ? `${trackWork.reps} reps a set last time. Today: same weight, ${suggestion.reps} reps a set. Add weight at ${hi}.`
+            : `Under ${lo} reps last time: same weight, build back to ${lo} reps a set.`;
         } else if(suggestion.readyToProgress){
           if(ex.conservative){
             msg = wentOverTarget
-              ? `Hit target ${unitWord} ${suggestion.streak} sessions straight (${actualAmt} last time): add weight.`
-              : `Hit target ${unitWord} ${suggestion.streak} sessions straight: add weight.`;
+              ? `Hit target ${unitWord} ${suggestion.streak} sessions straight (${actualAmt} last time): ${chg} today.`
+              : `Hit target ${unitWord} ${suggestion.streak} sessions straight: ${chg} today.`;
           } else {
-            msg = `${hitLeadIn}: add weight.`;
+            msg = `${hitLeadIn}: ${chg} today.`;
           }
         } else if(suggestion.hitTarget){
-          msg = `${hitLeadIn}, ${suggestion.streak} of ${suggestion.requiredStreak} sessions: hold one more.`;
+          msg = `${hitLeadIn} (${suggestion.streak} of ${suggestion.requiredStreak} sessions needed): ${chg} today, one more time.`;
         } else {
-          msg = `Missed target ${unitWord}: hold and chase it.`;
+          msg = `Missed target ${unitWord} last time: ${chg} today, get every rep before adding.`;
         }
       } else if(ex.trackBy === "duration"){
         nextLabel = `${suggestion.minutes} min`;
         msg = suggestion.difficultyNote === "easy"
-          ? `Felt easy: +5 min.`
+          ? `Felt easy last time: ${chg} today.`
           : suggestion.difficultyNote === "hard"
-          ? `Rated hard: 5 min shorter.`
-          : `Holding steady.`;
+          ? `Rated hard last time: ${chg} today.`
+          : `Same time as last session.`;
       } else {
         nextLabel = repLabel(suggestion.sets,suggestion.reps,ex.unit) + repsSuffix(name);
         msg = suggestion.painHold ? painMessage(suggestion, null)
           : suggestion.deloadWeek ? `Deload: same reps, fewer sets. Stop around RPE 6, 3 to 4 reps short of failure.`
           : suggestion.powerHold ? `Power: hold reps; go higher or farther only while every rep stays fast.`
-          : `Add 2 reps.`;
+          : ex.unit === "sec" ? `Each hold ${suggestion.reps} sec today: ${vsLast}.`
+          : `${suggestion.reps} ${repsWord(name)} a set today: ${vsLast}.`;
       }
       // Before today's log the weight is the big number, so the headline is the sets and reps and the
       // step from the last full session. Once today is logged, it plans the next session in full.
       let headline;
       if(todayLog) headline = suggestion.heavy != null ? `Next ${suggestion.heavy ? "heavy" : "volume"} day: ${nextLabel}` : `Next time: ${nextLabel}`;
       else if(suggestion.shoulderPaused) headline = "Paused today";
-      else headline = [suggestion.heavy != null ? (suggestion.heavy ? "Heavy" : "Volume") : "", planShape(name, ex, suggestion), suggestion.trackStart ? "" : stepText(ex, suggestion, trackPrior)].filter(Boolean).join(" · ");
+      else headline = [suggestion.heavy != null ? (suggestion.heavy ? "Heavy" : "Volume") : "", planShape(name, ex, suggestion)].filter(Boolean).join(" · ");
       recHtml = renderNextTile(headline, ex, composeGuidance(msg, name, ex, last, work, suggestion), suggestion.shoulderPaused ? "No load today" : loadText(name, ex, suggestion));
     }
 

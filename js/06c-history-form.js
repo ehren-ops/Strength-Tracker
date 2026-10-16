@@ -187,15 +187,26 @@ function confirmDeleteEntry(name, idx){
 
 // A thin line stopwatch in the button's own color, in place of the emoji.
 const STOPWATCH_ICON = `<svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9.2" r="5.3"/><path d="M8 9.2V6.4M6.4 1.8h3.2M8 1.8v2.1M12.4 4.6l1-1"/></svg>`;
+// A solid clock face for the hold timer, so it never reads as the rest stopwatch.
+const HOLD_ICON = `<svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.4V8l2.5 1.5"/></svg>`;
 // Deload Week starts the note with this, so the history and the coach read the session as planned.
 const DELOAD_NOTE = "Deload";
 function renderForm(name, ex){
   let html = "";
+  // Timed lifts get the hold timer in the rest button's place, from the very first session.
+  const holdBtn = isHoldLift(ex) ? (() => {
+    const p = holdPlanFor(name, ex);
+    return `<button type="button" class="hold-action-btn" onclick="startHoldTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start hold timer, ${p.sets} holds of ${p.secs} seconds">${HOLD_ICON}${p.sets}x${p.secs}</button>`;
+  })() : "";
+  const spacer = `<button type="button" class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;
+  if(!ex.entries.length && holdBtn) html += `<div class="action-row">${spacer}${spacer}${holdBtn}</div>`;
   if(ex.entries.length){
     html += `<div class="action-row">`;
     html += `<button type="button" class="tool-btn" onclick="repeatLast('${name.replace(/'/g,"\\'")}')">↻ ${isRecovery(name) ? "Repeat last" : "Repeat set"}</button>`;
     html += renderProgressionToggle(name, ex);
-    if(ex.trackBy !== "duration"){
+    if(holdBtn){
+      html += holdBtn;
+    } else if(ex.trackBy !== "duration"){
       html += `<button type="button" class="rest-action-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start rest timer, ${restTimeFor(ex)}">${STOPWATCH_ICON}${restTimeFor(ex)}</button>`;
     } else {
       html += `<button type="button" class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;

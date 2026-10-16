@@ -201,17 +201,27 @@ function planShape(name, ex, s){
   if(ex.trackBy === "reps") return `${s.sets} sets`;
   return "";
 }
-// Today against the last full session: +5 lb, −15 lb, +2 reps, +5 min, or same. A lift held at
-// the same weight with more reps planned (a rep range) reads in reps, not "same as last".
+// Today against the last full session, in words: "5 lb heavier", "1 more rep", "5 sec longer",
+// "same weight". A lift held at the same weight with a rep change (a rep range) reads in reps.
 function stepText(ex, s, prior){
-  if(!prior) return "";
-  const repStep = ex.trackBy === "weight" && s.weight === prior.weight && s.reps != null && s.reps !== prior.reps;
-  const [d, unit] = repStep ? [s.reps - prior.reps, Math.abs(s.reps - prior.reps) === 1 ? "rep" : "reps"]
-    : ex.trackBy === "weight" ? [s.weight - prior.weight, "lb"]
-    : ex.trackBy === "duration" ? [s.minutes - prior.minutes, "min"] : [s.reps - prior.reps, ex.unit === "sec" ? "sec" : "reps"];
-  if(!isFinite(d)) return "";
-  const n = Math.round(Math.abs(d) * 10) / 10;
-  return d > 0 ? `+${n} ${unit}` : d < 0 ? `−${n} ${unit}` : "same as last";
+  if(!s || !prior) return "";
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  const round = v => Math.round(Math.abs(v) * 10) / 10;
+  if(ex.trackBy === "duration"){
+    const d = s.minutes - prior.minutes;
+    return !isFinite(d) ? "" : d > 0 ? `${round(d)} min longer` : d < 0 ? `${round(d)} min shorter` : "same time";
+  }
+  const reps = d => ex.unit === "sec" ? (d > 0 ? `${round(d)} sec longer` : `${round(d)} sec shorter`)
+    : d > 0 ? `${plural(round(d), "more rep", "more reps")}` : `${plural(round(d), "fewer rep", "fewer reps")}`;
+  if(ex.trackBy === "weight" && prior.weight > 0){
+    const d = s.weight - prior.weight;
+    if(!isFinite(d)) return "";
+    if(d > 0) return `${round(d)} lb heavier`;
+    if(d < 0) return `${round(d)} lb lighter`;
+    return s.reps != null && s.reps !== prior.reps ? `same weight, ${reps(s.reps - prior.reps)}` : "same weight";
+  }
+  const d = s.reps - prior.reps;
+  return !isFinite(d) ? "" : d ? reps(d) : ex.unit === "sec" ? "same hold" : "same reps";
 }
 
 // Recovery tile, same shape as the Next tile: the last 7 days, the usual dose, the last session.
