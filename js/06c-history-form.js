@@ -68,7 +68,7 @@ function renderHistRow(e, idx, isLatest, ex, name, pr){
   const tag = isLatest ? (e.date === todayISO() ? "Today" : "Latest") : "";
   html += `<span>${fmtDate(e.date)}${tag ? `<br><span class="latest-tag">${tag}</span>` : ''}</span>`;
   const hr = hrFor(name, e.date);
-  html += `<span class="exact">${ex.trackBy === "duration" && !isRecovery(name) ? cardioCell(e, ex) : pr ? `<span class="pr-val" title="PR">${formatEntryValue(e, ex)}</span>` : formatEntryValue(e, ex)}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">${hrShort(hr)}</span>` : ""}</span>`;
+  html += `<span class="exact">${ex.trackBy === "duration" && !isRecovery(name) ? cardioCell(e, ex) : formatEntryValue(e, ex)}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">${hrShort(hr)}</span>` : ""}</span>`;
   html += `<span class="exact">${e.difficulty ?? "-"}</span>`;
   html += `<span class="hist-note-cell">`;
   html += `<span class="note">${painTag(e)}${e.note ? escapeHtml(e.note) : ""}</span>`;

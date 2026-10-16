@@ -553,7 +553,8 @@ function renderExerciseCard(name, ex){
     const prRow = recent.find(r => prs[r.i]);
     const picking = skipPicking === name;
     const prHtml = prRow && !picking ? `<span class="pr-detail"><b>PR</b> ${prText(prRow.e, ex, prs[prRow.i])}</span>` : "";
-    html += `<div class="hist-foot">${older.length && !picking ? `<button class="hist-toggle" onclick="toggleHistory('${name.replace(/'/g,"\\'")}')">Earlier (${older.length})</button>` : ""}${prHtml}${renderSkipControl(name)}</div>`;
+    // A fixed three-slot grid, so the PR line starts in the same place on every card.
+    html += `<div class="hist-foot pr-foot${picking ? " picking" : ""}"><span class="foot-left">${older.length && !picking ? `<button class="hist-toggle" onclick="toggleHistory('${name.replace(/'/g,"\\'")}')">Earlier (${older.length})</button>` : ""}</span>${prHtml || "<span></span>"}${renderSkipControl(name)}</div>`;
     if(older.length){
       html += `<div class="hist ${openHistory[name] ? 'open' : ''}" id="hist-${cssId(name)}">`;
       older.forEach(r => { html += renderHistRow(r.e, r.i, false, ex, name, prs[r.i]); });
