@@ -808,11 +808,11 @@ async function main(){
 
   await page.click('.tab:has-text("Full Body")');
   const headingFontDark = await page.evaluate(() => getComputedStyle(document.querySelector('.ex-name')).fontFamily);
-  if(!headingFontDark.toLowerCase().includes('space grotesk')) throw new Error('expected headings to switch to Space Grotesk in dark mode, got: ' + headingFontDark);
+  if(!headingFontDark.toLowerCase().includes('sora')) throw new Error('expected headings to switch to Sora in dark mode, got: ' + headingFontDark);
   if(headingFontDark === headingFontLight) throw new Error('expected the heading font to actually differ between light and dark');
   const darkModeStored = await page.evaluate(() => localStorage.getItem('strength-tracker-dark-mode'));
   if(darkModeStored !== '1') throw new Error('expected dark mode preference to persist to localStorage');
-  console.log('OK: toggling dark mode swaps the background, switches headings to Space Grotesk, and persists');
+  console.log('OK: toggling dark mode swaps the background, switches headings to Sora, and persists');
 
   await page.reload();
   await waitForText(page, '#sync-status', t => t.includes('Synced') || t.includes('Not signed in'), 10000, 'reload after enabling dark mode');
