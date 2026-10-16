@@ -1355,23 +1355,21 @@ async function main(){
   if(chestFlySuggestion.weight !== 55) throw new Error('expected Cable Chest Fly to suggest 55 lbs, got: ' + chestFlySuggestion.weight);
   console.log('OK: an old miss no longer permanently blocks progression once recent sessions consistently hit target');
 
-  console.log('=== 52: Back Extension is weight-tracked and autoloads the last logged reps count ===');
+  console.log('=== 52: Back Extension is weight-tracked and pre-fills the next rep in its 10-15 range ===');
   await page.click('.tab:has-text("Full Body")');
   await page.locator('.pill').filter({ hasText: /Back Extension/ }).click();
   await sleep(150);
   if(await page.locator('#f-weight').count() !== 1) throw new Error('expected a Weight field on Back Extension');
-  // Back Extension already has an entry from scenario 26 (reps: 8, the
-  // static target). Log a new one with a different rep count, then confirm
-  // the freshly re-rendered form autoloads THAT rep count, not the static
-  // target - proving it tracks the last logged value, not a fixed default.
+  // Log 3x11, then the re-rendered form follows the Next tile's plan: one more rep (12) at the
+  // same weight, inside the 10-15 range, rather than repeating the last reps.
   await page.fill('#f-weight', '55');
   await page.fill('#f-sets', '3');
   await page.fill('#f-reps', '11');
   await page.click('button.log:has-text("Log set")');
   await sleep(150);
   const backExtRepsVal = await page.inputValue('#f-reps');
-  if(backExtRepsVal !== '11') throw new Error('expected the Reps field to autoload the last logged reps (11), got: ' + backExtRepsVal);
-  console.log('OK: Back Extension has a weight field and autoloads the last logged reps count');
+  if(backExtRepsVal !== '12') throw new Error('expected the Reps field to pre-fill the planned next rep (12), got: ' + backExtRepsVal);
+  console.log('OK: Back Extension has a weight field and pre-fills the planned next rep');
 
   console.log('=== 53: Dead Hang exercise defaults to a 3x45 second time interval ===');
   await page.click('.tab:has-text("Extra")');
@@ -2043,8 +2041,8 @@ async function main(){
     ex.entries = saved; render();
     return out;
   });
-  if(backExt.reps !== '12' || !backExt.weight) throw new Error('expected Back Extension to keep carrying its last reps (12) with a pre-filled weight, got: ' + JSON.stringify(backExt));
-  console.log('OK: the form pre-fills the modifier plan when one applies, otherwise the next progression, and says which; Back Extension keeps its last reps');
+  if(backExt.reps !== '13' || !backExt.weight) throw new Error('expected Back Extension to pre-fill its planned next rep (13) with a pre-filled weight, got: ' + JSON.stringify(backExt));
+  console.log('OK: the form pre-fills the modifier plan when one applies, otherwise the next progression, and says which; Back Extension pre-fills its next rep in range');
 
   console.log('=== 70: a weight written in last session\'s note sets the next one; jumps and bounds hold their reps ===');
   const noteCases = await page.evaluate(() => [
@@ -2412,7 +2410,7 @@ async function main(){
     out.fly = !!computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly').shoulderPaused;
     out.curlWeek1 = !!computeSuggestion(data['Bicep Curl'], 'Bicep Curl').shoulderPaused;
     selected = 'Cable Chest Fly'; render();
-    out.flyCard = { next: document.querySelector('.rec-plan').textContent, skip: !!document.querySelector('.skip-ctl'), tip: document.querySelector('.shoulder-care-line').textContent };
+    out.flyCard = { next: document.querySelector('.rec-plan').textContent, skip: !!document.querySelector('.skip-btn'), paused: (document.querySelector('.skip-state') || {}).textContent, tip: document.querySelector('.shoulder-care-line').textContent };
     selected = 'Bench Press'; render();
     out.benchNote = document.getElementById('f-note').value;
     document.getElementById('f-note').value = 'felt fine';
@@ -2473,7 +2471,7 @@ async function main(){
     r79.pushups[0] === 4 && r79.pushups[1] > 0 && r79.pushups[2] === -1 &&
     /incline/.test(r79.pushupCard.tip || '') && r79.pushupCard.note === 'Rehab' && r79.pushupCard.exists &&
     r79.benchP3.first === 157.5 && r79.benchP3.build && r79.benchP3.next === 155 &&
-    r79.fly && r79.curlWeek1 && /paused/i.test(r79.flyCard.next) && !r79.flyCard.skip && /Right arm/.test(r79.flyCard.tip) &&
+    r79.fly && r79.curlWeek1 && /paused/i.test(r79.flyCard.next) && !r79.flyCard.skip && /Paused/.test(r79.flyCard.paused) && /Right arm/.test(r79.flyCard.tip) &&
     r79.benchNote === 'Rehab' && r79.benchLogged === 'Rehab, felt fine' && /85% of pre-rehab weight, palms-in grip/.test(r79.row.tip || '') && r79.row.badge && r79.row.note === 'Rehab' &&
     /right arm/.test(r79.week2Hammer || '') &&
     r79.p1.items === 3 && r79.p1.week === 'Week 1 · Phase 1' && r79.p1.done && r79.p1.pain === 2 && r79.p1.painOn === '2' && r79.p1.notTraining &&
@@ -2531,7 +2529,7 @@ async function main(){
     persist(); render();
     return out;
   });
-  const ok81 = r81.form.minutes === '15' && r81.form.temp === '180' && !r81.form.rpe && !r81.form.skip && !r81.form.chart &&
+  const ok81 = r81.form.minutes === '15' && r81.form.temp === '180' && !r81.form.rpe && r81.form.skip && !r81.form.chart &&
     r81.saved.minutes === 18 && r81.saved.tempF === 185 && r81.tempCol === 185 && r81.saved.difficulty == null &&
     /18 min/.test(r81.card.big) && /185°F/.test(r81.card.big) && /Last 7 days: 1× · 18 min/.test(r81.card.tile) && /185°F/.test(r81.card.load) && /at 185°F/.test(r81.card.hist) &&
     r81.suggestion === null && r81.notTraining && r81.notInLogTimes && !r81.inExercises &&
@@ -2781,34 +2779,40 @@ async function main(){
   if(reg.bad.length) throw new Error('expected every modifier row to be complete, got: ' + JSON.stringify(reg));
   console.log('OK: ' + reg.keys.join(', ') + ' each carry a name, badge, tag kind, rules and a color in both themes');
 
-  console.log('=== 89: rep PRs are flagged, accessories show their rep record instead of Est. 1RM, Coach\'s Notes skip what the cards say ===');
+  console.log('=== 89: PRs are flagged (heavier, or more reps at the top weight), accessories show their rep record instead of Est. 1RM, Coach\'s Notes skip what the cards say ===');
   const r89 = await page.evaluate(() => {
     const saved = JSON.stringify({ fly: data['Cable Chest Fly'], squat: data['Squat'] }), savedModes = { ...modes };
     MODE_DEFS.forEach(m => { modes[m.key] = false; });
     const d = n => shiftISO(todayISO(), n);
     const mk = (name, rows) => Object.assign(newExerciseShell(name), { entries: rows.map((r, i) => ({ clientId: 'p89' + name + i, date: d(r[0]), weight: r[1], sets: 3, reps: r[2], difficulty: 7, deload: r[3] || undefined })) });
-    const fly = mk('Cable Chest Fly', [[-20, 50, 12], [-15, 55, 10], [-10, 50, 11], [-5, 50, 13], [-3, 45, 14, true], [0, 50, 14]]);
+    const fly = mk('Cable Chest Fly', [[-20, 50, 12], [-15, 55, 10], [-10, 50, 11], [-5, 50, 13], [-3, 45, 14, true], [0, 55, 12]]);
     const out = { flags: prFlags(fly), record: repRecord(fly, 50).reps, recordHeavier: repRecord(fly, 55).weight };
     data['Cable Chest Fly'] = fly; modes.knee = true;
     const card = name => { const div = document.createElement('div'); div.innerHTML = renderExerciseCard(name, data[name]); return div; };
     let c = card('Cable Chest Fly');
     out.flySlot = c.querySelector('.onerm-box').textContent.replace(/\s+/g, ' ').trim();
     out.flyLabel = c.querySelector('.big-label').textContent;
-    out.chips = c.querySelectorAll('.pr-tag').length;
+    out.chips = c.querySelectorAll('.pr-val').length;
+    out.prDetail = (c.querySelector('.pr-detail') || {}).textContent || '';
     data['Squat'] = mk('Squat', [[-9, 175, 8], [-4, 175, 9]]);
     c = card('Squat');
     out.squatSlot = c.querySelector('.onerm-box').textContent.replace(/\s+/g, ' ').trim();
     out.notes = generateCoachNotes() || '';
+    const savedBack = data['Back Extension'] ? JSON.stringify(data['Back Extension']) : null;
+    data['Back Extension'] = mk('Back Extension', [[-7, 25, 10]]);
+    c = card('Back Extension');
+    out.back = { plan: c.querySelector('.rec-plan').textContent, reps: c.querySelector('#f-reps').value };
+    if(savedBack) data['Back Extension'] = JSON.parse(savedBack); else delete data['Back Extension'];
     const restore = JSON.parse(saved);
     ['Cable Chest Fly', 'Squat'].forEach((n, i) => { const v = i ? restore.squat : restore.fly; if(v) data[n] = v; else delete data[n]; });
     Object.assign(modes, savedModes);
     return out;
   });
-  const ok89 = JSON.stringify(r89.flags) === JSON.stringify([false, false, false, true, false, true]) && r89.record === 14 && r89.recordHeavier === 55 &&
-    /^Most reps ?14 reps$/.test(r89.flySlot) && /Logged today ✓ · Rep PR/.test(r89.flyLabel) && r89.chips === 2 && /^Est\. 1RM/.test(r89.squatSlot) &&
-    /Rep PRs?: .*Cable Chest Fly \(14 at 50 lb\)/.test(r89.notes) && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
-  if(!ok89) throw new Error('expected rep PRs, the rep record slot and trimmed Coach\'s Notes, got: ' + JSON.stringify(r89));
-  console.log('OK: fly 3x13 and 3x14 at 50 lb are rep PRs (the deload and a new weight are not), the fly shows "Most reps 14", squat keeps Est. 1RM, and Coach\'s Notes lead with the PR and skip modifier lines');
+  const ok89 = JSON.stringify(r89.flags) === JSON.stringify([false, 'weight', false, false, false, 'reps']) && r89.record === 13 && r89.recordHeavier === 55 &&
+    /^Most reps ?12 reps$/.test(r89.flySlot) && /Logged today ✓ · PR/.test(r89.flyLabel) && r89.chips === 2 && /PR ?Most reps at 55 lb: 12/.test(r89.prDetail) && /^Est\. 1RM/.test(r89.squatSlot) &&
+    /PRs?: .*Cable Chest Fly \(55 lb x 12\)/.test(r89.notes) && /3x11 · \+1 rep/.test(r89.back.plan) && r89.back.reps === '11' && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
+  if(!ok89) throw new Error('expected PRs, the rep record slot and trimmed Coach\'s Notes, got: ' + JSON.stringify(r89));
+  console.log('OK: fly 55 lb is a weight PR and 55x12 a rep PR (50x13 at a lighter weight and the deload are not), outlined with the detail in the footer, the fly shows "Most reps 12", squat keeps Est. 1RM, and Coach\'s Notes lead with the PR and skip modifier lines');
 
   console.log('=== 90: the joint check logs a 0-10 pain score and area, holds or drops the next weight, and nudges the matching care modifier ===');
   const r90 = await page.evaluate(() => {

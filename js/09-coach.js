@@ -28,7 +28,10 @@ function compactEntry(e, ex){
   if(e.note) s += ` "${String(e.note).slice(0, 100)}"`;
   if(ex.targetRepsStrength && e.heavy != null) s += e.heavy ? " [heavy]" : " [volume]";
   if(e.deload) s += " [deload]";
-  else if(prFlags(ex)[ex.entries.indexOf(e)]) s += " [rep PR]";
+  else {
+    const pr = prFlags(ex)[ex.entries.indexOf(e)];
+    if(pr) s += pr === "weight" ? " [weight PR]" : " [rep PR]";
+  }
   return s;
 }
 function describeSuggestion(ex, name){

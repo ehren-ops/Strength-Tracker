@@ -1,10 +1,12 @@
 // Below the Next tile: Recent History rows with edit, delete and skip; the log form with its
 // per-set reps and joint check; and the chart value helpers. Shared global scope.
 
-// Right end of the history footer: skip this lift today, for injury or another reason. Hidden once
-// the lift is logged today; while skipped, shows the reason and an undo.
+// Right end of the card footer, on every card: skip this lift today, for injury or another reason.
+// Once it is logged, or paused by Shoulder Rehab, the same spot says so instead of going blank;
+// while skipped, it shows the reason and an undo.
 function renderSkipControl(name){
-  if(isLoggedToday(name) || isShoulderPaused(name) || isRecovery(name)) return "";
+  if(isLoggedToday(name)) return `<div class="skip-ctl"><span class="skip-state">Done today ✓</span></div>`;
+  if(isShoulderPaused(name)) return `<div class="skip-ctl"><span class="skip-state">Paused: Shoulder Rehab</span></div>`;
   const q = name.replace(/'/g, "\\'");
   const reason = skipReason(name);
   if(reason){
@@ -64,9 +66,9 @@ function renderHistRow(e, idx, isLatest, ex, name, pr){
   // far more per line than the mono numbers.
   let html = `<div class="hist-row${isLatest?' latest':''}${ex.trackBy==="duration"?' cardio':''}">`;
   const tag = isLatest ? (e.date === todayISO() ? "Today" : "Latest") : "";
-  html += `<span>${fmtDate(e.date)}${e.confirmed===false?'<span class="est">*</span>':''}${tag ? `<br><span class="latest-tag">${tag}</span>` : ''}</span>`;
+  html += `<span>${fmtDate(e.date)}${tag ? `<br><span class="latest-tag">${tag}</span>` : ''}</span>`;
   const hr = hrFor(name, e.date);
-  html += `<span class="exact">${ex.trackBy === "duration" && !isRecovery(name) ? cardioCell(e, ex) : formatEntryValue(e, ex)}${pr ? '<span class="pr-tag" title="Most reps yet at this weight">PR</span>' : ""}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">${hrShort(hr)}</span>` : ""}</span>`;
+  html += `<span class="exact">${ex.trackBy === "duration" && !isRecovery(name) ? cardioCell(e, ex) : pr ? `<span class="pr-val" title="PR">${formatEntryValue(e, ex)}</span>` : formatEntryValue(e, ex)}${hr ? `<span class="hist-hr" title="Heart rate: average / peak">${hrShort(hr)}</span>` : ""}</span>`;
   html += `<span class="exact">${e.difficulty ?? "-"}</span>`;
   html += `<span class="hist-note-cell">`;
   html += `<span class="note">${painTag(e)}${e.note ? escapeHtml(e.note) : ""}</span>`;
@@ -203,8 +205,8 @@ function renderForm(name, ex){
   html += `<div class="form-row">`;
   // The form starts on this session's recommendation, so logging it as prescribed takes one tap:
   // the modifier-adjusted plan when a modifier changes this lift's numbers, otherwise the next
-  // progression. Lifts set to carry their last reps (Back Extension) keep doing so unless a
-  // modifier sets the reps. A first-ever log has no recommendation and starts as before.
+  // progression. Lifts set to carry their last reps keep doing so unless a modifier or a rep
+  // range sets the reps. A first-ever log has no recommendation and starts as before.
   const mods = planModifiers(name, ex);
   const plan = ex.entries.length ? computeSuggestion(ex, name) : null;
   let repsDefault = (ex.autoloadLastReps && ex.entries.length) ? ex.entries[ex.entries.length - 1].reps : effectiveTargetReps(ex);
@@ -217,7 +219,8 @@ function renderForm(name, ex){
   if(recovery) minutesDefault = lastLog ? lastLog.minutes : RECOVERY[name].minutes;
   if(plan){
     if(plan.sets != null) setsDefault = plan.sets;
-    if(plan.reps != null && (mods.length || !ex.autoloadLastReps)) repsDefault = plan.reps;
+    // A rep range (Back Extension's 10-15) plans the reps, so the form matches the Next tile.
+    if(plan.reps != null && (mods.length || !ex.autoloadLastReps || activeRepRange(ex))) repsDefault = plan.reps;
     if(ex.trackBy === "weight" && plan.weight != null) weightDefault = plan.weight;
     if(ex.trackBy === "duration" && plan.minutes != null) minutesDefault = plan.minutes;
   }

@@ -97,7 +97,7 @@ function painMessage(s, load){
 function repRecordLine(name, ex, s){
   if(!s || ex.trackBy !== "weight" || !COMPOUND_LIFTS.has(name) || !(s.weight > 0) || s.deloadWeek) return "";
   const rec = repRecord(ex, s.weight);
-  return rec ? `Rep PR at ${rec.weight} lb: ${rec.reps} reps, ${fmtShortDate(rec.date)}.` : "";
+  return rec ? `Most reps at ${rec.weight} lb: ${rec.reps}, ${fmtShortDate(rec.date)}.` : "";
 }
 // How this lift moves up, in one line.
 // Main lifts: why today is the heavy or the volume day.
@@ -201,10 +201,13 @@ function planShape(name, ex, s){
   if(ex.trackBy === "reps") return `${s.sets} sets`;
   return "";
 }
-// Today against the last full session: +5 lb, −15 lb, +2 reps, +5 min, or same.
+// Today against the last full session: +5 lb, −15 lb, +2 reps, +5 min, or same. A lift held at
+// the same weight with more reps planned (a rep range) reads in reps, not "same as last".
 function stepText(ex, s, prior){
   if(!prior) return "";
-  const [d, unit] = ex.trackBy === "weight" ? [s.weight - prior.weight, "lb"]
+  const repStep = ex.trackBy === "weight" && s.weight === prior.weight && s.reps != null && s.reps !== prior.reps;
+  const [d, unit] = repStep ? [s.reps - prior.reps, Math.abs(s.reps - prior.reps) === 1 ? "rep" : "reps"]
+    : ex.trackBy === "weight" ? [s.weight - prior.weight, "lb"]
     : ex.trackBy === "duration" ? [s.minutes - prior.minutes, "min"] : [s.reps - prior.reps, ex.unit === "sec" ? "sec" : "reps"];
   if(!isFinite(d)) return "";
   const n = Math.round(Math.abs(d) * 10) / 10;

@@ -258,21 +258,23 @@
   .hist-toggle{background:none;border:none;padding:0;margin-top:0.6rem;font-size:0.74rem;color:var(--amber);font-weight:600;text-decoration:underline;cursor:pointer;}
   .hist{display:none;margin-top:0.5rem;border-top:1px dashed var(--line);padding-top:0.5rem;}
   .hist.open{display:block;}
-  .hist-row{display:grid;grid-template-columns:42px 96px 24px minmax(0,1fr);column-gap:0.5rem;align-items:baseline;font-size:0.72rem;padding:0.22rem 0;font-family:var(--font-body);font-variant-numeric:tabular-nums;color:var(--slate);border-bottom:1px solid var(--hairline);}
+  .hist-row{display:grid;grid-template-columns:40px 78px 22px minmax(0,1fr);column-gap:0.4rem;align-items:baseline;font-size:0.72rem;padding:0.22rem 0;font-family:var(--font-body);font-variant-numeric:tabular-nums;color:var(--slate);border-bottom:1px solid var(--hairline);}
   .hist-row > :last-child{overflow-wrap:anywhere;min-width:0;}
   .hist-note-cell{display:flex;align-items:flex-start;justify-content:space-between;gap:0.3rem;}
   .hist-note-cell .note{flex:1 1 auto;min-width:0;margin:0;font-family:var(--font-body);font-style:normal;font-size:0.7rem;line-height:1.25;}
   .hist-note-cell .row-actions{flex:0 0 auto;white-space:nowrap;}
+  .hist-note-cell .note:empty::before{content:"\200b";} /* keeps the row baseline, so ✎ ✕ sit on the line */
   .hist-session-label{font-size:0.62rem;color:var(--amber-light);}
   .hist-row:last-child{border-bottom:none;}
+  .hist-row.cardio{grid-template-columns:40px 96px 22px minmax(0,1fr);}
   .hist-row .exact{color:var(--ink);text-align:left;}
   .hist-row.header{font-family:var(--font-body);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);font-weight:600;border-bottom:1px solid var(--line);padding-bottom:0.3rem;}
   .hist-row.latest{background:var(--rec-bg);border-radius:4px;padding-left:0.3rem;margin-left:-0.3rem;}
   .hist-row.latest .exact{font-weight:600;}
   .latest-tag{font-family:var(--font-body);font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--amber);font-weight:700;}
-  .pr-tag{display:inline-block;margin-left:0.3rem;padding:0 0.25rem;border-radius:3px;font-family:var(--font-body);font-size:0.56rem;font-weight:700;letter-spacing:0.04em;vertical-align:1px;color:var(--emerald);border:1px solid color-mix(in srgb, var(--emerald) 45%, transparent);}
+  /* A PR row: the numbers outlined; what the record was sits in the footer. */
+  .pr-val{border:1px solid var(--emerald);border-radius:4px;padding:0 0.2rem;margin-left:-0.2rem;-webkit-box-decoration-break:clone;box-decoration-break:clone;}
   .note{font-size:0.68rem;color:var(--amber);font-style:italic;margin-left:0.4rem;}
-  .est{color:var(--amber-light);}
   .add-ex-row{display:flex;gap:0.4rem;margin-bottom:0.8rem;}
   .add-ex-row input{flex:1;padding:0.4rem 0.5rem;border:1px solid var(--line);border-radius:6px;font-size:0.85rem;background:var(--input-bg);color:var(--ink);}
   .add-ex-row button{background:var(--accent-2);color:#fff;border:none;border-radius:6px;padding:0.4rem 0.8rem;font-size:0.8rem;}
@@ -304,6 +306,8 @@
   .icon-btn.del-btn.armed{color:#fff;background:var(--danger);border-radius:4px;}
   .hist-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;margin-top:0.6rem;}
   .hist-foot .hist-toggle{margin-top:0;}
+  .pr-detail{flex:1 1 0;min-width:0;text-align:center;font-size:0.68rem;line-height:1.25;color:var(--slate);}
+  .pr-detail b{color:var(--emerald);font-weight:700;letter-spacing:0.04em;margin-right:0.15rem;}
   .skip-ctl{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:0.25rem;font-size:0.72rem;}
   .skip-state{color:var(--slate);}
   .skip-btn, .skip-reason{background:var(--surface);border:1px solid var(--line);color:var(--slate);font-size:0.72rem;font-weight:600;padding:0.3rem 0.6rem;border-radius:7px;cursor:pointer;}

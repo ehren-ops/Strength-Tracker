@@ -130,11 +130,18 @@ test("shoulder rehab pauses the fly", () => {
   run(`modes.shoulder = true; shoulderRehab = { startedOn: shiftISO(todayISO(), -2), endedOn: null };`);
   eq(!!suggest("Cable Chest Fly").shoulderPaused, true, "paused");
 });
-test("rep PRs: more reps at a weight or heavier; deloads and new weights never count", () => {
-  reset(); lift("Cable Chest Fly", [[20, 50, 12], [15, 55, 10], [10, 50, 11], [5, 50, 13], [3, 45, 14, { deload: true }], [0, 50, 14]]);
-  eq(run(`prFlags(data["Cable Chest Fly"])`), [false, false, false, true, false, true], "flags");
-  eq(run(`repRecord(data["Cable Chest Fly"], 50).reps`), 14, "record at 50");
+test("PRs: heavier than ever, or more reps at the top weight; never more reps at a lighter weight", () => {
+  reset(); lift("Cable Chest Fly", [[20, 50, 12], [15, 55, 10], [12, 50, 15], [10, 55, 11], [5, 55, 11], [3, 60, 14, { deload: true }], [0, 60, 8]]);
+  eq(run(`prFlags(data["Cable Chest Fly"])`), [false, "weight", false, "reps", false, false, "weight"], "flags");
+  eq(run(`prText(data["Cable Chest Fly"].entries[3], data["Cable Chest Fly"], "reps")`), "Most reps at 55 lb: 11", "reps text");
+  eq(run(`prText(data["Cable Chest Fly"].entries[6], data["Cable Chest Fly"], "weight")`), "Heaviest yet: 60 lb x 8", "weight text");
+  eq(run(`repRecord(data["Cable Chest Fly"], 50).reps`), 15, "record at 50");
   eq(run(`repRecord(data["Cable Chest Fly"], 55).weight`), 55, "record at 55");
+});
+test("rep range: the Next tile says +1 rep, not same as last, at the same weight", () => {
+  reset(); lift("Back Extension", [[7, 25, 10]]);
+  eq(run(`stepText(data["Back Extension"], { weight: 25, reps: 11 }, data["Back Extension"].entries[0])`), "+1 rep", "step");
+  eq(run(`stepText(data["Back Extension"], { weight: 30, reps: 10 }, data["Back Extension"].entries[0])`), "+5 lb", "weight step");
 });
 test("reps per set: logs the lowest set and keeps the list only when sets differ", () => {
   eq(run(`applyPerSet({}, [8, 8, 6])`), { sets: 3, reps: 6, repsBySet: [8, 8, 6] }, "uneven");

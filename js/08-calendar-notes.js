@@ -272,7 +272,7 @@ function generateCoachNotes(){
 
   const sentences = [`${dayLabel} on ${fmtDate(lastDate)}: ${hitCount}/${total} lifts hit target.`];
   if(records.length){
-    sentences.push(`Rep PR${records.length > 1 ? "s" : ""}: ${records.slice(0, 3).map(i => i.ex.trackBy === "weight" ? `${i.name} (${i.entry.reps} at ${i.entry.weight} lb)` : `${i.name} (${i.entry.reps})`).join(", ")}.`);
+    sentences.push(`PR${records.length > 1 ? "s" : ""}: ${records.slice(0, 3).map(i => i.ex.trackBy === "weight" ? `${i.name} (${i.entry.weight} lb x ${i.entry.reps})` : `${i.name} (${i.entry.reps})`).join(", ")}.`);
   }
   if(missed.length){
     const names = missed.slice(0,2).map(i => i.ex.trackBy==="weight" ? `${i.name} (${i.entry.weight} lb)` : i.name).join(" and ");

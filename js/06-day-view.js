@@ -290,7 +290,7 @@ function renderChecklistCard(name, ex, opts){
   });
 
   const doneCount = routine.items.filter((_, i) => completed.has(i)).length;
-  html += `<p style="font-size:0.72rem;color:var(--slate);margin-top:0.8rem;">${doneCount}/${routine.items.length} done today</p>`;
+  html += `<div class="hist-foot"><p style="font-size:0.72rem;color:var(--slate);margin:0;">${doneCount}/${routine.items.length} done today</p>${renderSkipControl(name)}</div>`;
   html += `</div>`;
   return html;
 }
@@ -383,7 +383,7 @@ function renderExerciseCard(name, ex){
       : ex.trackBy==="duration" ? v.minutes+" min" + (v.tempF != null ? sideTag(` ${v.tempF}°F`) : "") : v.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
     let bigVal, bigLabel;
     if(recovery){ bigVal = bigOf(work); bigLabel = "Last"; }
-    else if(todayLog){ bigVal = bigOf(todayLog); bigLabel = "Logged today ✓" + (prs[ex.entries.lastIndexOf(todayLog)] ? ` · ${ex.unit === "sec" ? "Hold" : "Rep"} PR` : ""); }
+    else if(todayLog){ bigVal = bigOf(todayLog); bigLabel = "Logged today ✓" + (prs[ex.entries.lastIndexOf(todayLog)] ? " · PR" : ""); }
     else if(suggestion && suggestion.shoulderPaused){ bigVal = "Paused"; bigLabel = "Today"; }
     else if(suggestion){ bigVal = bigOf(suggestion); bigLabel = "Today"; }
     else { bigVal = bigOf(work); bigLabel = "Last"; }
@@ -543,18 +543,18 @@ function renderExerciseCard(name, ex){
     html += `<div class="hist-row header${cardioCls}"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;
     recent.forEach((r, idx) => { html += renderHistRow(r.e, r.i, idx === 0, ex, name, prs[r.i]); });
 
-    // One footer row: earlier history on the left, Skip today on the right.
-    // While picking a skip reason the link steps aside so the reasons fit on this one row.
-    html += `<div class="hist-foot">${older.length && skipPicking !== name ? `<button class="hist-toggle" onclick="toggleHistory('${name.replace(/'/g,"\\'")}')">Show earlier history (${older.length})</button>` : ""}${renderSkipControl(name)}</div>`;
+    // One footer row: earlier history on the left, the newest PR in the rows above in the middle,
+    // Skip today on the right. While picking a skip reason the reasons take the whole row.
+    const prRow = recent.find(r => prs[r.i]);
+    const picking = skipPicking === name;
+    const prHtml = prRow && !picking ? `<span class="pr-detail"><b>PR</b> ${prText(prRow.e, ex, prs[prRow.i])}</span>` : "";
+    html += `<div class="hist-foot">${older.length && !picking ? `<button class="hist-toggle" onclick="toggleHistory('${name.replace(/'/g,"\\'")}')">Earlier (${older.length})</button>` : ""}${prHtml}${renderSkipControl(name)}</div>`;
     if(older.length){
       html += `<div class="hist ${openHistory[name] ? 'open' : ''}" id="hist-${cssId(name)}">`;
       older.forEach(r => { html += renderHistRow(r.e, r.i, false, ex, name, prs[r.i]); });
       html += `</div>`;
     }
 
-    if(ex.entries.some(e => e.confirmed===false)){
-      html += `<p style="font-size:0.68rem;color:var(--slate);margin-top:0.4rem;">* estimated date, not confirmed</p>`;
-    }
     html += `</div>`;
   }
   html += `</div>`;
