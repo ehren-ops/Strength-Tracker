@@ -122,7 +122,7 @@ function finishHoldTimer(early){
   t.summary = perSet.length ? `${perSet.length}x${Math.min(...perSet)}` : "--";
   t.result = early ? (perSet.length ? `Stopped: ${perSet.length} set${perSet.length === 1 ? "" : "s"} filled in` : "Stopped") : "Done: filled in below, tap Log";
   renderHoldClock();
-  setTimeout(() => { if(holdTimer === t) clearHoldTimer(); }, early ? 1400 : 2400);
+  setTimeout(() => { if(holdTimer === t) clearHoldTimer(); }, early ? 3400 : 2400);
 }
 
 function clearHoldTimer(){

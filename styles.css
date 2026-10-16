@@ -263,6 +263,10 @@
     background:var(--pine);color:var(--header-text);border-bottom:5px solid var(--phase);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.15rem;
     font-family:var(--font-body);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 6px 24px rgba(0,0,0,0.35);}
   .hold-clock.ready{--phase:var(--amber-light);} .hold-clock.hold{--phase:var(--emerald);} .hold-clock.rest{--phase:var(--amber);} .hold-clock.done{--phase:var(--emerald);}
+  /* Hold and rest each tint the background toward their own color, so the phase reads at a glance. */
+  .hold-clock.hold{background:color-mix(in srgb, var(--emerald) 38%, var(--pine));}
+  .hold-clock.rest{background:color-mix(in srgb, var(--amber) 30%, var(--pine));}
+  .hold-clock.hold .hc-phase{color:color-mix(in srgb, var(--emerald) 40%, #fff);}
   .hc-phase{font-size:1rem;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--phase);}
   .hc-time{font-size:clamp(4rem, 20vw, 7rem);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;}
   .hc-set{font-size:1rem;opacity:0.85;}
