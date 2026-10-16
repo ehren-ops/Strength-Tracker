@@ -147,7 +147,7 @@ test("trend line for the coach is one short sentence", () => {
 test("day lists: about 7 lifts each, Back Extension on Full and Upper, Lat Pulldown on Full", () => {
   reset();
   eq(run(`activeDayOrder("full")`), ["Squat", "Bench Press", "RDL", "Barbell Row", "Cable Lat Pulldown", "Face Pulls", "Back Extension"], "full");
-  eq(run(`activeDayOrder("upper")`), ["Bench Press", "Incline DB Press", "Push-Ups", "Barbell Row", "Face Pulls", "Bicep Curl", "Tricep Pushdown", "Back Extension"], "upper");
+  eq(run(`activeDayOrder("upper")`), ["Bench Press", "Barbell Row", "Incline DB Press", "Push-Ups", "Face Pulls", "Bicep Curl", "Tricep Pushdown", "Back Extension"], "upper");
   eq(run(`[activeDayOrder("lower").includes("Lateral Lunge"), extraList("strength").includes("Cable Chest Fly"), finishersFor("full"), finishersFor("upper"), finishersFor("lower")]`), [true, true, ["Pallof Press", "Farmer's Carry"], ["Dead Hang"], ["Side Plank"]], "Lateral Lunge year-round on Lower, fly on Extra, finishers");
 });
 test("ski phases are exclusive and preseason adds its week-3 lifts in week 3", () => {

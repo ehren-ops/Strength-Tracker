@@ -14,7 +14,7 @@ const SEED = {
 // hidden while Preseason Prep is off (activeDayOrder).
 const DAY_ORDER = {
   full: ["Squat","Bench Press","RDL","Barbell Row","Cable Lat Pulldown","Face Pulls","Back Extension","Seated Calf Raise"],
-  upper: ["Bench Press","Incline DB Press","Push-Ups","Barbell Row","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
+  upper: ["Bench Press","Barbell Row","Incline DB Press","Push-Ups","Face Pulls","Bicep Curl","Tricep Pushdown","Back Extension","Med Ball Slam"],
   lower: ["Squat","RDL","Bulgarian Split Squat","Hip Thrust","Kettlebell Swings","Walking Lunge","Lateral Lunge","Standing Calf Raise","Box Jumps","Trap Bar Jump","Skater Bound"],
   // Full Body 2+1 (the other program): two full-body days, A and B, plus an optional C. Same lifts
   // and history as the split; preseason power work (listed last) moves to the front when it's on.
@@ -339,6 +339,6 @@ function backfillExerciseDefaults(){
 function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v108";
+const APP_VERSION = "v109";
 const APP_UPDATED = "Oct 15, 2026";
 

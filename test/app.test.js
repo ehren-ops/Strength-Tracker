@@ -474,7 +474,7 @@ async function main(){
   if(await page.locator('.plate-line').count() !== 1) throw new Error('expected plate math on Bench Press');
 
   await page.click('.tab:has-text("Upper Body")');
-  await page.locator('.pill').filter({ hasText: /^2\.\s*Incline DB Press/ }).click();
+  await page.locator('.pill').filter({ hasText: /^3\.\s*Incline DB Press/ }).click();
   if(await page.locator('.plate-line').count() !== 0) throw new Error('did not expect plate math on a dumbbell exercise (Incline DB Press)');
   await page.click('.tab:has-text("Full Body")');
   console.log('OK: plate math shows on barbell exercises (Squat, Bench Press) and not on Incline DB Press');
@@ -2470,7 +2470,7 @@ async function main(){
     /Incline DB Press|Bicep Curl/.test(r79.flyPill || '') &&
     r79.bench.weight === 157.5 && r79.bench.hold && r79.bench.badge && /85%/.test(r79.bench.tip || '') &&
     r79.benchAfter150 === 150 && r79.benchDeload === 150 && r79.off.pushupsOnUpper && r79.off.pushupsOnExtra &&
-    r79.pushups[0] === 3 && r79.pushups[1] > 0 && r79.pushups[2] === -1 &&
+    r79.pushups[0] === 4 && r79.pushups[1] > 0 && r79.pushups[2] === -1 &&
     /incline/.test(r79.pushupCard.tip || '') && r79.pushupCard.note === 'Rehab' && r79.pushupCard.exists &&
     r79.benchP3.first === 157.5 && r79.benchP3.build && r79.benchP3.next === 155 &&
     r79.fly && r79.curlWeek1 && /paused/i.test(r79.flyCard.next) && !r79.flyCard.skip && /Right arm/.test(r79.flyCard.tip) &&
