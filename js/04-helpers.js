@@ -104,7 +104,7 @@ function checkCoreWorkoutComplete(day){
   if(celebratedToday[day] === today) return;
   celebratedToday[day] = today;
   try{ window.localStorage.setItem(CELEBRATED_KEY, JSON.stringify(celebratedToday)); }catch(e){}
-  showCelebration(`🎉 ${DAY_TITLES[day]} complete - nice work!`);
+  showCelebration(`${DAY_TITLES[day]} complete - nice work!`);
   if(currentSession) flushQueue();
 }
 
@@ -313,6 +313,27 @@ function estimate1RM(weight, reps){
 // the "Next:" recommendation and the numeric seconds the rest timer uses -
 // keeping these as two independently-edited copies is exactly the kind of
 // drift that let a stale weight number survive a text-only fix earlier.
+// Outline icons in place of emoji: 16px grid, drawn in the text color, sized to the text.
+const ICON_PATHS = {
+  deload: '<rect x="1.5" y="4.5" width="11.5" height="7" rx="1.5"/><path d="M14.6 7v2M4 7v2"/>',
+  shoulder: '<circle cx="8" cy="8" r="6.3"/><path d="M8 4.8v6.4M4.8 8h6.4"/>',
+  knee: '<path d="M4.2 1.6 7.6 7.6 5.6 14.4"/><path d="M7.6 7.6c1.6-.6 2.6.2 2.6 1.6"/><path d="M4.2 14.4h3.4"/>',
+  back: '<rect x="5.4" y="1.4" width="5.2" height="3.2" rx="1.2"/><rect x="5" y="6.4" width="6" height="3.2" rx="1.2"/><rect x="5.4" y="11.4" width="5.2" height="3.2" rx="1.2"/>',
+  preseason: '<path d="M1.5 13.5 6 5.5l2.8 4.8 1.9-2.8 3.8 6z"/>',
+  ski: '<path d="M8 1.5v13M2.4 4.75l11.2 6.5M2.4 11.25l11.2-6.5"/>',
+  cloud: '<path d="M4.6 12.5h6.9a2.8 2.8 0 0 0 .3-5.6 4 4 0 0 0-7.6.9 2.4 2.4 0 0 0 .4 4.7z"/>',
+  warn: '<path d="M8 2.2 14.3 13.4H1.7z"/><path d="M8 6.6v3.2M8 11.6v.1"/>',
+  spark: '<path d="M8 1.8 9.4 6.6 14.2 8 9.4 9.4 8 14.2 6.6 9.4 1.8 8 6.6 6.6z"/>',
+  target: '<circle cx="8" cy="8" r="6.2"/><circle cx="8" cy="8" r="3.4"/><circle cx="8" cy="8" r=".8"/>',
+  down: '<path d="M8 2v8.5M4.6 7.2 8 10.5l3.4-3.3M2.5 13.5h11"/>',
+  up: '<path d="M8 10.5V2M4.6 5.3 8 2l3.4 3.3M2.5 13.5h11"/>',
+  pause: '<path d="M5.5 3.5v9M10.5 3.5v9"/>',
+  play: '<path d="M5 3.2 12.6 8 5 12.8z"/>',
+  next: '<path d="M3.2 3.4 9.4 8l-6.2 4.6zM12.6 3.4v9.2"/>',
+  check: '<path d="M3 8.6l3.2 3.1L13 4.6"/>',
+};
+function icon(key){ return ICON_PATHS[key] ? `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${ICON_PATHS[key]}</svg>` : ""; }
+
 function restBucketFor(ex){
   // Main lifts: start at 90 sec and stretch to 3 min when the sets are heavy (the button steps up).
   const name = Object.keys(data).find(k => data[k] === ex);

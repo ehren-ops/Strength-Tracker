@@ -80,28 +80,32 @@ let syncFlashTimer = null;
 function renderSyncStatus(){
   const el = document.getElementById("sync-status");
   if(!el) return;
-  let state;
+  let state, text, ic = "cloud";
   if(localSaveFailed.data || localSaveFailed.queue){
-    state = "storage";
-    el.textContent = currentSession
-      ? "⚠ Couldn't save on this phone (storage full?) - tap to back up to the cloud now"
-      : "⚠ Couldn't save on this phone (storage full?) - sign in to back up";
+    state = "storage"; ic = "warn";
+    text = currentSession
+      ? "Couldn't save on this phone (storage full?) - tap to back up to the cloud now"
+      : "Couldn't save on this phone (storage full?) - sign in to back up";
   } else if(!currentSession){
     state = "signed-out";
-    el.textContent = "☁ Not signed in - logging locally";
+    text = "Not signed in - logging locally";
   } else if(typeof navigator !== "undefined" && navigator.onLine === false){
     state = "offline";
-    el.textContent = pendingQueue.length ? `☁ Offline - ${pendingQueue.length} pending` : "☁ Offline";
+    text = pendingQueue.length ? `Offline - ${pendingQueue.length} pending` : "Offline";
   } else if(pendingQueue.length){
     state = lastFlushHadFailures ? "failing" : "syncing";
-    el.textContent = lastFlushHadFailures
-      ? `⚠ ${pendingQueue.length} pending - having trouble syncing, tap to retry`
-      : `☁ Syncing… ${pendingQueue.length} pending`;
+    if(lastFlushHadFailures) ic = "warn";
+    text = lastFlushHadFailures
+      ? `${pendingQueue.length} pending - having trouble syncing, tap to retry`
+      : `Syncing… ${pendingQueue.length} pending`;
   } else {
     state = "synced";
-    el.textContent = "☁ Synced";
+    text = "Synced";
   }
-  el.title = el.textContent;
+  // Can run while the scripts are still loading (a backfill at startup), before icon() exists. The
+  // text is always the app's own, never user input.
+  el.innerHTML = `${typeof icon === "function" ? icon(ic) + " " : ""}${text}`;
+  el.title = text;
   el.classList.toggle("warn", state === "failing" || state === "offline" || state === "storage");
   if(state === "synced"){
     if(lastSyncState !== null && lastSyncState !== "synced"){
@@ -381,14 +385,14 @@ async function manualSync(){
   if(!btn) return;
   btn.disabled = false;
   if(!result.attempted){
-    const label = result.reason === "offline" ? "⚠ You're offline" : result.reason === "signed-out" ? "⚠ Not signed in" : "⚠ Already syncing";
+    const label = result.reason === "offline" ? "You're offline" : result.reason === "signed-out" ? "Not signed in" : "Already syncing";
     flashSyncButton(btn, label, false, originalText);
     return;
   }
   if(result.remaining === 0){
     flashSyncButton(btn, "✓ Synced", true, originalText);
   } else {
-    flashSyncButton(btn, `⚠ ${result.remaining} still stuck`, false, originalText);
+    flashSyncButton(btn, `${result.remaining} still stuck`, false, originalText);
   }
 }
 function flashSyncButton(btn, text, success, originalText){

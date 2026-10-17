@@ -444,7 +444,7 @@ function renderCoachButton(kind){
   const open = key && coachStore(kind)[key] && coachExpanded[kind + key];
   const loading = !!coachLoading[kind];
   return `<button class="ai-btn${open ? " open" : ""}" onclick="onCoachButton('${kind}')" ${loading ? "disabled" : ""}>
-    <span class="ai-tag">✨ AI</span>
+    <span class="ai-tag">${icon("spark")} AI</span>
     <span>${loading ? "Working…" : COACH_SHORT[kind]}</span>
   </button>`;
 }
@@ -454,7 +454,7 @@ function renderCoachPanel(kind){
   const cached = key ? normalizeCoach(coachStore(kind)[key]) : null;
   const loading = !!coachLoading[kind];
   const err = coachError[kind] ? `<div style="font-size:0.74rem;color:var(--danger);margin-top:0.4rem;">${escapeHtml(coachError[kind])}</div>` : "";
-  if(!cached) return err ? `<div class="ai-panel"><div class="ai-panel-head"><span>✨ AI · ${COACH_LABELS[kind]}</span></div>${err}</div>` : "";
+  if(!cached) return err ? `<div class="ai-panel"><div class="ai-panel-head"><span>${icon("spark")} AI · ${COACH_LABELS[kind]}</span></div>${err}</div>` : "";
 
   const id = kind + key;
   const expanded = !!coachExpanded[id];
@@ -462,7 +462,7 @@ function renderCoachPanel(kind){
   const sub = (kind === "weekly" ? "week ending " : "") + `${Number(m)}/${Number(d)}`;
   let html = `<div class="ai-panel">
     <div class="ai-panel-head" onclick="toggleCoachExpanded('${id}')">
-      <span>✨ AI · ${COACH_LABELS[kind]} <span style="opacity:0.7;font-weight:400;">· ${sub}</span></span>
+      <span>${icon("spark")} AI · ${COACH_LABELS[kind]} <span style="opacity:0.7;font-weight:400;">· ${sub}</span></span>
       <span class="ai-toggle">${expanded ? "Hide ▲" : "Show ▼"}</span>
     </div>`;
   if(expanded){

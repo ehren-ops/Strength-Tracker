@@ -1745,7 +1745,7 @@ async function main(){
   const modOrder = await page.evaluate(() => {
     const card = [...document.querySelectorAll('.card')].find(c => c.textContent.includes('Training Modifiers'));
     const t = card.textContent;
-    return { deload: t.indexOf('Deload Week'), ski: t.indexOf('🎿 Ski'), status: document.getElementById('deload-status').textContent };
+    return { deload: t.indexOf('Deload Week'), ski: [...card.querySelectorAll('.mod-title')].findIndex(x => x.textContent.trim() === 'Ski') * 1000, status: document.getElementById('deload-status').textContent };
   });
   if(modOrder.deload < 0 || modOrder.deload > modOrder.ski) throw new Error('expected Deload Week to be the first modifier, got: ' + JSON.stringify(modOrder));
   if(!/No deload logged yet/.test(modOrder.status) || !/Next recommended/.test(modOrder.status)) throw new Error('expected deload status to show no prior deload and a next recommended date, got: ' + modOrder.status);
@@ -1775,8 +1775,9 @@ async function main(){
   await sleep(100);
   if(await page.locator('.mod-badges .deload-badge').count() !== 1) throw new Error('expected a Deload badge on the exercise card');
   // Modifier badges sit last in the card head's side column (under Last and the record), not in the title.
-  const badgePlace = await page.evaluate(() => { const m = document.querySelector('.mod-badges'); return { parent: m.parentElement.className, last: m === m.parentElement.lastElementChild, inTitle: !!document.querySelector('.ex-name .deload-badge') }; });
-  if(badgePlace.parent !== 'card-head-side' || !badgePlace.last || badgePlace.inTitle) throw new Error('expected modifier badges last in the card head side column, got: ' + JSON.stringify(badgePlace));
+  // A badge with no note on this lift (Deload) sits in a strip right under the card head.
+  const badgePlace = await page.evaluate(() => { const m = document.querySelector('.mod-badges'); return { prev: m.previousElementSibling && m.previousElementSibling.className, inTitle: !!document.querySelector('.ex-name .deload-badge') }; });
+  if(badgePlace.prev !== 'card-head' || badgePlace.inTitle) throw new Error('expected the Deload badge in a strip under the card head, got: ' + JSON.stringify(badgePlace));
   // A Deload Week session charts as a planned deload (diamond, Deload color), not a short-set flag.
   const deloadMark = await page.evaluate(() => {
     const ex = Object.assign(newExerciseShell('Squat'), { entries: [
@@ -2238,7 +2239,7 @@ async function main(){
     const d = div.querySelector('.delta-line');
     const c = div.querySelector('.last-line');
     const w = div.querySelector('.card-head');
-    return { cornerInTitle: !!(c && c.parentElement.classList.contains('card-head-side') && c.previousElementSibling && c.previousElementSibling.classList.contains('timer-btn')), corner: c && c.textContent, deltaInHistory: !!(d && /Recent History/.test(d.parentElement.textContent)), text: d && d.textContent,
+    return { cornerInTitle: !!(c && c.parentElement.classList.contains('ch-side') && c.parentElement.previousElementSibling && c.parentElement.previousElementSibling.classList.contains('big-val')), corner: c && c.textContent, deltaInHistory: !!(d && /Recent History/.test(d.parentElement.textContent)), text: d && d.textContent,
       big: div.querySelector('.big-val').textContent, label: div.querySelector('.big-label').textContent, plan: div.querySelector('.rec-plan').textContent, load: div.querySelector('.rec-load').textContent,
       next: w && w.nextElementSibling && w.nextElementSibling.className };
   });
@@ -2767,7 +2768,7 @@ async function main(){
     const bad = [];
     const savedTheme = darkMode;
     MODE_DEFS.forEach(m => {
-      ['key', 'storageKey', 'name', 'short', 'emoji', 'desc'].forEach(f => { if(!m[f]) bad.push(m.key + ' missing ' + f); });
+      ['key', 'storageKey', 'name', 'short', 'icon', 'desc'].forEach(f => { if(!m[f]) bad.push(m.key + ' missing ' + f); });
       if(!m.badge) bad.push(m.key + ' missing badge');
       if(!m.tag || !['light', 'block'].includes(m.tag.kind) || !(m.tag.re instanceof RegExp) || !m.tag.re.test(m.tag.label)) bad.push(m.key + ' tag');
       if(typeof m.applies !== 'function' || typeof m.changesNumbers !== 'function') bad.push(m.key + ' rules');
@@ -3064,7 +3065,7 @@ async function main(){
     const saved = { hang: JSON.stringify(data['Dead Hang'] || null), view, selected };
     data['Dead Hang'] = Object.assign(newExerciseShell('Dead Hang'), { entries: [{ clientId: 'h96', date: shiftISO(todayISO(), -4), weight: 0, sets: 3, reps: 40, difficulty: 7 }] });
     view = 'extra'; selected = 'Dead Hang'; render();
-    const out = { btn: (document.querySelector('.card-head-side .timer-btn') || {}).textContent, prefill: document.getElementById('f-sets').value + 'x' + document.getElementById('f-reps').value, restBtn: !!document.querySelector('.rest-action-btn'), desc: document.querySelector('.rec-desc').textContent };
+    const out = { btn: (document.querySelector('.card-head .timer-btn') || {}).textContent, prefill: document.getElementById('f-sets').value + 'x' + document.getElementById('f-reps').value, restBtn: !!document.querySelector('.rest-action-btn'), desc: document.querySelector('.rec-desc').textContent };
     const clock = () => document.getElementById('hold-clock');
     const text = () => [...clock().children].map(c => c.textContent).filter(Boolean).join(' ');
     startHoldTimer('Dead Hang');
@@ -3126,6 +3127,10 @@ async function main(){
     holdTimer.endAt = Date.now() - 1; tickHoldTimer(); // into the first hold
     out.holdBtns = btns();
     out.underline = getComputedStyle(clock().querySelector('.hc-stop')).textDecorationLine;
+    // Ticks only update the time: the buttons stay the same elements, so a tap never loses its target.
+    const pauseBtn = clock().querySelector('[data-hc="pause"]');
+    holdTimer.endAt -= 3000; tickHoldTimer(); holdTimer.endAt -= 3000; tickHoldTimer();
+    out.stable = pauseBtn.isConnected && pauseBtn === clock().querySelector('[data-hc="pause"]');
     clock().querySelector('[data-hc="pause"]').click();
     const frozen = holdTimer.paused.left;
     holdTimer.endAt = Date.now() - 1; tickHoldTimer(); // time passing while paused changes nothing
@@ -3150,8 +3155,8 @@ async function main(){
     view = saved.view; selected = saved.selected; render();
     return out;
   });
-  if(r97.firstRest !== 45 || r97.holdBtns !== '❚❚ Pause|Rest ⏭' || !/underline/.test(r97.underline) || JSON.stringify(r97.paused) !== '["hold",true,"Paused",true]' || !r97.resumed
-    || JSON.stringify(r97.skipped) !== '["rest","[[22]]"]' || r97.restBtns !== '−15|❚❚ Pause|Next set ⏭|+15' || JSON.stringify(r97.more) !== '[15,60,60,"55,55"]' || r97.afterRest !== 'ready' || r97.kept !== 60)
+  if(r97.firstRest !== 45 || !r97.stable || r97.holdBtns !== 'Pause|Rest' || !/underline/.test(r97.underline) || JSON.stringify(r97.paused) !== '["hold",true,"Paused",true]' || !r97.resumed
+    || JSON.stringify(r97.skipped) !== '["rest","[[22]]"]' || r97.restBtns !== '−15|Pause|Next set|+15' || JSON.stringify(r97.more) !== '[15,60,60,"55,55"]' || r97.afterRest !== 'ready' || r97.kept !== 60)
     throw new Error('expected pause, skip and -15/+15 on the hold clock, with the new rest kept, got: ' + JSON.stringify(r97));
   console.log('OK: Pause freezes the clock (Resume picks up), Skip ends the hold at 22 sec and goes to the rest, +15 makes the rest 60 sec for this run and the next, Skip on a rest goes to the count-in, "Tap twice to stop" is underlined');
 
@@ -3164,14 +3169,16 @@ async function main(){
     view = 'full'; selected = 'Squat'; render();
     const clock = () => document.getElementById('hold-clock');
     const text = () => [...clock().children].filter(c => !c.matches('button')).map(c => c.textContent).filter(Boolean).join(' ');
-    const out = { btn: (document.querySelector('.card-head-side .timer-btn') || {}).textContent };
-    document.querySelector('.card-head-side .timer-btn').click();
+    const out = { btn: (document.querySelector('.card-head .timer-btn') || {}).textContent };
+    document.querySelector('.card-head .timer-btn').click();
     out.set1 = text();
     out.done1 = clock().querySelector('.hc-done').textContent;
     clock().querySelector('.hc-done').click();
     out.rest = [holdTimer.steps[holdTimer.idx].kind, holdTimer.rest, text()];
+    out.plan = document.querySelector('.card-head .timer-plan').textContent;
     clock().querySelector('[data-hc="more"]').click();
     out.nextRests = holdTimer.steps.filter(x => x.kind === 'rest').map(x => x.secs).join(',');
+    out.planAfter = document.querySelector('.card-head .timer-plan').textContent;
     holdTimer.endAt = Date.now() - 1; tickHoldTimer(); // the rest runs out: set 2
     out.set2 = text();
     clock().querySelector('.hc-done').click();
@@ -3182,7 +3189,7 @@ async function main(){
     clearHoldTimer();
     // Stopped after one set: only that set goes in the form.
     render();
-    document.querySelector('.card-head-side .timer-btn').click();
+    document.querySelector('.card-head .timer-btn').click();
     clock().querySelector('.hc-done').click();
     clock().click(); clock().click();
     out.stopped = [text(), document.getElementById('f-sets').value].join(' | ');
@@ -3192,7 +3199,7 @@ async function main(){
     view = saved.view; selected = saved.selected; render();
     return out;
   });
-  if(r98.btn !== '3x8' || !/^Set 1 of 3 8 reps Squat · 185 lb total/.test(r98.set1) || !/Set done/.test(r98.done1) || r98.rest[0] !== 'rest' || r98.rest[1] !== 90 || !/^Rest 1:30 Next: set 2 of 3/.test(r98.rest[2])
+  if(r98.btn !== '3x8' || r98.plan !== '3 × 8 repsRest 1:30' || r98.planAfter !== '3 × 8 repsRest 1:45' || !/^Set 1 of 3 8 reps Squat · 185 lb total/.test(r98.set1) || !/Set done/.test(r98.done1) || r98.rest[0] !== 'rest' || r98.rest[1] !== 90 || !/^Rest 1:30 Next: set 2 of 3/.test(r98.rest[2])
     || r98.nextRests !== '105,105' || !/^Set 2 of 3/.test(r98.set2) || !/^Done 3x8/.test(r98.end) || r98.form !== '185,3,8' || !/^Stopped 1x8/.test(r98.stopped) || !/\| 1$/.test(r98.stopped))
     throw new Error('expected Squat to run 3 sets of 8 at 185 with Done and a 90 sec rest, fill the form, and keep only finished sets when stopped, got: ' + JSON.stringify(r98));
   console.log('OK: the clock button runs Squat 3x8 at 185: Set done, Rest 1:30 (+15 makes the rests 1:45), set 2 when the rest ends, Done 3x8 fills the form; stopped after one set it fills 1 set');
@@ -3247,6 +3254,24 @@ async function main(){
     || !/Next: Pigeon Pose/.test(r99.resume) || r99.rehabBtns !== 2 || !/^Move 1 of 6 12-15 reps Side-lying external rotation · 3-5 lb · set 1 of 3/.test(r99.rehab) || !/^Rest 30 Next: set 2 of 3/.test(r99.rehabRest))
     throw new Error('expected Mobility and Shoulder Rehab to play their moves and check them off, got: ' + JSON.stringify(r99));
   console.log('OK: Hip Stretch plays 45 sec a side with a switch, rep moves wait for Done, each move is checked off as it ends (5/5), a second play starts at the first unchecked move; Shoulder Rehab has a play button per group (12-15 reps, 3-5 lb, set 1 of 3, then a 30 sec rest)');
+
+  console.log('=== 100: no emoji anywhere: modifiers, Overview, sync status and the clock use outline icons ===');
+  const r100 = await page.evaluate(() => {
+    const saved = { view, selected, modes: { ...modes }, sr: JSON.stringify(shoulderRehab) };
+    const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2B00}-\u{2BFF}\u{23E9}-\u{23FA}\u{FE0F}]/u;
+    const found = [];
+    const scan = where => { const m = (document.body.innerText || '').match(emoji); if(m) found.push(where + ': ' + m[0]); };
+    MODE_DEFS.forEach(m => setModeFlag(m.key, ['knee', 'back', 'deload'].includes(m.key)));
+    ['full', 'upper', 'lower', 'extra', 'overview'].forEach(v => { view = v; selected = v === 'extra' || v === 'overview' ? selected : DAY_ORDER[v][0]; render(); scan(v); });
+    view = 'full'; selected = 'Squat'; render();
+    startHoldTimer('Squat'); scan('clock'); clearHoldTimer();
+    const icons = document.querySelectorAll('#app .card [class$="-badge"] svg.ic').length;
+    MODE_DEFS.forEach(m => setModeFlag(m.key, !!saved.modes[m.key])); shoulderRehab = JSON.parse(saved.sr);
+    view = saved.view; selected = saved.selected; render();
+    return { found, icons };
+  });
+  if(r100.found.length || r100.icons < 2) throw new Error('expected outline icons and no emoji, got: ' + JSON.stringify(r100));
+  console.log('OK: no emoji on any day, Overview or the clock; modifier pills carry outline icons (' + r100.icons + ' on Squat)');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

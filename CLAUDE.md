@@ -10,6 +10,7 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - Every release bumps the version (see Releasing), passes the full suite, and gets a 360px
   screenshot check (light and dark) before pushing to `main`.
 - Weights are "lb" everywhere (never "lbs"). Short, plain coaching language.
+- No emoji in the UI: outline icons only, via `icon(key)` (04, `ICON_PATHS`). Scenario 100 checks.
 - Leave destructive Supabase actions (drops, deletes) to the owner.
 
 ## Layout
@@ -24,7 +25,7 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 | `js/05-rest-timer-progression.js` | Rest timer, readiness, progression engine: `computeSuggestion` = core, note target, max weight cap, `applyReturn` (breaks, post-deload), `applyShoulder`, deload overlay |
 | `js/05b-shoulder-rehab.js` | Shoulder Rehab modifier: rehab card, paused/held lifts, return ramp, coach block |
 | `js/05c-hold-timer.js` | The clock: holds for timed lifts (`unit: "sec"`), set by set for rep lifts, routines (Mobility, Shoulder Rehab groups) from item doses; Pause, Skip, -15/+15 rests, remembered rests (`restPrefs`); fills the form |
-| `js/06-day-view.js` | Render: tabs, pill rows, Mobility and checklist cards, the exercise card (`.card-head`: name and weight left; Last, record and modifier badges stacked right; then care lines, Next tile, chart) |
+| `js/06-day-view.js` | Render: tabs, pill rows, Mobility and checklist cards, the exercise card (`.card-head`: the name row with the clock and its plan text, then a grid pairing today's weight with Last and its label with the record; a modifier's pill leads its own note line, pills with no note sit in a strip; then the Next tile and chart) |
 | `js/06b-next-tile.js` | The Next tile's words: `planModifiers`, the call, and the guidance sentence pool |
 | `js/06c-history-form.js` | Recent History rows, edit/delete/skip, the log form (per-set reps, joint check) |
 | `js/07-charts.js` | SVG chart, `MODIFIER_TAGS` (light = diamond, block = circle), note tag helpers |
@@ -41,7 +42,7 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 ## Patterns to follow
 - A new entry field needs: `entryToRow` and `rowToEntry` in 01, a migration adding the column, and
   the mock needs nothing (it is generic).
-- A new modifier is one row in `MODE_DEFS` (03): name, emoji, badge, tag (kind light or block),
+- A new modifier is one row in `MODE_DEFS` (03): name, icon (a key in `ICON_PATHS`, 04), badge, tag (kind light or block),
   `applies` / `changesNumbers` rules and the Overview text, plus a `--<key>` color token in both
   themes and its `.<key>-badge` style; scenario 88 checks the row. No schema change: settings sync
   through `user_settings.settings` (JSON). The old per-mode columns are legacy; leave them be.
@@ -65,6 +66,9 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   an empty track from the estimated max. Read reps through `effectiveTargetReps` /
   `entryTargetReps`, which know the track. Browser scenarios that test other rules on a main lift
   stub `plannedHeavy = () => false` so they do not depend on the weekday.
+- The clock repaints through `paintClock` (05c), which rebuilds its markup only when words or buttons
+  change; ticks update just the time and bar. Never set its innerHTML on every tick, or taps on
+  Pause, Skip and Done get lost mid-press.
 - The clock (05c): one `holdTimer` with `mode` holds / sets / routine and a list of steps (`ready`,
   `hold`, `set` waits for Done, `rest`), all on absolute end times. `timerButtonFor` puts the round
   clock button at the top of the card head's side column (in the title row before any history);

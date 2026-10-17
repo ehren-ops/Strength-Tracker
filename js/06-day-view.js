@@ -266,7 +266,7 @@ function renderChecklistCard(name, ex, opts){
   const completed = new Set(entry ? entry.completedIndices || [] : []);
 
   let html = `<div class="card">`;
-  html += `<div class="ex-title-row"><h2 class="ex-name">${opts && opts.title || name}</h2>${routineButton(`playChecklist('${name.replace(/'/g,"\\'")}')`, name)}</div>`;
+  html += `<div class="ex-title-row"><h2 class="ex-name">${opts && opts.title || name}</h2>${routineButton(`playChecklist('${name.replace(/'/g,"\\'")}')`, name, name, routineItemsFor(name).map((_, i) => i))}</div>`;
   if(opts && opts.chips) html += opts.chips;
   if(routine.intro) html += `<p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.8rem;">${routine.intro}</p>`;
 
@@ -328,40 +328,44 @@ function renderExerciseCard(name, ex){
   // Just the weight; a tap adds the date, on every card, until tapped again.
   const priorHtml = prior && !recovery ? `<button type="button" class="last-line" onclick="toggleLastDate()" aria-pressed="${lastDateShown}" title="${fmtShortDate(prior.date)}">Last: ${shortValue(name, ex, prior)}${lastDateShown ? ` · ${fmtShortDate(prior.date)}` : ""}</button>` : "";
 
-  // Active modifiers: badges, then their notes, under the current weight rather than above it.
-  const badges = mods.map(m => `<span class="${m.key}-badge">${m.emoji} ${typeof m.badge === "function" ? m.badge(name) : m.badge}</span>`).join("");
-  // The badges ride in the card head's side column (under Last and the record) once there is
-  // history; the care and tempo lines stay full width under it.
-  const badgeHtml = badges ? `<div class="mod-badges">${badges}</div>` : "";
+  // Active modifiers: each badge starts its own note (Knee Care on the knee tip, and so on), so the
+  // pill and what it changes read together. Badges with no note on this lift (Deload) sit in a strip
+  // above the notes.
+  const usedBadges = new Set();
+  const badgeOf = m => `<span class="${m.key}-badge">${icon(m.icon)}${typeof m.badge === "function" ? m.badge(name) : m.badge}</span>`;
+  const pill = key => { const m = mods.find(x => x.key === key); if(!m || usedBadges.has(key)) return ""; usedBadges.add(key); return badgeOf(m); };
   let modHtml = "";
   if(kneeActive && KNEE_CARE_TIP[name]){
-    modHtml += `<div class="care-line knee-care-line">${KNEE_CARE_TIP[name]}</div>`;
+    modHtml += `<div class="care-line knee-care-line">${pill("knee")}${KNEE_CARE_TIP[name]}</div>`;
   }
   if(backActive && LOW_BACK_CARE_TIP[name]){
-    modHtml += `<div class="care-line back-care-line">${LOW_BACK_CARE_TIP[name]}</div>`;
+    modHtml += `<div class="care-line back-care-line">${pill("back")}${LOW_BACK_CARE_TIP[name]}</div>`;
   }
   const shoulderTip = shoulderCardTip(name);
   if(shoulderTip){
-    modHtml += `<div class="care-line shoulder-care-line">${shoulderTip}</div>`;
+    modHtml += `<div class="care-line shoulder-care-line">${pill("shoulder")}${shoulderTip}</div>`;
   }
   if(kneeActive || backActive){
     modHtml += `<p class="care-disclaimer">Load adjustment only, not a substitute for a PT or doctor.</p>`;
   }
   if(modes.ski && ex.inSeasonNote){
-    modHtml += `<div class="ski-tempo-line">${ex.inSeasonNote}</div>`;
+    modHtml += `<div class="ski-tempo-line">${pill("ski")}${ex.inSeasonNote}</div>`;
   }
   if(skiActive && ex.skiTempo){
-    modHtml += `<div class="ski-tempo-line">Ski tempo: ${ex.skiTempo} · target ${ex.targetRepsSki} reps</div>`;
+    modHtml += `<div class="ski-tempo-line">${pill("ski")}Ski tempo: ${ex.skiTempo} · target ${ex.targetRepsSki} reps</div>`;
   }
   if(preseasonActive && ex.preseasonTempo){
-    modHtml += `<div class="preseason-line">Preseason tempo: ${ex.preseasonTempo} · target ${ex.targetRepsPreseason} reps</div>`;
+    modHtml += `<div class="preseason-line">${pill("preseason")}Preseason tempo: ${ex.preseasonTempo} · target ${ex.targetRepsPreseason} reps</div>`;
   }
   if(preseasonActive && ex.preseasonNote){
-    modHtml += `<div class="preseason-line">${ex.preseasonNote}${ex.preseasonWeek3 && !(preseasonWeek() >= 3) ? ' <b>Add from week 3.</b>' : ''}</div>`;
+    modHtml += `<div class="preseason-line">${pill("preseason")}${ex.preseasonNote}${ex.preseasonWeek3 && !(preseasonWeek() >= 3) ? ' <b>Add from week 3.</b>' : ''}</div>`;
   }
 
+  const leftover = mods.filter(m => !usedBadges.has(m.key));
+  if(leftover.length) modHtml = `<div class="mod-badges">${leftover.map(badgeOf).join("")}</div>` + modHtml;
+
   let html = `<div class="card${mods.filter(m => m.key !== "deload").map(m => ` ${m.key}-mode`).join("")}">`;
-  const timerBtn = timerButtonFor(name, ex);
+  const timerBtn = timerGroupFor(name, ex);
   let titleHtml;
   if(isCustom && deletingExercise === name){
     titleHtml = `<div class="ex-name-row">
@@ -372,11 +376,11 @@ function renderExerciseCard(name, ex){
       </span>
     </div>`;
   } else {
-    // Before any history the timer button rides in the title row; after, it heads the side column.
-    titleHtml = `<div class="ex-title-row"><h2 class="ex-name">${name}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>${hasEntries ? "" : timerBtn}</div>`;
+    // The clock and what it will run ride at the right of the name row.
+    titleHtml = `<div class="ex-title-row"><h2 class="ex-name">${name}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>${timerBtn}</div>`;
   }
   if(!hasEntries){
-    html += titleHtml + badgeHtml + modHtml;
+    html += titleHtml + modHtml;
     // Same tile as every other lift, so the card never changes shape.
     html += recovery ? renderRecoveryTile(name, ex) : renderNextTile("Next: first session", ex, firstSessionGuidance(name, ex), loadText(name, ex, null));
     html += renderTips(name);
@@ -391,18 +395,12 @@ function renderExerciseCard(name, ex){
     else if(suggestion){ bigVal = bigOf(suggestion); bigLabel = "Today"; }
     else { bigVal = bigOf(work); bigLabel = "Last"; }
 
-    // Card head: the name and today's weight on the left; Last, the record and the active modifier
-    // badges stacked on the right, so a name that wraps never leaves an empty corner.
+    // Card head: the name row (with the clock) across the top, then a grid so each pair lines up:
+    // today's weight with Last, the label under the weight with the record.
     html += `<div class="card-head">
-      <div class="card-head-main">${titleHtml}
-        <div class="weight-row">
-          <div class="weight-main">
-            <span class="big-val">${bigVal}</span>
-            <span class="big-label${todayLog ? " locked" : ""}">${bigLabel}</span>
-          </div>
-        </div>
-      </div>
-      <div class="card-head-side">${timerBtn}${priorHtml}${topRightSlot(name, ex, work, todayLog || suggestion || work, isCustom)}${badgeHtml}</div>
+      ${titleHtml}
+      <span class="big-val">${bigVal}</span><div class="ch-side">${priorHtml}</div>
+      <span class="big-label${todayLog ? " locked" : ""}">${bigLabel}</span><div class="ch-side">${topRightSlot(name, ex, work, todayLog || suggestion || work, isCustom)}</div>
     </div>`;
     html += modHtml;
 

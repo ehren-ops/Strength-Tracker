@@ -36,7 +36,7 @@ function showDeloadEndedModal(){
   const el = document.getElementById("deload-modal");
   if(!el) return;
   el.innerHTML = `<div class="app-modal-card">
-    <h3 class="section" style="color:var(--deload-text);">🔋 Deload week complete</h3>
+    <h3 class="section" style="color:var(--deload-text);">${icon("deload")} Deload week complete</h3>
     <p style="font-size:0.85rem;line-height:1.5;margin:0 0 0.8rem;">A week is up, so Deload Week is now off and suggestions pick back up from your pre-deload weights.</p>
     <div style="display:flex;gap:0.5rem;justify-content:flex-end;flex-wrap:wrap;">
       <button class="tool-btn" onclick="keepDeloadOn()">Keep it on another week</button>
@@ -84,7 +84,7 @@ function renderSkiModifier(){
     : phase === "season" ? `In season${start ? ` since ${fmtShortDate(start)}` : ""}.`
     : skiPhase.endedOn ? `Last block ended ${fmtShortDate(skiPhase.endedOn)}.` : "Off.";
   return `<div class="mod-row">
-      <div class="mod-head"><span class="mod-title">🎿 Ski</span>
+      <div class="mod-head"><span class="mod-title">${icon("ski")} Ski</span>
         <div class="seg" role="group" aria-label="Ski phase">${SKI_PHASES.map(([k, label]) =>
           `<button class="seg-btn ${k}${k === phase ? " on" : ""}" aria-pressed="${k === phase}" onclick="setSkiPhase('${k}')">${label}</button>`).join("")}</div>
       </div>
@@ -110,7 +110,7 @@ function checkSkiPhasePrompt(){
     later = 14;
   } else return;
   el.innerHTML = `<div class="app-modal-card">
-    <h3 class="section" style="color:var(--ski-text);">🎿 Ski</h3>
+    <h3 class="section" style="color:var(--ski-text);">${icon("ski")} Ski</h3>
     <p style="font-size:0.85rem;line-height:1.5;margin:0 0 0.8rem;">${body}</p>
     <div style="display:flex;gap:0.5rem;justify-content:flex-end;flex-wrap:wrap;">
       <button class="tool-btn" onclick="snoozeSkiPrompt(${later})">Not yet</button>${yes}
@@ -146,10 +146,10 @@ function collapsibleHead(key, title, summary){
 // One modifier: a title row with its on/off switch, then a short description.
 // The hidden label keeps "Name: ON/OFF" readable for screen readers.
 function renderModifierRow(key, extraHtml){
-  const { emoji, name, desc } = MODE_DEFS.find(m => m.key === key), on = !!modes[key];
+  const { icon: ic, name, desc } = MODE_DEFS.find(m => m.key === key), on = !!modes[key];
   return `<div class="mod-row">
       <div class="mod-head">
-        <span class="mod-title">${emoji} ${name}</span>
+        <span class="mod-title">${icon(ic)} ${name}</span>
         <button class="theme-toggle mod-switch${on ? " on" : ""}" style="--mod-color:var(--${key})" onclick="toggleMode('${key}')" aria-pressed="${on}" aria-label="${name}"><span class="knob"></span><span class="sr-only">${name}: ${on ? "ON" : "OFF"}</span></button>
       </div>
       <p class="mod-desc">${desc}</p>
@@ -287,7 +287,7 @@ function renderOverview(){
   if(coachNotes){
     html += `<div class="card" style="border-color:var(--amber-light);background:var(--rec-bg);">
       <div class="coach-head">
-        <h3 class="section" style="color:var(--amber);">🎯 Coach's Notes</h3>
+        <h3 class="section" style="color:var(--amber);">${icon("target")} Coach's Notes</h3>
         ${renderCoachButton("session")}
         ${renderCoachButton("weekly")}
       </div>
@@ -413,7 +413,7 @@ function renderBackupSyncCard(){
 
   if(currentSession){
     const syncedLabel = fmtSyncTime(lastSyncedAt);
-    html += `<p style="font-size:0.72rem;color:var(--slate);margin:0 0 0.2rem;">☁ ${escapeHtml(currentSession.user.email)} · ${pending ? pending + " pending" : "synced"}</p>`;
+    html += `<p style="font-size:0.72rem;color:var(--slate);margin:0 0 0.2rem;">${icon("cloud")} ${escapeHtml(currentSession.user.email)} · ${pending ? pending + " pending" : "synced"}</p>`;
     html += `<p style="font-size:0.64rem;color:var(--slate);margin:0 0 0.5rem;">Last synced: ${syncedLabel || "never yet"}</p>`;
     html += `<div class="header-tools" style="margin-bottom:0.6rem;">
       <button class="tool-btn" id="sync-now-btn" onclick="manualSync()">↻ Sync now</button>
@@ -432,8 +432,8 @@ function renderBackupSyncCard(){
   }
 
   html += `<div class="header-tools" style="padding-top:0.5rem;border-top:1px dashed var(--line);">
-    <button class="tool-btn" onclick="backupData()">⬇ Backup data</button>
-    <button class="tool-btn" onclick="document.getElementById('restore-input').click()">⬆ Restore backup</button>
+    <button class="tool-btn" onclick="backupData()">${icon("down")} Backup data</button>
+    <button class="tool-btn" onclick="document.getElementById('restore-input').click()">${icon("up")} Restore backup</button>
     <input type="file" id="restore-input" accept="application/json" style="display:none" onchange="restoreData(event)">
   </div>`;
   html += `<p id="card-status" style="font-size:0.68rem;color:var(--slate);margin-top:0.5rem;"></p>`;

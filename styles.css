@@ -180,14 +180,14 @@
   .side-tag{font-size:0.5em;font-weight:600;color:var(--slate);margin-left:0.15rem;letter-spacing:0;}
   .plate-line{font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.72rem;color:var(--slate);margin-top:0.15rem;}
   /* Card head: name and weight on the left; Last, the record and modifier badges stacked right. */
-  .card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:0.8rem;align-items:start;}
-  .card-head .ex-title-row{margin:0 0 0.2rem;}
-  .card-head .ex-name{line-height:1;}
-  .card-head-side{display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;padding-top:0.3rem;text-align:right;}
-  .card-head-side .last-line{margin-left:0;}
-  .card-head-side .mod-badges{justify-content:flex-end;margin:0;max-width:10rem;}
-  .weight-row{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:0.4rem 0.9rem;}
-  .weight-main{display:flex;flex-direction:column;align-items:flex-start;}
+  /* Card head: three rows of pairs. Name with the clock; today's weight with Last (centered on each
+     other); the label under the weight with the record. */
+  .card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:0.8rem;align-items:center;}
+  .card-head .ex-title-row{margin:0 0 0.2rem;grid-column:1 / -1;align-items:flex-start;}
+  .card-head .ex-name{line-height:1;flex:1 1 0;min-width:0;}
+  .ch-side{justify-self:end;text-align:right;}
+  .ch-side .last-line{margin-left:0;}
+  .card-head .big-label{align-self:center;}
   .big-label{display:block;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);white-space:nowrap;line-height:1.2;}
   .big-label.locked{color:var(--emerald);font-weight:700;}
   .last-line{font:inherit;font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.78rem;font-weight:600;color:var(--slate);white-space:nowrap;flex:0 0 auto;margin-left:auto;background:none;border:none;padding:0;cursor:pointer;}
@@ -259,8 +259,10 @@
   /* The timer button: a small clock above Last (or beside the name, before any history). */
   .timer-btn{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:1.85rem;height:1.85rem;margin:-0.25rem 0;padding:0;background:none;border:1.5px solid var(--emerald);color:var(--emerald);border-radius:50%;cursor:pointer;}
   .timer-btn .btn-icon{width:1.05rem;height:1.05rem;margin:0;stroke-width:2;}
-  .card-head-side .timer-btn{margin:-0.3rem 0 -0.1rem;}
-  .ex-title-row .timer-btn{align-self:center;}
+  /* What the clock will run, in two small lines left of it (the record label's type, not capitals). */
+  .timer-group{display:inline-flex;align-items:center;gap:0.45rem;flex:0 0 auto;}
+  .ex-title-row .timer-group{margin-left:auto;padding-top:0.05rem;}
+  .timer-plan{display:flex;flex-direction:column;align-items:flex-end;font-family:var(--font-body);font-size:0.58rem;text-transform:none;font-weight:400;line-height:1.25;letter-spacing:0.04em;color:var(--slate);white-space:nowrap;font-variant-numeric:tabular-nums;}
   .hold-clock{--phase:var(--slate);position:fixed;inset:0 0 auto 0;height:calc(30vh + env(safe-area-inset-top, 0px));min-height:calc(15.5rem + env(safe-area-inset-top, 0px));padding-top:env(safe-area-inset-top, 0px);z-index:70;
     background:var(--pine);color:var(--header-text);border-bottom:5px solid var(--phase);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.15rem;
     font-family:var(--font-body);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 6px 24px rgba(0,0,0,0.35);}
@@ -278,7 +280,8 @@
   .hc-stop{font-size:0.8rem;opacity:0.8;margin-top:0.35rem;text-decoration:underline;text-underline-offset:3px;}
   /* Pause, Skip and the rest's -15 / +15: one row of outlined buttons under the dots. */
   .hc-controls{display:flex;gap:0.45rem;margin-top:0.45rem;}
-  .hc-btn{background:rgba(255,255,255,0.08);border:1.5px solid rgba(241,239,231,0.55);color:inherit;border-radius:999px;padding:0.4rem 0.8rem;font:inherit;font-size:0.85rem;font-weight:700;line-height:1;cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .hc-btn .ic{width:1.05em;height:1.05em;stroke-width:2;}
+  .hc-btn{display:inline-flex;align-items:center;gap:0.35rem;background:rgba(255,255,255,0.08);border:1.5px solid rgba(241,239,231,0.55);color:inherit;border-radius:999px;padding:0.4rem 0.8rem;font:inherit;font-size:0.85rem;font-weight:700;line-height:1;cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums;}
   .hold-clock.paused .hc-time{opacity:0.55;}
   .hold-clock.compact .hc-controls{display:none;}
   /* Set by set: the reps in place of a clock, and a filled Done button. */
@@ -415,6 +418,12 @@
      per mode, so each class below is just a one-line color override. */
   .mod-badges{display:flex;flex-wrap:wrap;gap:0.3rem;margin:0.35rem 0 0.1rem;}
   .mod-badges > span{margin-left:0 !important;}
+  .mod-badges{margin:0.45rem 0 0.1rem;}
+  /* A modifier's pill leads its own note line. */
+  .care-line > span[class$="-badge"], .ski-tempo-line > span[class$="-badge"], .preseason-line > span[class$="-badge"]{margin:0 0.4rem 0 0;vertical-align:1px;}
+  .ic{width:1em;height:1em;vertical-align:-0.14em;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto;}
+  [class$="-badge"] .ic{margin-right:0.3em;}
+  .mod-title .ic, h3.section .ic, .tool-btn .ic, .sync-status .ic{margin-right:0.15em;}
   .btn-icon{width:0.95em;height:0.95em;margin-right:0.3em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;}
   .ski-badge, .knee-badge, .back-badge, .preseason-badge, .deload-badge{display:inline-block;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
   .ski-badge{background:var(--ski);}

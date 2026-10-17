@@ -24,6 +24,7 @@ function saveRestPref(name, sec){
   restPrefs[name] = Math.max(15, Math.round(sec / 5) * 5);
   try{ window.localStorage.setItem(REST_PREFS_KEY, JSON.stringify(restPrefs)); }catch(e){}
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  syncHoldButton();
 }
 
 function isHoldLift(ex){ return !!ex && ex.unit === "sec" && ex.trackBy !== "duration" && ex.trackBy !== "checklist"; }
@@ -64,6 +65,18 @@ function holdPlanFor(name, ex, fromForm){
 
 // The button shows what the clock will run: the form's sets and seconds as they stand, prefilled or
 // edited. Called after every render and on every change to those two fields.
+// What the clock will run, in two small lines left of the button: "3 × 8 reps" and "Rest 1:30".
+function fmtRest(sec){ return sec < 60 ? `${sec} sec` : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`; }
+function timerPlanLines(name, ex, fromForm){
+  if(isHoldLift(ex)){ const p = holdPlanFor(name, ex, fromForm); return [`${p.sets} × ${p.secs} sec`, `Rest ${fmtRest(restPrefFor(name, ex))}`]; }
+  const p = setPlanFor(name, ex, fromForm);
+  return [`${p.sets} × ${p.reps} reps`, `Rest ${fmtRest(restPrefFor(name, ex))}`];
+}
+function timerPlanHtml(lines){ return `<span class="timer-plan">${lines.filter(Boolean).map(l => `<span>${l}</span>`).join("")}</span>`; }
+function timerGroupFor(name, ex){
+  const btn = timerButtonFor(name, ex);
+  return btn ? `<span class="timer-group">${timerPlanHtml(timerPlanLines(name, ex))}${btn}</span>` : "";
+}
 function syncHoldButton(){
   const btn = document.querySelector(".timer-btn");
   const ex = selected && data[selected];
@@ -75,6 +88,8 @@ function syncHoldButton(){
   const label = btn.querySelector(".hold-btn-label");
   if(label) label.textContent = `${p.sets}x${amount}`;
   btn.setAttribute("aria-label", `Start the timer, ${hold ? `${p.sets} holds of ${p.secs} seconds` : `${p.sets} sets of ${p.reps}`}`);
+  const plan = btn.parentElement && btn.parentElement.querySelector(".timer-plan");
+  if(plan) plan.outerHTML = timerPlanHtml(timerPlanLines(selected, ex, true));
 }
 
 // Ready, hold (each side), rest; the next count-in comes out of the rest so the gap is the rest.
@@ -318,8 +333,7 @@ function renderHoldClock(){
   const size = holdCompact ? " compact" : "";
   const handle = `<button type="button" class="hc-handle" data-hc="size" aria-label="${holdCompact ? "Show the big clock" : "Shrink to a bar"}">${holdCompact ? "▾" : "▴"}</button>`;
   if(t.finished){
-    el.className = "hold-clock done" + size;
-    el.innerHTML = `<div class="hc-phase">${t.result.startsWith("Done") ? "Done" : "Stopped"}</div><div class="hc-time">${t.summary}</div><div class="hc-set">${t.result.replace(/^(Done|Stopped): ?/, "")}</div><div class="hc-dots">${dots}</div><div class="hc-stop">Tap to close</div><button type="button" class="hc-close" data-hc="close" aria-label="Close">✕</button>`;
+    paintClock(el, "hold-clock done" + size, t.result, `<div class="hc-phase">${t.result.startsWith("Done") ? "Done" : "Stopped"}</div><div class="hc-time">${t.summary}</div><div class="hc-set">${t.result.replace(/^(Done|Stopped): ?/, "")}</div><div class="hc-dots">${dots}</div><div class="hc-stop">Tap to close</div><button type="button" class="hc-close" data-hc="close" aria-label="Close">✕</button>`);
     return;
   }
   const armed = Date.now() - t.lastTap < HOLD_STOP_WINDOW;
@@ -328,9 +342,7 @@ function renderHoldClock(){
   if(step.kind === "set"){
     // A set has no clock: the reps to do, the load, and Done.
     const load = t.weight > 0 ? ` · ${t.weight} lb${weightSuffix(t.name)}` : "";
-    el.className = `hold-clock set${size}`;
-    el.setAttribute("aria-label", `Set ${step.set} of ${t.sets}, ${t.reps} reps`);
-    el.innerHTML = `<div class="hc-phase">Set ${step.set} of ${t.sets}</div><div class="hc-time hc-reps">${t.reps}<small> reps${repsSuffix(t.name)}</small></div><div class="hc-set">${t.name}${load}</div><div class="hc-dots">${dots}</div><div class="hc-controls"><button type="button" class="hc-btn hc-done" data-hc="skip">✓ Set done</button></div>${stopHint}${handle}`;
+    paintClock(el, `hold-clock set${size}`, `Set ${step.set} of ${t.sets}, ${t.reps} reps`, `<div class="hc-phase">Set ${step.set} of ${t.sets}</div><div class="hc-time hc-reps">${t.reps}<small> reps${repsSuffix(t.name)}</small></div><div class="hc-set">${t.name}${load}</div><div class="hc-dots">${dots}</div><div class="hc-controls"><button type="button" class="hc-btn hc-done" data-hc="skip">${icon("check")}Set done</button></div>${stopHint}${handle}`);
     return;
   }
   const left = Math.max(0, Math.ceil(holdLeftMs(t) / 1000));
@@ -340,13 +352,28 @@ function renderHoldClock(){
   const skipLabel = step.kind === "rest" ? "Next set" : step.kind === "hold" ? (t.idx >= t.steps.length - 1 ? "Finish" : "Rest") : "Start";
   const controls = `<div class="hc-controls">`
     + (step.kind === "rest" ? `<button type="button" class="hc-btn" data-hc="less" aria-label="15 seconds less rest">−15</button>` : "")
-    + `<button type="button" class="hc-btn" data-hc="pause">${t.paused ? "▶ Resume" : "❚❚ Pause"}</button>`
-    + `<button type="button" class="hc-btn" data-hc="skip">${skipLabel} ⏭</button>`
+    + `<button type="button" class="hc-btn" data-hc="pause">${t.paused ? icon("play") + "Resume" : icon("pause") + "Pause"}</button>`
+    + `<button type="button" class="hc-btn" data-hc="skip">${skipLabel}${icon("next")}</button>`
     + (step.kind === "rest" ? `<button type="button" class="hc-btn" data-hc="more" aria-label="15 seconds more rest">+15</button>` : "")
     + `</div>`;
-  el.className = `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`;
-  el.setAttribute("aria-label", `${phase}, ${left} seconds, ${setLine}`);
-  el.innerHTML = `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${setLine}</div><div class="hc-dots">${dots}</div>${controls}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`;
+  paintClock(el, `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`, `${phase}, ${left} seconds, ${setLine}`, `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${setLine}</div><div class="hc-dots">${dots}</div>${controls}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`);
+}
+// Rebuilds the clock only when its words or buttons change; a tick just updates the time and the
+// bar, so a button is never swapped out from under a finger mid-tap.
+function paintClock(el, cls, aria, html){
+  el.className = cls;
+  el.setAttribute("aria-label", aria);
+  const timeRe = /<div class="hc-time">([^<]*)<\/div>/, barRe = /width:([\d.]+)%/;
+  const key = html.replace(timeRe, "").replace(barRe, "");
+  if(key === el._key){
+    const tm = html.match(timeRe), bw = html.match(barRe);
+    const time = el.querySelector(".hc-time"), bar = el.querySelector(".hc-bar");
+    if(tm && time && time.textContent !== tm[1]) time.textContent = tm[1];
+    if(bw && bar) bar.style.width = bw[1] + "%";
+    return;
+  }
+  el._key = key;
+  el.innerHTML = html;
 }
 function toggleHoldCompact(){ holdCompact = !holdCompact; renderHoldClock(); }
 
@@ -423,17 +450,22 @@ function markRoutineItem(t, idx){
   enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: t.name, clientId: entry.clientId } });
   render();
 }
-function routineButton(onclick, what){
-  return `<button type="button" class="timer-btn" onclick="${onclick}" aria-label="Play ${what}">${HOLD_ICON}</button>`;
+// The routine's clock button with what it will play: the moves left today, and the rest between
+// sets when any move has more than one.
+function routineButton(onclick, what, name, idxs){
+  const all = routineItemsFor(name), entry = data[name] && data[name].entries.find(e => e.date === todayISO());
+  const done = new Set(entry ? entry.completedIndices || [] : []);
+  const left = idxs.filter(i => !done.has(i)).length || idxs.length;
+  const multi = idxs.some(i => parseDose(all[i].dose).sets > 1);
+  const lines = [left < idxs.length ? `${left} of ${idxs.length} moves` : `${idxs.length} moves`, multi ? `Rest ${fmtRest(restPrefs[name] || ROUTINE_REST)}` : ""];
+  return `<span class="timer-group">${timerPlanHtml(lines)}<button type="button" class="timer-btn" onclick="${onclick}" aria-label="Play ${what}">${HOLD_ICON}</button></span>`;
 }
 function renderRoutineClock(el, t, step, dots, handle, stopHint, size){
   const pos = `${t.items.indexOf(step.item) + 1} of ${t.items.length}`;
   const setPart = step.sets > 1 ? ` · set ${step.set} of ${step.sets}` : "";
   const sidePart = step.side ? ` · ${step.side}` : "";
   if(step.kind === "set"){
-    el.className = `hold-clock set${size}`;
-    el.setAttribute("aria-label", `${step.label}, ${step.reps} reps`);
-    el.innerHTML = `<div class="hc-phase">Move ${pos}</div><div class="hc-time hc-reps">${step.reps}<small> reps${step.each ? " each " + step.each : ""}</small></div><div class="hc-set">${step.label}${setPart}</div><div class="hc-dots">${dots}</div><div class="hc-controls"><button type="button" class="hc-btn hc-done" data-hc="skip">✓ Done</button></div>${stopHint}${handle}`;
+    paintClock(el, `hold-clock set${size}`, `${step.label}, ${step.reps} reps`, `<div class="hc-phase">Move ${pos}</div><div class="hc-time hc-reps">${step.reps}<small> reps${step.each ? " each " + step.each : ""}</small></div><div class="hc-set">${step.label}${setPart}</div><div class="hc-dots">${dots}</div><div class="hc-controls"><button type="button" class="hc-btn hc-done" data-hc="skip">${icon("check")}Done</button></div>${stopHint}${handle}`);
     return;
   }
   const left = Math.max(0, Math.ceil(holdLeftMs(t) / 1000));
@@ -443,13 +475,11 @@ function renderRoutineClock(el, t, step, dots, handle, stopHint, size){
   const skipLabel = step.kind === "rest" ? "Next set" : step.kind === "hold" ? "Next" : "Start";
   const controls = `<div class="hc-controls">`
     + (step.kind === "rest" ? `<button type="button" class="hc-btn" data-hc="less" aria-label="15 seconds less rest">−15</button>` : "")
-    + `<button type="button" class="hc-btn" data-hc="pause">${t.paused ? "▶ Resume" : "❚❚ Pause"}</button>`
-    + `<button type="button" class="hc-btn" data-hc="skip">${skipLabel} ⏭</button>`
+    + `<button type="button" class="hc-btn" data-hc="pause">${t.paused ? icon("play") + "Resume" : icon("pause") + "Pause"}</button>`
+    + `<button type="button" class="hc-btn" data-hc="skip">${skipLabel}${icon("next")}</button>`
     + (step.kind === "rest" ? `<button type="button" class="hc-btn" data-hc="more" aria-label="15 seconds more rest">+15</button>` : "")
     + `</div>`;
-  el.className = `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`;
-  el.setAttribute("aria-label", `${phase}, ${left} seconds, ${line}`);
-  el.innerHTML = `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${line}</div><div class="hc-dots">${dots}</div>${controls}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`;
+  paintClock(el, `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`, `${phase}, ${left} seconds, ${line}`, `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${line}</div><div class="hc-dots">${dots}</div>${controls}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`);
 }
 
 // Sound needs a tap to start on phones; the Start tap creates the context, later beeps reuse it.
