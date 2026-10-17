@@ -256,9 +256,11 @@
   .rest-timer-badge.running{background:var(--amber);}
   .rest-timer-badge.done{background:var(--danger);}
   /* Hold timer: the top half of the screen while timed holds run. Colors by phase. */
-  .hold-action-btn{background:var(--emerald);border:1.5px solid var(--emerald);color:var(--card);font-weight:700;border-radius:7px;cursor:pointer;}
-  .hold-action-btn .btn-icon{stroke-width:2;}
-  .action-row .hold-action-btn{height:var(--input-h);width:100%;margin:0;padding:0 0.3rem;display:flex;align-items:center;justify-content:center;font-size:0.8rem;white-space:nowrap;}
+  /* The timer button: a small clock above Last (or beside the name, before any history). */
+  .timer-btn{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:1.85rem;height:1.85rem;margin:-0.25rem 0;padding:0;background:none;border:1.5px solid var(--emerald);color:var(--emerald);border-radius:50%;cursor:pointer;}
+  .timer-btn .btn-icon{width:1.05rem;height:1.05rem;margin:0;stroke-width:2;}
+  .card-head-side .timer-btn{margin:-0.3rem 0 -0.1rem;}
+  .ex-title-row .timer-btn{align-self:center;}
   .hold-clock{--phase:var(--slate);position:fixed;inset:0 0 auto 0;height:calc(30vh + env(safe-area-inset-top, 0px));min-height:calc(15.5rem + env(safe-area-inset-top, 0px));padding-top:env(safe-area-inset-top, 0px);z-index:70;
     background:var(--pine);color:var(--header-text);border-bottom:5px solid var(--phase);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.15rem;
     font-family:var(--font-body);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 6px 24px rgba(0,0,0,0.35);}
@@ -279,6 +281,14 @@
   .hc-btn{background:rgba(255,255,255,0.08);border:1.5px solid rgba(241,239,231,0.55);color:inherit;border-radius:999px;padding:0.4rem 0.8rem;font:inherit;font-size:0.85rem;font-weight:700;line-height:1;cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums;}
   .hold-clock.paused .hc-time{opacity:0.55;}
   .hold-clock.compact .hc-controls{display:none;}
+  /* Set by set: the reps in place of a clock, and a filled Done button. */
+  .hold-clock.set{--phase:var(--amber-light);}
+  .hc-reps small{font-size:0.32em;font-weight:600;opacity:0.8;margin-left:0.15em;}
+  .hc-btn.hc-done{background:var(--emerald);border-color:var(--emerald);color:#fff;padding:0.6rem 1.4rem;font-size:1rem;}
+  .hold-clock.compact.set .hc-controls{display:flex;margin:0 0 0 auto;}
+  .hold-clock.compact.set .hc-btn.hc-done{padding:0.35rem 0.8rem;font-size:0.85rem;}
+  .hold-clock.compact .hc-reps small, .hold-clock.compact.set .hc-set{display:none;}
+  .hold-clock.compact .hc-phase{white-space:nowrap;}
   .hold-clock:not(.compact){padding-bottom:1.6rem;} /* keeps the hint clear of the shrink handle */
   .hc-stop.armed{opacity:1;color:var(--phase);font-weight:700;}
   .hold-clock[hidden]{display:none;}

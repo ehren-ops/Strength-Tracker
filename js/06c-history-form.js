@@ -193,20 +193,11 @@ const HOLD_ICON = `<svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true">
 const DELOAD_NOTE = "Deload";
 function renderForm(name, ex){
   let html = "";
-  // Timed lifts get the hold timer in the rest button's place, from the very first session.
-  const holdBtn = isHoldLift(ex) ? (() => {
-    const p = holdPlanFor(name, ex);
-    return `<button type="button" class="hold-action-btn" onclick="startHoldTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start hold timer, ${p.sets} holds of ${p.secs} seconds">${HOLD_ICON}<span class="hold-btn-label">${p.sets}x${p.secs}</span></button>`;
-  })() : "";
-  const spacer = `<button type="button" class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;
-  if(!ex.entries.length && holdBtn) html += `<div class="action-row">${spacer}${spacer}${holdBtn}</div>`;
   if(ex.entries.length){
     html += `<div class="action-row">`;
     html += `<button type="button" class="tool-btn" onclick="repeatLast('${name.replace(/'/g,"\\'")}')">↻ ${isRecovery(name) ? "Repeat last" : "Repeat set"}</button>`;
     html += renderProgressionToggle(name, ex);
-    if(holdBtn){
-      html += holdBtn;
-    } else if(ex.trackBy !== "duration"){
+    if(ex.trackBy !== "duration"){
       html += `<button type="button" class="rest-action-btn" onclick="startRestTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start rest timer, ${restTimeFor(ex)}">${STOPWATCH_ICON}${restTimeFor(ex)}</button>`;
     } else {
       html += `<button type="button" class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;

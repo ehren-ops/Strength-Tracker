@@ -361,6 +361,7 @@ function renderExerciseCard(name, ex){
   }
 
   let html = `<div class="card${mods.filter(m => m.key !== "deload").map(m => ` ${m.key}-mode`).join("")}">`;
+  const timerBtn = timerButtonFor(name, ex);
   let titleHtml;
   if(isCustom && deletingExercise === name){
     titleHtml = `<div class="ex-name-row">
@@ -371,7 +372,8 @@ function renderExerciseCard(name, ex){
       </span>
     </div>`;
   } else {
-    titleHtml = `<div class="ex-title-row"><h2 class="ex-name">${name}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2></div>`;
+    // Before any history the timer button rides in the title row; after, it heads the side column.
+    titleHtml = `<div class="ex-title-row"><h2 class="ex-name">${name}${isCustom ? `<button class="icon-btn" onclick="startDeleteExercise('${name.replace(/'/g,"\\'")}')" aria-label="Delete exercise" style="float:right;font-size:1rem;">✕</button>` : ''}</h2>${hasEntries ? "" : timerBtn}</div>`;
   }
   if(!hasEntries){
     html += titleHtml + badgeHtml + modHtml;
@@ -400,7 +402,7 @@ function renderExerciseCard(name, ex){
           </div>
         </div>
       </div>
-      <div class="card-head-side">${priorHtml}${topRightSlot(name, ex, work, todayLog || suggestion || work, isCustom)}${badgeHtml}</div>
+      <div class="card-head-side">${timerBtn}${priorHtml}${topRightSlot(name, ex, work, todayLog || suggestion || work, isCustom)}${badgeHtml}</div>
     </div>`;
     html += modHtml;
 

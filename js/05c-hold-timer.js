@@ -1,4 +1,5 @@
-// Hold timer for timed lifts (Dead Hang, Side Plank, Wall Sit, Farmer's Carry): the top 30% of the
+// Hold timer for timed lifts (Dead Hang, Side Plank, Wall Sit, Farmer's Carry), and set by set for
+// every lift done for reps (Done after each set, then the rest). The top 30% of the
 // screen turns into a big clock; swipe it up (or tap the handle) for a slim bar that keeps running.
 // When it ends or is stopped, a tap or the close button clears it. A 5 second count-in, the hold counting down, then the lift's
 // shortest suggested rest, for every set on its own. Lifts done per side hold each side in turn
@@ -26,6 +27,29 @@ function saveRestPref(name, sec){
 }
 
 function isHoldLift(ex){ return !!ex && ex.unit === "sec" && ex.trackBy !== "duration" && ex.trackBy !== "checklist"; }
+// Lifts done for reps run set by set instead: tap Done after each set, the rest counts down, then the
+// next set. No count-in; the end of the rest is the cue.
+function isSetLift(name, ex){
+  return !!ex && !isHoldLift(ex) && (ex.trackBy === "weight" || ex.trackBy === "reps") && !isRecovery(name) && name !== REHAB_NAME;
+}
+function setPlanFor(name, ex, fromForm){
+  const plan = ex.entries.length ? computeSuggestion(ex, name) : null;
+  const field = id => fromForm ? Number((document.getElementById(id) || {}).value) : 0;
+  const sets = Math.max(1, Math.min(10, field("f-sets") || (plan && plan.sets) || 3));
+  const reps = Math.max(1, field("f-reps") || (plan && plan.reps) || effectiveTargetReps(ex) || 8);
+  const weight = ex.trackBy === "weight" ? field("f-weight") || (plan && plan.weight) || 0 : 0;
+  return { sets, reps, weight };
+}
+// The clock button at the top right of a card: holds for timed lifts, set by set for the rest. Just
+// the icon, so it never crowds the name; its hidden label is what the clock will run.
+function timerButtonFor(name, ex){
+  const mode = isHoldLift(ex) ? "holds" : isSetLift(name, ex) ? "sets" : null;
+  if(!mode) return "";
+  const p = mode === "holds" ? holdPlanFor(name, ex) : setPlanFor(name, ex);
+  const amount = mode === "holds" ? p.secs : p.reps;
+  const what = mode === "holds" ? `${p.sets} holds of ${p.secs} seconds` : `${p.sets} sets of ${p.reps}`;
+  return `<button type="button" class="timer-btn" onclick="startHoldTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start the timer, ${what}">${HOLD_ICON}<span class="hold-btn-label sr-only">${p.sets}x${amount}</span></button>`;
+}
 
 // The plan on the button: the next progression, else three holds at the target. Starting the clock
 // reads the form instead (fromForm), so an edited sets or seconds field wins.
@@ -41,12 +65,16 @@ function holdPlanFor(name, ex, fromForm){
 // The button shows what the clock will run: the form's sets and seconds as they stand, prefilled or
 // edited. Called after every render and on every change to those two fields.
 function syncHoldButton(){
-  const btn = document.querySelector(".hold-action-btn");
-  if(!btn || !selected || !isHoldLift(data[selected])) return;
-  const { sets, secs } = holdPlanFor(selected, data[selected], true);
+  const btn = document.querySelector(".timer-btn");
+  const ex = selected && data[selected];
+  if(!btn || !ex) return;
+  const hold = isHoldLift(ex);
+  if(!hold && !isSetLift(selected, ex)) return;
+  const p = hold ? holdPlanFor(selected, ex, true) : setPlanFor(selected, ex, true);
+  const amount = hold ? p.secs : p.reps;
   const label = btn.querySelector(".hold-btn-label");
-  if(label) label.textContent = `${sets}x${secs}`;
-  btn.setAttribute("aria-label", `Start hold timer, ${sets} holds of ${secs} seconds`);
+  if(label) label.textContent = `${p.sets}x${amount}`;
+  btn.setAttribute("aria-label", `Start the timer, ${hold ? `${p.sets} holds of ${p.secs} seconds` : `${p.sets} sets of ${p.reps}`}`);
 }
 
 // Ready, hold (each side), rest; the next count-in comes out of the rest so the gap is the rest.
@@ -62,17 +90,41 @@ function holdSteps(sets, secs, rest, sides){
   return steps;
 }
 
+// Set by set: each set waits for Done, with the lift's rest between.
+function setSteps(sets, rest){
+  const steps = [];
+  for(let s = 1; s <= sets; s++){
+    steps.push({ kind: "set", secs: Infinity, set: s });
+    if(s < sets) steps.push({ kind: "rest", secs: rest, set: s });
+  }
+  return steps;
+}
+function restStepSecs(t){ return t.mode === "sets" ? t.rest : Math.max(5, t.rest - HOLD_COUNT_IN); }
+
 function startHoldTimer(name){
   const ex = data[name];
-  if(!isHoldLift(ex)) return;
+  if(!isHoldLift(ex)){ if(isSetLift(name, ex)) startSetTimer(name); return; }
   stopHoldTimer(true);
   clearRestTimer();
   const { sets, secs } = holdPlanFor(name, ex, true);
   const sides = sidesOf(name).reps === "side" ? ["Left side", "Right side"] : sidesOf(name).reps === "leg" ? ["Left leg", "Right leg"] : [null];
   const rest = restPrefFor(name, ex);
   const steps = holdSteps(sets, secs, rest, sides);
-  holdTimer = { name, sets, secs, rest, sides: sides.length, steps, idx: 0, endAt: Date.now() + steps[0].secs * 1000, paused: null,
+  holdTimer = { mode: "holds", name, sets, secs, rest, sides: sides.length, steps, idx: 0, endAt: Date.now() + steps[0].secs * 1000, paused: null,
     held: [], lastTap: 0, beeped: {}, intervalId: setInterval(tickHoldTimer, 200), wake: null };
+  beginHoldTimer();
+}
+function startSetTimer(name){
+  const ex = data[name];
+  stopHoldTimer(true);
+  clearRestTimer();
+  const { sets, reps, weight } = setPlanFor(name, ex, true);
+  const rest = restPrefFor(name, ex);
+  holdTimer = { mode: "sets", name, sets, reps, weight, rest, sides: 1, steps: setSteps(sets, rest), idx: 0, endAt: Infinity, paused: null,
+    held: [], lastTap: 0, beeped: {}, intervalId: setInterval(tickHoldTimer, 200), wake: null };
+  beginHoldTimer();
+}
+function beginHoldTimer(){
   holdAudio(); // unlocked by this tap, so later beeps can play
   try{ if(navigator.wakeLock) navigator.wakeLock.request("screen").then(w => { if(holdTimer) holdTimer.wake = w; else w.release(); }).catch(() => {}); }catch(e){}
   holdBuzz(80);
@@ -88,7 +140,7 @@ function nextHoldStep(t, from){
   if(t.idx >= t.steps.length){ finishHoldTimer(false); return false; }
   const next = t.steps[t.idx];
   t.endAt = from + next.secs * 1000;
-  if(next.kind === "hold"){ holdBeep(880, 250); holdBuzz(200); }
+  if(next.kind === "hold" || next.kind === "set"){ holdBeep(880, 250); holdBuzz(200); }
   else if(next.kind === "rest"){ holdBeep(520, 400); holdBuzz([200, 100, 200]); recordRestTap(t.name); }
   return true;
 }
@@ -127,7 +179,7 @@ function toggleHoldPause(){
 }
 
 // Skip: a hold or count-in ends now (the seconds held so far count), a rest jumps to the next set's
-// count-in.
+// count-in (or straight to the next set, set by set). On a set it is Done: the set counts in full.
 function skipHoldStep(){
   const t = holdTimer;
   if(!t || t.finished) return;
@@ -136,6 +188,7 @@ function skipHoldStep(){
     const heldSec = Math.floor(step.secs - holdLeftMs(t) / 1000);
     if(heldSec > 0) recordHold(step.set, heldSec);
   }
+  if(step.kind === "set") recordHold(step.set, t.reps);
   t.paused = null;
   t.lastTap = 0;
   if(nextHoldStep(t, Date.now())) renderHoldClock();
@@ -151,8 +204,8 @@ function adjustHoldRest(delta){
   if(!applied) return;
   if(t.paused) t.paused.left = newLeft; else t.endAt += applied * 1000;
   step.secs += applied;
-  t.rest = Math.max(HOLD_COUNT_IN + 5, t.rest + applied);
-  t.steps.forEach((s, i) => { if(i > t.idx && s.kind === "rest") s.secs = Math.max(5, t.rest - HOLD_COUNT_IN); });
+  t.rest = Math.max(t.mode === "sets" ? 15 : HOLD_COUNT_IN + 5, t.rest + applied);
+  t.steps.forEach((s, i) => { if(i > t.idx && s.kind === "rest") s.secs = restStepSecs(t); });
   saveRestPref(t.name, t.rest);
   renderHoldClock();
 }
@@ -255,10 +308,19 @@ function renderHoldClock(){
     el.innerHTML = `<div class="hc-phase">${t.result.startsWith("Done") ? "Done" : "Stopped"}</div><div class="hc-time">${t.summary}</div><div class="hc-set">${t.result.replace(/^(Done|Stopped): ?/, "")}</div><div class="hc-dots">${dots}</div><div class="hc-stop">Tap to close</div><button type="button" class="hc-close" data-hc="close" aria-label="Close">✕</button>`;
     return;
   }
+  const armed = Date.now() - t.lastTap < HOLD_STOP_WINDOW;
+  const stopHint = `<div class="hc-stop${armed ? " armed" : ""}">${armed ? "Tap again to stop" : "Tap twice to stop"}</div>`;
+  if(step.kind === "set"){
+    // A set has no clock: the reps to do, the load, and Done.
+    const load = t.weight > 0 ? ` · ${t.weight} lb${weightSuffix(t.name)}` : "";
+    el.className = `hold-clock set${size}`;
+    el.setAttribute("aria-label", `Set ${step.set} of ${t.sets}, ${t.reps} reps`);
+    el.innerHTML = `<div class="hc-phase">Set ${step.set} of ${t.sets}</div><div class="hc-time hc-reps">${t.reps}<small> reps${repsSuffix(t.name)}</small></div><div class="hc-set">${t.name}${load}</div><div class="hc-dots">${dots}</div><div class="hc-controls"><button type="button" class="hc-btn hc-done" data-hc="skip">✓ Set done</button></div>${stopHint}${handle}`;
+    return;
+  }
   const left = Math.max(0, Math.ceil(holdLeftMs(t) / 1000));
   const phase = t.paused ? "Paused" : step.kind === "ready" ? (step.switching ? "Switch sides" : "Get ready") : step.kind === "hold" ? "Hold" : "Rest";
   const setLine = step.kind === "rest" ? `Next: set ${step.set + 1} of ${t.sets}` : `Set ${step.set} of ${t.sets}${step.side ? ` · ${step.side}` : ""}`;
-  const armed = Date.now() - t.lastTap < HOLD_STOP_WINDOW;
   const pct = Math.min(100, Math.max(0, 100 * (1 - holdLeftMs(t) / (step.secs * 1000))));
   const skipLabel = step.kind === "rest" ? "Next set" : step.kind === "hold" ? (t.idx >= t.steps.length - 1 ? "Finish" : "Rest") : "Start";
   const controls = `<div class="hc-controls">`
@@ -269,7 +331,7 @@ function renderHoldClock(){
     + `</div>`;
   el.className = `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`;
   el.setAttribute("aria-label", `${phase}, ${left} seconds, ${setLine}`);
-  el.innerHTML = `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${setLine}</div><div class="hc-dots">${dots}</div>${controls}<div class="hc-stop${armed ? " armed" : ""}">${armed ? "Tap again to stop" : "Tap twice to stop"}</div><div class="hc-bar" style="width:${pct}%"></div>${handle}`;
+  el.innerHTML = `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${setLine}</div><div class="hc-dots">${dots}</div>${controls}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`;
 }
 function toggleHoldCompact(){ holdCompact = !holdCompact; renderHoldClock(); }
 
