@@ -19,6 +19,7 @@ function render(){
   }
   lastRenderedView = view;
   fitGuidance();
+  syncHoldButton();
 }
 
 function renderTabs(){

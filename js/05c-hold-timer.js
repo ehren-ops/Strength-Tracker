@@ -25,6 +25,17 @@ function holdPlanFor(name, ex, fromForm){
   return { sets, secs };
 }
 
+// The button shows what the clock will run: the form's sets and seconds as they stand, prefilled or
+// edited. Called after every render and on every change to those two fields.
+function syncHoldButton(){
+  const btn = document.querySelector(".hold-action-btn");
+  if(!btn || !selected || !isHoldLift(data[selected])) return;
+  const { sets, secs } = holdPlanFor(selected, data[selected], true);
+  const label = btn.querySelector(".hold-btn-label");
+  if(label) label.textContent = `${sets}x${secs}`;
+  btn.setAttribute("aria-label", `Start hold timer, ${sets} holds of ${secs} seconds`);
+}
+
 // Ready, hold (each side), rest; the next count-in comes out of the rest so the gap is the rest.
 function holdSteps(sets, secs, rest, sides){
   const steps = [];
@@ -117,6 +128,7 @@ function finishHoldTimer(early){
     if(setsEl) setsEl.value = perSet.length;
     if(repsEl) repsEl.value = Math.min(...perSet);
     logFormDirty = true;
+    syncHoldButton();
   }
   if(!early){ holdBeep(880, 500); holdBuzz([300, 120, 300]); }
   t.summary = perSet.length ? `${perSet.length}x${Math.min(...perSet)}` : "--";

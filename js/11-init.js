@@ -22,7 +22,11 @@ document.addEventListener("visibilitychange", () => {
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitGuidance);
 
 // Typing in the log form holds off the background heart-rate refresh's re-render.
-document.addEventListener("input", e => { if(e.target && /^f-/.test(e.target.id || "")) logFormDirty = true; });
+document.addEventListener("input", e => {
+  if(!e.target || !/^f-/.test(e.target.id || "")) return;
+  logFormDirty = true;
+  if(e.target.id === "f-sets" || e.target.id === "f-reps") syncHoldButton();
+});
 
 function afterSignInSync(){ if(repairDeloadDates()) render(); ensureDeloadNotes(); ensureRehabNotes(); refreshHeartRate(); }
 

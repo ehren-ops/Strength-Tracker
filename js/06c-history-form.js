@@ -196,7 +196,7 @@ function renderForm(name, ex){
   // Timed lifts get the hold timer in the rest button's place, from the very first session.
   const holdBtn = isHoldLift(ex) ? (() => {
     const p = holdPlanFor(name, ex);
-    return `<button type="button" class="hold-action-btn" onclick="startHoldTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start hold timer, ${p.sets} holds of ${p.secs} seconds">${HOLD_ICON}${p.sets}x${p.secs}</button>`;
+    return `<button type="button" class="hold-action-btn" onclick="startHoldTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start hold timer, ${p.sets} holds of ${p.secs} seconds">${HOLD_ICON}<span class="hold-btn-label">${p.sets}x${p.secs}</span></button>`;
   })() : "";
   const spacer = `<button type="button" class="action-btn-spacer" tabindex="-1" aria-hidden="true">-</button>`;
   if(!ex.entries.length && holdBtn) html += `<div class="action-row">${spacer}${spacer}${holdBtn}</div>`;
@@ -405,6 +405,7 @@ function repeatLast(name){
     if(s) s.value = last.sets;
     if(r) r.value = last.reps;
   }
+  syncHoldButton();
   const d = document.getElementById("f-difficulty");
   if(d && last.difficulty) d.value = last.difficulty;
 }
