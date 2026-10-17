@@ -10,7 +10,9 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - Every release bumps the version (see Releasing), passes the full suite, and gets a 360px
   screenshot check (light and dark) before pushing to `main`.
 - Weights are "lb" everywhere (never "lbs"). Short, plain coaching language.
-- No emoji in the UI: outline icons only, via `icon(key)` (04, `ICON_PATHS`). Scenario 100 checks.
+- No emoji in the UI, with one exception: the training modifiers keep their emoji (`emoji` in
+  `MODE_DEFS`, on their pills and Overview rows). Everything else uses outline icons via `icon(key)`
+  (04, `ICON_PATHS`). Scenario 100 checks.
 - No disclaimers or safety warnings anywhere ("not a substitute for a PT or doctor", "get it checked",
   "not medical advice"), in the app or the coach prompt. They are clutter; say what to change instead.
 - Leave destructive Supabase actions (drops, deletes) to the owner.
@@ -30,6 +32,7 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 | `js/06-day-view.js` | Render: tabs, pill rows, Mobility and checklist cards, the exercise card (`.card-head`: the name row with the clock and its plan text, then a grid pairing today's weight with Last and its label with the record; a modifier's pill leads its own note line, pills with no note sit in a strip; then the Next tile and chart) |
 | `js/06b-next-tile.js` | The Next tile's words: `planModifiers`, the call, and the guidance sentence pool |
 | `js/06c-history-form.js` | Recent History rows, edit/delete/skip, the log form (per-set reps, joint check) |
+| `js/06d-library.js` | Exercise library from the "+" on a day's pill row: every strength lift grouped by movement (`LIFT_PATTERNS`), search, equipment, home day, last done; picks join today's row only (`dayPicks`, this phone), "Keep on this day" makes them stay (`keptLifts`, synced in `user_settings.settings.kept`); never counted toward finishing a day |
 | `js/07-charts.js` | SVG chart, `MODIFIER_TAGS` (light = diamond, block = circle), note tag helpers |
 | `js/08-calendar-notes.js` | Calendar, `guessDayForNames`, due lifts (`dueLifts`), rule-based Coach's Notes |
 | `js/09-coach.js` | AI coach: cached analyses, payloads (`buildSessionCoachPayload`/`buildWeeklyCoachPayload`), trends, heart rate, panels |
@@ -44,7 +47,7 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 ## Patterns to follow
 - A new entry field needs: `entryToRow` and `rowToEntry` in 01, a migration adding the column, and
   the mock needs nothing (it is generic).
-- A new modifier is one row in `MODE_DEFS` (03): name, icon (a key in `ICON_PATHS`, 04), badge, tag (kind light or block),
+- A new modifier is one row in `MODE_DEFS` (03): name, emoji, badge, tag (kind light or block),
   `applies` / `changesNumbers` rules and the Overview text, plus a `--<key>` color token in both
   themes and its `.<key>-badge` style; scenario 88 checks the row. No schema change: settings sync
   through `user_settings.settings` (JSON). The old per-mode columns are legacy; leave them be.
@@ -81,6 +84,10 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   then an `extra` step ("Ready") counts up to the max before the next set starts on its own. Routine
   doses are parsed by `parseDose`; keep new checklist doses in the same shapes ("45 sec each side",
   "10 reps", "3 × 12-15, 3-5 lb").
+- A lift added from the library (`addedLifts(day)`) sits after the day's numbered lifts and custom
+  exercises, before the finishers: dashed for today only, solid once kept. Its card says so in the
+  tips (`addedLiftTip`). New lifts for the library want a `LIFT_PATTERNS` group (09) and a
+  `LIBRARY_EQUIPMENT` line (06d). On Extra the "+" still adds a custom exercise by name.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double

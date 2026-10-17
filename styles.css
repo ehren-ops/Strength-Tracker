@@ -109,6 +109,10 @@
   .group-row{display:flex;gap:0.3rem;margin-bottom:0.5rem;}
   /* Finishers: optional core and grip work after the numbered lifts, in the core color. */
   .pill.finisher-pill{background:var(--cat-core-bg);border-color:var(--cat-core-border);color:var(--cat-core-text);}
+  /* Added from the library: dashed for today only, solid once kept on the day. */
+  .pill.added-pill:not(.active){border-style:dashed;}
+  .pill.added-pill.kept:not(.active){border-style:solid;}
+  .ex-tips .added-tip b{color:var(--amber);}
   .pill.finisher-pill.active{background:var(--cat-core);border-color:var(--cat-core);color:#fff;}
   .ex-tips .finisher-tip b{color:var(--cat-core-text);}
   .range-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0.25rem;margin:0 0 0.4rem;}
@@ -437,7 +441,6 @@
   /* A modifier's pill leads its own note line. */
   .care-line > span[class$="-badge"], .ski-tempo-line > span[class$="-badge"], .preseason-line > span[class$="-badge"]{margin:0 0.4rem 0 0;vertical-align:1px;}
   .ic{width:1em;height:1em;vertical-align:-0.14em;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto;}
-  [class$="-badge"] .ic{margin-right:0.3em;}
   .mod-title .ic, h3.section .ic, .tool-btn .ic, .sync-status .ic{margin-right:0.15em;}
   .btn-icon{width:0.95em;height:0.95em;margin-right:0.3em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;}
   .ski-badge, .knee-badge, .back-badge, .preseason-badge, .deload-badge{display:inline-block;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:0.5rem;vertical-align:middle;letter-spacing:0.02em;}
@@ -528,3 +531,22 @@
   :root[data-theme="dark"] .pill.cat-recovery.active{color:#050308;}
 /* Unclamped while fitGuidance() measures how many sentences fill two lines. */
 .rec-desc.fitting{display:block;height:auto;max-height:none;-webkit-line-clamp:unset;overflow:visible;}
+
+/* Exercise library: a full-screen list from the "+" pill. */
+.library{position:fixed;inset:0;z-index:75;background:var(--stone);color:var(--ink);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top, 0px) + 0.8rem) 1rem calc(env(safe-area-inset-bottom, 0px) + 0.8rem);box-sizing:border-box;}
+.library[hidden]{display:none;}
+body.library-open{overflow:hidden;}
+.lib-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 0.6rem;}
+.lib-head .ex-name{margin:0;}
+.lib-close{background:none;border:none;color:var(--slate);font-size:1.3rem;padding:0.3rem 0.5rem;cursor:pointer;}
+.lib-search{font:inherit;font-size:1rem;width:100%;box-sizing:border-box;padding:0.6rem 0.75rem;border:1px solid var(--line);border-radius:10px;background:var(--input-bg);color:var(--ink);margin:0 0 0.4rem;}
+.lib-list{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:0 -0.25rem;padding:0 0.25rem;}
+.lib-group[hidden], .lib-row[hidden]{display:none;}
+.lib-group h3.section{margin:0.9rem 0 0.25rem;}
+.lib-row{display:flex;flex-direction:column;align-items:flex-start;gap:0.1rem;width:100%;text-align:left;background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:0.55rem 0.75rem;margin:0 0 0.35rem;font:inherit;color:inherit;cursor:pointer;}
+.lib-row.on-row{border-color:var(--amber-light);}
+.lib-name{font-size:0.92rem;font-weight:600;}
+.lib-meta{font-size:0.7rem;color:var(--slate);}
+.lib-empty{font-size:0.8rem;color:var(--slate);margin:1rem 0;}
+.lib-custom{display:flex;gap:0.5rem;padding-top:0.6rem;border-top:1px solid var(--hairline);margin-top:0.4rem;}
+.lib-custom input{flex:1 1 auto;min-width:0;font:inherit;padding:0.5rem 0.65rem;border:1px solid var(--line);border-radius:8px;background:var(--input-bg);color:var(--ink);}

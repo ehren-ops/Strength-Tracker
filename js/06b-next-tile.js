@@ -240,6 +240,7 @@ function renderTips(name){
   const t = EXERCISE_TIPS[name];
   const fin = programDays().includes(view) && finishersFor(view).includes(name)
     ? `<div class="finisher-tip"><b>Finisher</b> Optional, after the numbered lifts. Doesn't count toward finishing the day.</div>` : "";
-  if(!t && !fin) return "";
-  return `<div class="ex-tips">${t ? `<div><b>Form</b> ${t[0]}</div><div><b>Swap</b> ${t[1]}</div>` : ""}${fin}</div>`;
+  const add = addedLiftTip(name);
+  if(!t && !fin && !add) return "";
+  return `<div class="ex-tips">${t ? `<div><b>Form</b> ${t[0]}</div><div><b>Swap</b> ${t[1]}</div>` : ""}${fin}${add}</div>`;
 }

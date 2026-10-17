@@ -36,7 +36,7 @@ function showDeloadEndedModal(){
   const el = document.getElementById("deload-modal");
   if(!el) return;
   el.innerHTML = `<div class="app-modal-card">
-    <h3 class="section" style="color:var(--deload-text);">${icon("deload")} Deload week complete</h3>
+    <h3 class="section" style="color:var(--deload-text);">🔋 Deload week complete</h3>
     <p style="font-size:0.85rem;line-height:1.5;margin:0 0 0.8rem;">A week is up, so Deload Week is now off and suggestions pick back up from your pre-deload weights.</p>
     <div style="display:flex;gap:0.5rem;justify-content:flex-end;flex-wrap:wrap;">
       <button class="tool-btn" onclick="keepDeloadOn()">Keep it on another week</button>
@@ -95,7 +95,7 @@ function renderSkiModifier(){
     : phase === "season" ? `In season${start ? ` since ${fmtShortDate(start)}` : ""}.`
     : skiPhase.endedOn ? `Last block ended ${fmtShortDate(skiPhase.endedOn)}.` : "Off.";
   return `<div class="mod-row">
-      <div class="mod-head"><span class="mod-title">${icon("ski")} Ski</span>
+      <div class="mod-head"><span class="mod-title">🎿 Ski</span>
         <div class="seg" role="group" aria-label="Ski phase">${SKI_PHASES.map(([k, label]) =>
           `<button class="seg-btn ${k}${k === phase ? " on" : ""}" aria-pressed="${k === phase}" onclick="userSetSkiPhase('${k}')">${label}</button>`).join("")}</div>
       </div>
@@ -122,7 +122,7 @@ function checkSkiPhasePrompt(){
     later = 14;
   } else return;
   el.innerHTML = `<div class="app-modal-card">
-    <h3 class="section" style="color:var(--ski-text);">${icon("ski")} Ski</h3>
+    <h3 class="section" style="color:var(--ski-text);">🎿 Ski</h3>
     <p style="font-size:0.85rem;line-height:1.5;margin:0 0 0.8rem;">${body}</p>
     <div style="display:flex;gap:0.5rem;justify-content:flex-end;flex-wrap:wrap;">
       <button class="tool-btn" onclick="snoozeSkiPrompt(${later})">Not yet</button>${yes}
@@ -158,10 +158,10 @@ function collapsibleHead(key, title, summary){
 // One modifier: a title row with its on/off switch, then a short description.
 // The hidden label keeps "Name: ON/OFF" readable for screen readers.
 function renderModifierRow(key, extraHtml){
-  const { icon: ic, name, desc } = MODE_DEFS.find(m => m.key === key), on = !!modes[key];
+  const { emoji, name, desc } = MODE_DEFS.find(m => m.key === key), on = !!modes[key];
   return `<div class="mod-row">
       <div class="mod-head">
-        <span class="mod-title">${icon(ic)} ${name}</span>
+        <span class="mod-title">${emoji} ${name}</span>
         <button class="theme-toggle mod-switch${on ? " on" : ""}" style="--mod-color:var(--${key})" onclick="userToggleMode('${key}')" aria-pressed="${on}" aria-label="${name}"><span class="knob"></span><span class="sr-only">${name}: ${on ? "ON" : "OFF"}</span></button>
       </div>
       <p class="mod-desc">${desc}</p>

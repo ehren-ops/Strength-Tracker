@@ -104,7 +104,7 @@ function renderDay(day){
   if(modes.shoulder && ["upper", "full", "a", "b"].includes(day)) bridge.push(PUSHUP_NAME);
   if(modes.knee && ["lower", "full", "a", "b"].includes(day)) bridge.push(...KNEE_ONLY);
   const finishers = day === "extra" ? [] : finishersFor(day);
-  let list;
+  let list, added = [];
   let groupRow = "";
   if(day === "extra"){
     // A routine opened directly (from history or the calendar) opens inside the Mobility card.
@@ -116,7 +116,9 @@ function renderDay(day){
     groupRow = `<div class="group-row">${EXTRA_GROUPS.map(g => `<button type="button" class="group-chip${g.key === extraGroup ? " active" : ""}" onclick="selectExtraGroup('${g.key}')" aria-pressed="${g.key === extraGroup}">${g.label}${g.key === "mobility" && isLoggedToday(MOBILITY_NAME) ? " ✓" : ""}</button>`).join("")}</div>`;
     list = lead.concat(extraList(extraGroup));
   } else {
-    list = lead.concat(getDisplayOrder(day), bridge.filter(n => !getDisplayOrder(day).includes(n)), customExercises, finishers);
+    const base = lead.concat(getDisplayOrder(day), bridge.filter(n => !getDisplayOrder(day).includes(n)), customExercises);
+    added = addedLifts(day).filter(n => !base.includes(n) && !finishers.includes(n));
+    list = base.concat(added, finishers);
   }
   if(selected === REHAB_NAME && !modes.shoulder) selected = activeDayOrder(day)[0];
 
@@ -137,6 +139,7 @@ function renderDay(day){
     if(day !== "extra" && KNEE_ONLY.has(name)) pillClasses.push('knee-pill');
     if(name === MOBILITY_NAME) pillClasses.push('cat-stretch');
     if(finishers.includes(name)) pillClasses.push('finisher-pill');
+    if(added.includes(name)) pillClasses.push(isKept(day, name) ? 'added-pill kept' : 'added-pill');
     if(day === "extra" && EXTRA_CATEGORY[name]) pillClasses.push('cat-' + EXTRA_CATEGORY[name]);
     if(selected===name) pillClasses.push('active');
     const skipped = !loggedToday && skipReason(name);
@@ -149,19 +152,19 @@ function renderDay(day){
       : due[name] && !loggedToday ? ` title="Due: missed its last ${due[name].missedSessions} sessions"` : '';
     html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')"${title}>${(day !== "extra" && n >= 0 && n < activeDayOrder(day).length) ? (n+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
   });
-  html += `<div class="pill pill-add" onclick="toggleAddExercise()">+</div></div>`;
+  html += `<div class="pill pill-add" onclick="${day === "extra" ? "toggleAddExercise()" : "openLibrary()"}" aria-label="${day === "extra" ? "Add an exercise" : "Exercise library"}">+</div></div>`;
   html += `<div id="add-ex-row" style="display:none" class="add-ex-row">
     <input id="new-ex-name" placeholder="Exercise name">
     <button onclick="addExercise()">Add</button>
   </div>`;
 
-  if(DAY_ORDER[day].includes(selected) && !activeDayOrder(day).includes(selected)) selected = activeDayOrder(day)[0];
+  if(DAY_ORDER[day].includes(selected) && !activeDayOrder(day).includes(selected) && !added.includes(selected)) selected = activeDayOrder(day)[0];
   if(selected === MOBILITY_NAME){
     app.innerHTML = html + renderMobilityCard();
     return;
   }
   let ex = selected === REHAB_NAME && modes.shoulder ? ensureRehabExercise() : data[selected];
-  if(!ex && (DAY_ORDER[day].includes(selected) || bridge.includes(selected) || finishers.includes(selected))){
+  if(!ex && (DAY_ORDER[day].includes(selected) || bridge.includes(selected) || finishers.includes(selected) || added.includes(selected))){
     ex = data[selected] = newExerciseShell(selected);
     persist();
     enqueueOp({ id: genId(), type: "upsert_exercise", payload: { name: selected } });
@@ -332,7 +335,7 @@ function renderExerciseCard(name, ex){
   // pill and what it changes read together. Badges with no note on this lift (Deload) sit in a strip
   // above the notes.
   const usedBadges = new Set();
-  const badgeOf = m => `<span class="${m.key}-badge">${icon(m.icon)}${typeof m.badge === "function" ? m.badge(name) : m.badge}</span>`;
+  const badgeOf = m => `<span class="${m.key}-badge">${m.emoji} ${typeof m.badge === "function" ? m.badge(name) : m.badge}</span>`;
   const pill = key => { const m = mods.find(x => x.key === key); if(!m || usedBadges.has(key)) return ""; usedBadges.add(key); return badgeOf(m); };
   let modHtml = "";
   if(kneeActive && KNEE_CARE_TIP[name]){

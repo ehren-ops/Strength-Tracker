@@ -293,7 +293,7 @@ async function runOp(op){
     const { error } = await supabaseClient.from("user_settings").upsert({
       user_id: userId,
       // The JSON field is the source of truth; the per-mode columns are kept for older app versions.
-      settings: { modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), deload: deloadRecord, shoulderRehab: rehabRecord, ski: skiPhase, program: { key: program.key, startedOn: program.startedOn || null, history: program.history || [] }, rest: restPrefs },
+      settings: { modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), deload: deloadRecord, shoulderRehab: rehabRecord, ski: skiPhase, program: { key: program.key, startedOn: program.startedOn || null, history: program.history || [] }, rest: typeof restPrefs !== "undefined" ? restPrefs : {}, kept: typeof keptLifts !== "undefined" ? keptLifts : {} },
       ...Object.fromEntries(MODE_DEFS.filter(m => m.column).map(m => [m.column, modes[m.key]])),
       deload_started_on: deloadDates.startedOn || null,
       deload_ended_on: deloadDates.endedOn || null,
@@ -491,6 +491,11 @@ async function pullRemoteAndMerge(){
   if(saved.program && PROGRAMS[saved.program.key] && !program.startedOn && saved.program.key !== program.key){
     program = { key: saved.program.key, startedOn: saved.program.startedOn || null, history: saved.program.history || [] };
     saveProgram();
+  }
+  // Lifts kept on a day elsewhere: adopted when this device has kept none.
+  if(saved.kept && typeof saved.kept === "object" && !Object.keys(keptLifts).length && Object.keys(saved.kept).length){
+    keptLifts = saved.kept;
+    saveKept();
   }
   // Rests set on the hold clock elsewhere fill in lifts this device has no rest for.
   if(saved.rest && typeof saved.rest === "object"){

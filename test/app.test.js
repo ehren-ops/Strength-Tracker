@@ -601,9 +601,9 @@ async function main(){
 
   console.log('--- verifying a custom-only exercise does NOT trigger the banner on an otherwise-incomplete day ---');
   await page.click('.tab:has-text("Upper Body")');
-  await page.click('.pill-add');
-  await page.fill('#new-ex-name', 'Lateral Raise');
-  await page.click('.add-ex-row button:has-text("Add")');
+  await page.click('.pill-add'); // the library; a custom name goes in at its bottom
+  await page.fill('#lib-new-name', 'Lateral Raise');
+  await page.click('.lib-custom button:has-text("Add")');
   await page.fill('#f-weight', '15');
   await page.fill('#f-sets', '3');
   await page.fill('#f-reps', '12');
@@ -1385,9 +1385,9 @@ async function main(){
   console.log('=== 54: a user-added custom exercise can be deleted, but a built-in exercise cannot ===');
   await page.click('.tab:has-text("Full Body")');
   if(await page.locator('button[aria-label="Delete exercise"]').count() !== 0) throw new Error('did not expect a delete control on a built-in exercise');
-  await page.click('.pill-add');
-  await page.fill('#new-ex-name', 'Cable Lateral Raise');
-  await page.click('.add-ex-row button:has-text("Add")');
+  await page.click('.pill-add'); // the library; a custom name goes in at its bottom
+  await page.fill('#lib-new-name', 'Cable Lateral Raise');
+  await page.click('.lib-custom button:has-text("Add")');
   await sleep(150);
   if(await page.locator('button[aria-label="Delete exercise"]').count() !== 1) throw new Error('expected a delete control on a newly-added custom exercise');
   await page.click('button[aria-label="Delete exercise"]');
@@ -1745,7 +1745,7 @@ async function main(){
   const modOrder = await page.evaluate(() => {
     const card = [...document.querySelectorAll('.card')].find(c => c.textContent.includes('Training Modifiers'));
     const t = card.textContent;
-    return { deload: t.indexOf('Deload Week'), ski: [...card.querySelectorAll('.mod-title')].findIndex(x => x.textContent.trim() === 'Ski') * 1000, status: document.getElementById('deload-status').textContent };
+    return { deload: t.indexOf('Deload Week'), ski: [...card.querySelectorAll('.mod-title')].findIndex(x => /Ski$/.test(x.textContent.trim())) * 1000, status: document.getElementById('deload-status').textContent };
   });
   if(modOrder.deload < 0 || modOrder.deload > modOrder.ski) throw new Error('expected Deload Week to be the first modifier, got: ' + JSON.stringify(modOrder));
   if(!/No deload logged yet/.test(modOrder.status) || !/Next recommended/.test(modOrder.status)) throw new Error('expected deload status to show no prior deload and a next recommended date, got: ' + modOrder.status);
@@ -1764,8 +1764,11 @@ async function main(){
   const kneeWasOn = await page.evaluate(() => modes.knee);
   if(!kneeWasOn) await page.evaluate(() => { toggleMode('knee'); });
   const careSug = await page.evaluate(() => {
+    const ph = plannedHeavy; plannedHeavy = () => false; // one track, whatever the weekday
     const normal = (() => { const m = modes.deload; modes.deload = false; const r = computeSuggestion(data['Squat'], 'Squat'); modes.deload = m; return r; })();
-    return { normal, deload: computeSuggestion(data['Squat'], 'Squat') };
+    const out = { normal, deload: computeSuggestion(data['Squat'], 'Squat') };
+    plannedHeavy = ph;
+    return out;
   });
   if(!careSug.normal.careFlags || !careSug.deload.deloadKeptReduction || careSug.deload.weight !== careSug.normal.weight) throw new Error('expected a knee-care lift to keep its care weight under deload instead of a second cut, got: ' + JSON.stringify(careSug));
   if(!kneeWasOn) await page.evaluate(() => { toggleMode('knee'); });
@@ -2768,7 +2771,7 @@ async function main(){
     const bad = [];
     const savedTheme = darkMode;
     MODE_DEFS.forEach(m => {
-      ['key', 'storageKey', 'name', 'short', 'icon', 'desc'].forEach(f => { if(!m[f]) bad.push(m.key + ' missing ' + f); });
+      ['key', 'storageKey', 'name', 'short', 'emoji', 'desc'].forEach(f => { if(!m[f]) bad.push(m.key + ' missing ' + f); });
       if(!m.badge) bad.push(m.key + ' missing badge');
       if(!m.tag || !['light', 'block'].includes(m.tag.kind) || !(m.tag.re instanceof RegExp) || !m.tag.re.test(m.tag.label)) bad.push(m.key + ' tag');
       if(typeof m.applies !== 'function' || typeof m.changesNumbers !== 'function') bad.push(m.key + ' rules');
@@ -3263,23 +3266,25 @@ async function main(){
     throw new Error('expected Mobility and Shoulder Rehab to play their moves and check them off, got: ' + JSON.stringify(r99));
   console.log('OK: Hip Stretch plays 45 sec a side with a switch, rep moves wait for Done, each move is checked off as it ends (5/5), a second play starts at the first unchecked move; Shoulder Rehab has a play button per group (12-15 reps, 3-5 lb, set 1 of 3, then a 30 sec rest)');
 
-  console.log('=== 100: no emoji anywhere: modifiers, Overview, sync status and the clock use outline icons ===');
+  console.log('=== 100: no emoji but the modifiers\' own: the sync status and the clock use outline icons, modifier pills keep their emoji ===');
   const r100 = await page.evaluate(() => {
     const saved = { view, selected, modes: { ...modes }, sr: JSON.stringify(shoulderRehab) };
     const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2B00}-\u{2BFF}\u{23E9}-\u{23FA}\u{FE0F}]/u;
     const found = [];
-    const scan = where => { const m = (document.body.innerText || '').match(emoji); if(m) found.push(where + ': ' + m[0]); };
+    // The modifiers keep their emoji (pills and Overview rows); nothing else may carry one.
+    const allowed = MODE_DEFS.map(m => m.emoji);
+    const scan = where => { let t = document.body.innerText || ''; allowed.forEach(e => { t = t.split(e).join(''); }); const m = t.match(emoji); if(m) found.push(where + ': ' + m[0]); };
     MODE_DEFS.forEach(m => setModeFlag(m.key, ['knee', 'back', 'deload'].includes(m.key)));
     ['full', 'upper', 'lower', 'extra', 'overview'].forEach(v => { view = v; selected = v === 'extra' || v === 'overview' ? selected : DAY_ORDER[v][0]; render(); scan(v); });
     view = 'full'; selected = 'Squat'; render();
     startHoldTimer('Squat'); scan('clock'); clearHoldTimer();
-    const icons = document.querySelectorAll('#app .card [class$="-badge"] svg.ic').length;
+    const icons = [...document.querySelectorAll('#app .card [class$="-badge"]')].filter(b => MODE_DEFS.some(m => b.textContent.startsWith(m.emoji))).length;
     MODE_DEFS.forEach(m => setModeFlag(m.key, !!saved.modes[m.key])); shoulderRehab = JSON.parse(saved.sr);
     view = saved.view; selected = saved.selected; render();
     return { found, icons };
   });
   if(r100.found.length || r100.icons < 2) throw new Error('expected outline icons and no emoji, got: ' + JSON.stringify(r100));
-  console.log('OK: no emoji on any day, Overview or the clock; modifier pills carry outline icons (' + r100.icons + ' on Squat)');
+  console.log('OK: no emoji on any day, Overview or the clock beyond the modifiers\' own; Squat\'s ' + r100.icons + ' modifier pills carry their emoji');
 
   console.log('=== 101: the label under the weight and the record share a baseline on every card ===');
   const r101 = await page.evaluate(() => {
@@ -3341,6 +3346,53 @@ async function main(){
   const want102 = { repair: [true, true, 4], flipBack: true, undoBar: 'In season onUndo', undone: ['preseason', true, true], kneeUndo: 'Knee Care onUndo', kneeBack: false, manual: [true, false, true], deload: [true, true, false, true], disclaimer: false };
   if(JSON.stringify(r102) !== JSON.stringify(want102)) throw new Error('expected ski and deload dates to hold up to stray taps, got: ' + JSON.stringify(r102));
   console.log('OK: a restamped preseason start goes back to its first logged session (week 4), Off then back on keeps it, Undo restores a phase or a modifier, hand-set ski and deload dates stay put, and care cards carry no disclaimer');
+
+  console.log('=== 103: the "+" opens the exercise library: search, pick for today, keep on the day, remove ===');
+  const r103 = await page.evaluate(() => {
+    const saved = { view, selected, picks: JSON.stringify(dayPicks), kept: JSON.stringify(keptLifts), modes: { ...modes } };
+    MODE_DEFS.forEach(m => setModeFlag(m.key, false));
+    keptLifts = {}; dayPicks = { date: todayISO(), byDay: {} };
+    view = 'full'; selected = 'Squat'; render();
+    const pills = () => [...document.querySelectorAll('#pill-scroll .pill:not(.pill-add)')].map(p => p.textContent.replace(/ ✓$/, ''));
+    const out = {};
+    document.querySelector('.pill-add').click();
+    const lib = document.getElementById('library');
+    out.groups = [...lib.querySelectorAll('.lib-group h3')].map(h => h.textContent);
+    out.noCardio = !lib.querySelector('[data-name="Zone 2 Ride"]') && !lib.querySelector('[data-name="Hip Stretch"]') && !lib.querySelector('[data-name="Sauna"]');
+    out.onRow = lib.querySelector('[data-name="Squat"]').classList.contains('on-row');
+    filterLibrary('thrust');
+    out.search = [...lib.querySelectorAll('.lib-row')].filter(r => !r.hidden).map(r => r.dataset.name);
+    lib.querySelector('[data-name="Hip Thrust"]').click();
+    out.picked = [lib.hidden, selected, pills().includes('Hip Thrust'), !!document.querySelector('.pill.added-pill.active'), /Today only/.test(document.querySelector('.added-tip').textContent)];
+    // It never counts toward finishing the day, and it is gone tomorrow.
+    out.notCore = !DAY_ORDER.full.includes('Hip Thrust');
+    keepLift('Hip Thrust');
+    out.kept = [JSON.stringify(keptLifts), /Kept on Full Body/.test(document.querySelector('.added-tip').textContent), !!document.querySelector('.pill.added-pill.kept')];
+    dayPicks.date = shiftISO(todayISO(), -1); // a new day: today's picks clear, the kept lift stays
+    render();
+    out.nextDay = pills().includes('Hip Thrust');
+    removeAddedLift('Hip Thrust');
+    out.removed = [pills().includes('Hip Thrust'), JSON.stringify(keptLifts), selected];
+    // A custom name from the bottom of the library.
+    document.querySelector('.pill-add').click();
+    document.getElementById('lib-new-name').value = 'Sled Push 103';
+    addCustomFromLibrary();
+    out.custom = [selected, data['Sled Push 103'] && data['Sled Push 103'].day, pills().includes('Sled Push 103')];
+    delete data['Sled Push 103']; persist();
+    // Extra keeps its own add row.
+    view = 'extra'; render();
+    out.extraPlus = document.querySelector('.pill-add').getAttribute('onclick');
+    dayPicks = JSON.parse(saved.picks); savePicks(); keptLifts = JSON.parse(saved.kept); saveKept();
+    MODE_DEFS.forEach(m => setModeFlag(m.key, !!saved.modes[m.key]));
+    closeLibrary(); view = saved.view; selected = saved.selected; render();
+    return out;
+  });
+  const ok103 = r103.groups[0] === 'Squat' && r103.groups.includes('Pull') && r103.groups.includes('Power') && r103.noCardio && r103.onRow
+    && JSON.stringify(r103.search) === '["Hip Thrust"]' && JSON.stringify(r103.picked) === '[true,"Hip Thrust",true,true,true]' && r103.notCore
+    && JSON.stringify(r103.kept) === '["{\\"full\\":[\\"Hip Thrust\\"]}",true,true]' && r103.nextDay && JSON.stringify(r103.removed) === '[false,"{}","Squat"]'
+    && JSON.stringify(r103.custom) === '["Sled Push 103","full",true]' && r103.extraPlus === 'toggleAddExercise()';
+  if(!ok103) throw new Error('expected the exercise library to search, pick, keep and remove, got: ' + JSON.stringify(r103));
+  console.log('OK: the "+" opens the library grouped by movement (no cardio or routines), search finds Hip Thrust, a pick joins Full Body for today (dashed, Today only), Keep makes it stay, Remove takes it off, a custom name adds from the bottom; Extra keeps its own add row');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
