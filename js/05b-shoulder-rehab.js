@@ -22,10 +22,10 @@ const SHOULDER_CARE_TIP = {
   "Bicep Curl": "Hammer curls only, both arms, light, lower over 3 seconds. Skip if the front of the left shoulder aches.",
   "Barbell Row": "85% of pre-rehab weight, palms-in grip (neutral handle, or single-arm DB rows), elbows ~45°, pull to the lower ribs, no shrug. Over 3 of 10: drop 10 lb.",
 };
-const SHOULDER_PAUSED_TIP = "Paused for Shoulder Rehab. Back once the side-raise press is pain-free.";
+const SHOULDER_PAUSED_TIP = "Back once the side-raise press is pain-free.";
 const SHOULDER_PAUSED_TIPS = {
-  "Cable Chest Fly": "Paused for Shoulder Rehab. " + RIGHT_PRESS_TIP,
-  "Incline DB Press": "Paused for Shoulder Rehab. " + RIGHT_PRESS_TIP,
+  "Cable Chest Fly": RIGHT_PRESS_TIP,
+  "Incline DB Press": RIGHT_PRESS_TIP,
   "Bicep Curl": "Left arm paused until week 3. Right arm: slow hammer curls, 3 × 10 light, can start now.",
 };
 const BENCH_PHASE3_TIP = "Phase 3: full-range bench is back. Add 5 lb a session while it stays at 3 of 10 or less, up to your pre-rehab weight.";
@@ -33,12 +33,12 @@ const BENCH_PHASE3_TIP = "Phase 3: full-range bench is back. Add 5 lb a session 
 // rehab is on they also join the Upper and Full Body rows, after the numbered lifts.
 const PUSHUP_NAME = "Push-Ups";
 const PUSHUP_TIP = {
-  early: "Shoulder Rehab: incline only, hands on a bench or counter, shoulder width, elbows about 45°. Stop a few inches short of the bottom. 3 of 10 or less.",
-  phase3: "Shoulder Rehab phase 3: floor push-ups to full depth. Pain-free here is a good sign for full-range bench.",
+  early: "Incline only, hands on a bench or counter, shoulder width, elbows about 45°. Stop a few inches short of the bottom. 3 of 10 or less.",
+  phase3: "Phase 3: floor push-ups to full depth. Pain-free here is a good sign for full-range bench.",
 };
 // Lifts the modifier leaves alone but has a word on, shown while it is on.
 const SHOULDER_KEEP_TIP = {
-  "Face Pulls": "Shoulder Rehab: keep as is. More pulling evens out the pressing, which protects both shoulders.",
+  "Face Pulls": "Keep as is. More pulling evens out the pressing, which protects both shoulders.",
 };
 // Logged sessions of a paused or held lift say so in their note, like Deload.
 const REHAB_NOTE = "Rehab";

@@ -66,7 +66,7 @@ function renderProgramCard(){
   return `<div class="card">
     <div class="mod-head"><h3 class="section" style="margin:0;">Program</h3>
       <div class="seg" role="group" aria-label="Program">${Object.entries(PROGRAMS).map(([k, v]) =>
-        `<button class="seg-btn prog${k === program.key ? " on" : ""}" aria-pressed="${k === program.key}" onclick="setProgram('${k}')">${v.short}</button>`).join("")}</div>
+        `<button class="seg-btn prog${k === program.key ? " on" : ""}" aria-pressed="${k === program.key}" onclick="userSetProgram('${k}')">${v.short}</button>`).join("")}</div>
     </div>
     <p class="mod-desc">${p.desc}${since}</p>
   </div>`;

@@ -348,18 +348,15 @@ function renderExerciseCard(name, ex){
   if(shoulderTip){
     modHtml += `<div class="care-line shoulder-care-line">${pill("shoulder")}${shoulderTip}</div>`;
   }
-  if(modes.ski && ex.inSeasonNote){
-    modHtml += `<div class="ski-tempo-line">${pill("ski")}${ex.inSeasonNote}</div>`;
-  }
-  if(skiActive && ex.skiTempo){
-    modHtml += `<div class="ski-tempo-line">${pill("ski")}Ski tempo: ${ex.skiTempo} · target ${ex.targetRepsSki} reps</div>`;
-  }
-  if(preseasonActive && ex.preseasonTempo){
-    modHtml += `<div class="preseason-line">${pill("preseason")}Preseason tempo: ${ex.preseasonTempo} · target ${ex.targetRepsPreseason} reps</div>`;
-  }
-  if(preseasonActive && ex.preseasonNote){
-    modHtml += `<div class="preseason-line">${pill("preseason")}${ex.preseasonNote}${ex.preseasonWeek3 && !(preseasonWeek() >= 3) ? ' <b>Add from week 3.</b>' : ''}</div>`;
-  }
+  // One line per modifier: its pill, then its notes run together, so nothing is left dangling on a
+  // line of its own. The pill names the modifier, so the text never repeats it.
+  // Tempo copy comes from the app's defaults first, so a wording change reaches lifts saved earlier.
+  const skiTempo = (EXERCISE_DEFAULTS[name] || {}).skiTempo || ex.skiTempo;
+  const ski = [modes.ski && ex.inSeasonNote, skiActive && skiTempo ? `Tempo: ${skiTempo}, ${ex.targetRepsSki} reps.` : ""].filter(Boolean);
+  if(ski.length) modHtml += `<div class="ski-tempo-line">${pill("ski")}${ski.join(" ")}</div>`;
+  const pre = [preseasonActive && ex.preseasonTempo ? `Tempo: ${ex.preseasonTempo}, ${ex.targetRepsPreseason} reps.` : "",
+    preseasonActive && ex.preseasonNote ? `${ex.preseasonNote}${ex.preseasonWeek3 && !(preseasonWeek() >= 3) ? ' <b>Add from week 3.</b>' : ''}` : ""].filter(Boolean);
+  if(pre.length) modHtml += `<div class="preseason-line">${pill("preseason")}${pre.join(" ")}</div>`;
 
   const leftover = mods.filter(m => !usedBadges.has(m.key));
   if(leftover.length) modHtml = `<div class="mod-badges">${leftover.map(badgeOf).join("")}</div>` + modHtml;

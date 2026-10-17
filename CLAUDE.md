@@ -84,6 +84,11 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   then an `extra` step ("Ready") counts up to the max before the next set starts on its own. Routine
   doses are parsed by `parseDose`; keep new checklist doses in the same shapes ("45 sec each side",
   "10 reps", "3 × 12-15, 3-5 lb").
+- The program switch keeps the same safety net as Ski: `userSetProgram` offers Undo, switching back
+  within `PROGRAM_RESUME_DAYS` restores the old start (dropping an empty stint), and `repairProgram`
+  clears same-day stints so Classic with no real 2+1 stint counts from the first logged session.
+- Modifier note lines: one line per modifier (its pill, then its notes run together), and the text
+  never repeats the modifier's name ("Tempo: 4 sec lowering, 5 reps.", not "Preseason tempo: ...").
 - A lift added from the library (`addedLifts(day)`) sits after the day's numbered lifts and custom
   exercises, before the finishers: dashed for today only, solid once kept. Its card says so in the
   tips (`addedLiftTip`). New lifts for the library want a `LIFT_PATTERNS` group (09) and a

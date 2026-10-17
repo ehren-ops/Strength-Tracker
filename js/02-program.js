@@ -203,11 +203,11 @@ const EXERCISE_DEFAULTS = {
   "Dead Bug": { trackBy: "reps", targetReps: 8 },
   "Wall Sit": { trackBy: "reps", unit: "sec", targetReps: 45 },
   "Squat": { targetRepsStrength: 5,
-    targetRepsSki: 5, skiTempo: "3-4 sec eccentric descent", equipment: "barbell",
+    targetRepsSki: 5, skiTempo: "3-4 sec lowering", equipment: "barbell",
     preseason: true, targetRepsPreseason: 5, preseasonTempo: "4 sec lowering",
   },
-  "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec eccentric descent per leg", repRange: "8-12" },
-  "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec controlled descent each step" },
+  "Bulgarian Split Squat": { targetRepsSki: 6, skiTempo: "3-4 sec lowering per leg", repRange: "8-12" },
+  "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec lowering each step" },
   "Bench Press": { equipment: "barbell", targetRepsStrength: 5 },
   "RDL": { equipment: "barbell", targetRepsStrength: 5 },
   "Hip Thrust": { equipment: "barbell", targetReps: 10 },
@@ -339,6 +339,6 @@ function backfillExerciseDefaults(){
 function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v126";
+const APP_VERSION = "v127";
 const APP_UPDATED = "Oct 15, 2026";
 

@@ -59,9 +59,25 @@ function plannedHeavy(name, ex, date){
   const wk = weekStartISO(date);
   return !ex.entries.some(e => e.date >= wk && e.date < date);
 }
+// Switching back to a program left within PROGRAM_RESUME_DAYS picks up its old start date, and the
+// stint just left is dropped from the history when no lift was logged during it, so trying the
+// other program for a minute leaves no trace.
+const PROGRAM_RESUME_DAYS = 14;
+function liftLoggedSince(stamp){
+  return Object.entries(data).some(([n, ex]) => ex.trackBy !== "checklist" && !isRecovery(n) && n !== REHAB_NAME
+    && ex.entries.some(e => (e.loggedAt || e.date) >= stamp));
+}
 function setProgram(key){
   if(key === program.key || !PROGRAMS[key]) return;
-  program = { key, startedOn: todayISO(), history: [...(program.history || []), { key, startedOn: todayISO() }] };
+  const today = todayISO();
+  const recent = { ...(program.recent || {}), [program.key]: { startedOn: program.startedOn || null, leftOn: today } };
+  const r = recent[key], resume = !!(r && r.startedOn && daysBetween(r.leftOn, today) <= PROGRAM_RESUME_DAYS);
+  const history = [...(program.history || [])];
+  const stint = history[history.length - 1];
+  if(resume && stint && stint.key === program.key && !liftLoggedSince(stint.startedAt || stint.startedOn)) history.pop();
+  const lastKey = history.length ? history[history.length - 1].key : "classic";
+  if(!(resume && lastKey === key)) history.push({ key, startedOn: today, startedAt: new Date().toISOString() });
+  program = { key, startedOn: resume ? r.startedOn : today, history, recent };
   saveProgram();
   if(view !== "extra" && view !== "overview"){ view = nextProgramDay(); selected = DAY_ORDER[view][0]; }
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
@@ -285,6 +301,32 @@ function repairSkiPhaseStart(){
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
   return true;
 }
+// The program record follows what was trained: stints that ended the day they began (a quick
+// look at the other program) are dropped, repeats merge, and Classic with no real Full Body 2+1
+// stint left counts from the first logged session. Runs at startup and after each sign-in pull.
+function firstLiftDate(){
+  let first = "";
+  Object.entries(data).forEach(([n, ex]) => { if(ex.trackBy !== "checklist" && !isRecovery(n) && n !== REHAB_NAME) ex.entries.forEach(e => { if(e.date && (!first || e.date < first)) first = e.date; }); });
+  return first || null;
+}
+function repairProgram(){
+  const before = JSON.stringify(program);
+  const all = program.history || [];
+  const kept = all.filter((it, i) => !(all[i + 1] && all[i + 1].startedOn === it.startedOn));
+  const history = [];
+  kept.forEach(it => { if(!history.length || history[history.length - 1].key !== it.key) history.push(it); });
+  if(program.key === "classic" && !history.some(it => it.key !== "classic")){
+    program = { ...program, startedOn: firstLiftDate() || program.startedOn || null, history: [] };
+  } else {
+    const last = history[history.length - 1];
+    program = { ...program, history, startedOn: last && last.key === program.key ? last.startedOn : program.startedOn };
+  }
+  if(JSON.stringify(program) === before) return false;
+  saveProgram();
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  return true;
+}
+
 // Start dates set by hand on the Overview. A hand-set date is never repaired away.
 function setSkiStart(iso){
   if(!iso || iso > todayISO() || currentSkiPhase() === "off") return;
@@ -307,27 +349,42 @@ function setDeloadDate(which, iso){
 }
 
 // Undo: the Overview switches keep what they replaced for a few seconds, so an accidental tap is
-// one tap to take back. Covers Deload, Ski, Knee Care and Low Back Care (Shoulder Rehab also
-// edits session notes, so it has none).
+// one tap to take back. Covers Deload, Ski, Knee Care, Low Back Care and the program (Shoulder
+// Rehab also edits session notes, so it has none).
 const UNDO_MS = 10000;
 let undoState = null;
 function settingsSnapshot(){
   return JSON.stringify({ modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), skiPhase, deloadDates });
 }
+function restoreSettings(snap){
+  const s = JSON.parse(snap);
+  MODE_DEFS.forEach(m => setModeFlag(m.key, !!s.modes[m.key]));
+  skiPhase = s.skiPhase; saveSkiPhase();
+  deloadDates = s.deloadDates; saveDeloadDates();
+}
 function userToggleMode(key){
   const snap = settingsSnapshot(), wasOn = !!modes[key];
   toggleMode(key);
-  if(key !== "shoulder") offerUndo(`${MODE_DEFS.find(m => m.key === key).name} ${wasOn ? "off" : "on"}`, snap);
+  if(key !== "shoulder") offerUndo(`${MODE_DEFS.find(m => m.key === key).name} ${wasOn ? "off" : "on"}`, () => restoreSettings(snap));
 }
 function userSetSkiPhase(phase){
   if(phase === currentSkiPhase()) return;
   const snap = settingsSnapshot();
   setSkiPhase(phase);
-  offerUndo(phase === "off" ? "Ski off" : phase === "preseason" ? "Preseason on" : "In season on", snap);
+  offerUndo(phase === "off" ? "Ski off" : phase === "preseason" ? "Preseason on" : "In season on", () => restoreSettings(snap));
 }
-function offerUndo(text, snap){
+function userSetProgram(key){
+  if(key === program.key) return;
+  const snap = JSON.stringify(program), was = { view, selected };
+  setProgram(key);
+  offerUndo(`${PROGRAMS[key].short} on`, () => {
+    program = JSON.parse(snap); saveProgram();
+    view = was.view; selected = was.selected;
+  });
+}
+function offerUndo(text, restore){
   clearTimeout(undoState && undoState.timer);
-  undoState = { snap, timer: setTimeout(hideUndo, UNDO_MS) };
+  undoState = { restore, timer: setTimeout(hideUndo, UNDO_MS) };
   let el = document.getElementById("undo-bar");
   if(!el){ el = document.createElement("div"); el.id = "undo-bar"; el.className = "undo-bar"; el.setAttribute("role", "status"); document.body.appendChild(el); }
   el.innerHTML = `<span>${text}</span><button type="button" onclick="undoSettings()">Undo</button>`;
@@ -341,10 +398,7 @@ function hideUndo(){
 }
 function undoSettings(){
   if(!undoState) return;
-  const s = JSON.parse(undoState.snap);
-  MODE_DEFS.forEach(m => setModeFlag(m.key, !!s.modes[m.key]));
-  skiPhase = s.skiPhase; saveSkiPhase();
-  deloadDates = s.deloadDates; saveDeloadDates();
+  undoState.restore();
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
   hideUndo();
   render();

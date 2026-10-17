@@ -28,12 +28,12 @@ document.addEventListener("input", e => {
   if(e.target.id === "f-sets" || e.target.id === "f-reps") syncHoldButton();
 });
 
-function afterSignInSync(){ if(repairDeloadDates() | repairSkiPhaseStart()) render(); ensureDeloadNotes(); ensureRehabNotes(); refreshHeartRate(); }
+function afterSignInSync(){ if(repairDeloadDates() | repairSkiPhaseStart() | repairProgram()) render(); ensureDeloadNotes(); ensureRehabNotes(); refreshHeartRate(); }
 
 // Full Body 2+1 opens on the next session in its rotation.
 if(program.key === "fullbody"){ view = nextProgramDay(); selected = DAY_ORDER[view][0]; }
 render();
-if(repairDeloadDates() | repairSkiPhaseStart()) render();
+if(repairDeloadDates() | repairSkiPhaseStart() | repairProgram()) render();
 ensureDeloadNotes();
 ensureRehabNotes();
 checkDeloadAutoEnd(); checkSkiPhasePrompt();

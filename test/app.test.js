@@ -354,7 +354,7 @@ async function main(){
   skiBadgeCount = await page.locator('.ski-badge').count();
   if(skiBadgeCount !== 1) throw new Error('expected a ski badge on Squat once ski season is on, found ' + skiBadgeCount);
   const tempoLine = await page.locator('.ski-tempo-line').textContent();
-  if(!tempoLine.includes('3-4 sec eccentric descent') || !tempoLine.includes('5')) throw new Error('unexpected ski tempo line: ' + tempoLine);
+  if(!tempoLine.includes('3-4 sec lowering') || !tempoLine.includes('5 reps') || /Ski tempo/.test(tempoLine)) throw new Error('unexpected ski tempo line: ' + tempoLine);
   const repsField = await page.locator('#f-reps').inputValue();
   if(repsField !== '5') throw new Error('expected target reps to shift to 5 for ski season, got ' + repsField);
   console.log('OK: ski badge and tempo line show on Squat, target reps shift to 5:', tempoLine.trim());
@@ -2473,7 +2473,7 @@ async function main(){
     r79.bench.weight === 157.5 && r79.bench.hold && r79.bench.badge && /85%/.test(r79.bench.tip || '') &&
     r79.benchAfter150 === 150 && r79.benchDeload === 150 && r79.off.pushupsOnUpper && r79.off.pushupsOnExtra &&
     r79.pushups[0] === 4 && r79.pushups[1] > 0 && r79.pushups[2] === -1 &&
-    /incline/.test(r79.pushupCard.tip || '') && r79.pushupCard.note === 'Rehab' && r79.pushupCard.exists &&
+    /incline/i.test(r79.pushupCard.tip || '') && r79.pushupCard.note === 'Rehab' && r79.pushupCard.exists &&
     r79.benchP3.first === 157.5 && r79.benchP3.build && r79.benchP3.next === 155 &&
     r79.fly && r79.curlWeek1 && /paused/i.test(r79.flyCard.next) && !r79.flyCard.skip && /Paused/.test(r79.flyCard.paused) && /Right arm/.test(r79.flyCard.tip) &&
     r79.benchNote === 'Rehab' && r79.benchLogged === 'Rehab, felt fine' && /85% of pre-rehab weight, palms-in grip/.test(r79.row.tip || '') && r79.row.badge && r79.row.note === 'Rehab' &&
@@ -3393,6 +3393,35 @@ async function main(){
     && JSON.stringify(r103.custom) === '["Sled Push 103","full",true]' && r103.extraPlus === 'toggleAddExercise()';
   if(!ok103) throw new Error('expected the exercise library to search, pick, keep and remove, got: ' + JSON.stringify(r103));
   console.log('OK: the "+" opens the library grouped by movement (no cardio or routines), search finds Hip Thrust, a pick joins Full Body for today (dashed, Today only), Keep makes it stay, Remove takes it off, a custom name adds from the bottom; Extra keeps its own add row');
+
+  console.log('=== 104: the program switch survives stray taps: repair to the first log, flip-back restore, Undo ===');
+  const r104 = await page.evaluate(() => {
+    const saved = { program: JSON.stringify(program), view, selected };
+    const first = firstLiftDate(), d = n => shiftISO(todayISO(), n);
+    const out = {};
+    // A run of quick looks at Full Body 2+1 left Classic restarting yesterday: back to the first log.
+    program = { key: 'classic', startedOn: d(-1), history: [{ key: 'fullbody', startedOn: d(-2) }, { key: 'classic', startedOn: d(-2) }, { key: 'fullbody', startedOn: d(-1) }, { key: 'classic', startedOn: d(-1) }] };
+    out.repair = [repairProgram(), program.startedOn === first, JSON.stringify(program.history), repairProgram()];
+    // Over to Full Body 2+1 and straight back: Classic keeps its start, and the empty stint is gone.
+    setProgram('fullbody'); setProgram('classic');
+    out.flipBack = [program.key, program.startedOn === first, JSON.stringify(program.history)];
+    // A real Full Body 2+1 stint (sessions logged in it) stays in the history.
+    program = { key: 'fullbody', startedOn: d(-20), history: [{ key: 'fullbody', startedOn: d(-20) }] };
+    out.real = [repairProgram(), program.history.length, program.startedOn === d(-20)];
+    // The Overview switch offers Undo, which puts the program back exactly.
+    program = { key: 'classic', startedOn: first, history: [] };
+    view = 'overview'; render();
+    document.querySelector('.seg-btn.prog:not(.on)').click();
+    out.undoBar = document.getElementById('undo-bar').textContent;
+    document.querySelector('#undo-bar button').click();
+    out.undone = [program.key, program.startedOn === first, document.getElementById('undo-bar').hidden];
+    program = JSON.parse(saved.program); saveProgram();
+    view = saved.view; selected = saved.selected; render();
+    return out;
+  });
+  const want104 = { repair: [true, true, '[]', false], flipBack: ['classic', true, '[]'], real: [false, 1, true], undoBar: 'Full Body 2+1 onUndo', undone: ['classic', true, true] };
+  if(JSON.stringify(r104) !== JSON.stringify(want104)) throw new Error('expected the program record to hold up to stray taps, got: ' + JSON.stringify(r104));
+  console.log('OK: quick looks at Full Body 2+1 are cleared and Classic counts from the first log, a flip there and back keeps the start, a real 2+1 stint stays, and the switch offers Undo');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
