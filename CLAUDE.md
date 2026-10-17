@@ -23,7 +23,7 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 | `js/04-helpers.js` | Dates (`shiftISO`), formatting, plate math, `isLoggedToday`, `skipReason`, workout-complete check |
 | `js/05-rest-timer-progression.js` | Rest timer, readiness, progression engine: `computeSuggestion` = core, note target, max weight cap, `applyReturn` (breaks, post-deload), `applyShoulder`, deload overlay |
 | `js/05b-shoulder-rehab.js` | Shoulder Rehab modifier: rehab card, paused/held lifts, return ramp, coach block |
-| `js/05c-hold-timer.js` | Hold timer for timed lifts (`unit: "sec"`): big top-half clock, count-in, hold, rest per set, per side; fills the form |
+| `js/05c-hold-timer.js` | The clock: holds for timed lifts (`unit: "sec"`), set by set for rep lifts, routines (Mobility, Shoulder Rehab groups) from item doses; Pause, Skip, -15/+15 rests, remembered rests (`restPrefs`); fills the form |
 | `js/06-day-view.js` | Render: tabs, pill rows, Mobility and checklist cards, the exercise card (`.card-head`: name and weight left; Last, record and modifier badges stacked right; then care lines, Next tile, chart) |
 | `js/06b-next-tile.js` | The Next tile's words: `planModifiers`, the call, and the guidance sentence pool |
 | `js/06c-history-form.js` | Recent History rows, edit/delete/skip, the log form (per-set reps, joint check) |
