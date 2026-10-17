@@ -289,7 +289,7 @@ async function runOp(op){
     const { error } = await supabaseClient.from("user_settings").upsert({
       user_id: userId,
       // The JSON field is the source of truth; the per-mode columns are kept for older app versions.
-      settings: { modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), deload: deloadRecord, shoulderRehab: rehabRecord, ski: skiPhase, program: { key: program.key, startedOn: program.startedOn || null, history: program.history || [] } },
+      settings: { modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), deload: deloadRecord, shoulderRehab: rehabRecord, ski: skiPhase, program: { key: program.key, startedOn: program.startedOn || null, history: program.history || [] }, rest: restPrefs },
       ...Object.fromEntries(MODE_DEFS.filter(m => m.column).map(m => [m.column, modes[m.key]])),
       deload_started_on: deloadDates.startedOn || null,
       deload_ended_on: deloadDates.endedOn || null,
@@ -487,6 +487,12 @@ async function pullRemoteAndMerge(){
   if(saved.program && PROGRAMS[saved.program.key] && !program.startedOn && saved.program.key !== program.key){
     program = { key: saved.program.key, startedOn: saved.program.startedOn || null, history: saved.program.history || [] };
     saveProgram();
+  }
+  // Rests set on the hold clock elsewhere fill in lifts this device has no rest for.
+  if(saved.rest && typeof saved.rest === "object"){
+    let added = false;
+    Object.entries(saved.rest).forEach(([n, sec]) => { if(restPrefs[n] == null && sec > 0){ restPrefs[n] = sec; added = true; } });
+    if(added) try{ window.localStorage.setItem(REST_PREFS_KEY, JSON.stringify(restPrefs)); }catch(e){}
   }
   if(saved.ski && saved.ski.phase && !skiPhase.phase){
     skiPhase = saved.ski;

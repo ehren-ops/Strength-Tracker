@@ -3111,6 +3111,50 @@ async function main(){
     throw new Error('expected the Dead Hang hold timer to run 3x42 with a count-in and 45 sec rest, fill the form, and stop on two taps, got: ' + JSON.stringify(r96));
   console.log('OK: Dead Hang shows a 3x42 hold button (matching the form, and following edits to 3x50, 4x50) instead of rest ("2 sec longer than last time"); Get ready 5, Hold, Rest 40 + 5 count-in; Done fills 3 x 42; two taps stop and keep the 22 sec held; a tap clears the stopped clock; the handle shrinks it to a bar that keeps running');
 
+  console.log('=== 97: the hold clock pauses, skips ahead, and takes -15 / +15 on a rest that the lift then keeps ===');
+  const r97 = await page.evaluate(() => {
+    const saved = { hang: JSON.stringify(data['Dead Hang'] || null), view, selected, prefs: JSON.stringify(restPrefs) };
+    delete restPrefs['Dead Hang'];
+    data['Dead Hang'] = Object.assign(newExerciseShell('Dead Hang'), { entries: [{ clientId: 'h97', date: shiftISO(todayISO(), -4), weight: 0, sets: 3, reps: 40, difficulty: 7 }] });
+    view = 'extra'; selected = 'Dead Hang'; render();
+    const clock = () => document.getElementById('hold-clock');
+    const btns = () => [...clock().querySelectorAll('.hc-btn')].map(b => b.textContent).join('|');
+    const kind = () => holdTimer.steps[holdTimer.idx].kind;
+    const out = {};
+    startHoldTimer('Dead Hang');
+    out.firstRest = holdTimer.rest;
+    holdTimer.endAt = Date.now() - 1; tickHoldTimer(); // into the first hold
+    out.holdBtns = btns();
+    out.underline = getComputedStyle(clock().querySelector('.hc-stop')).textDecorationLine;
+    clock().querySelector('[data-hc="pause"]').click();
+    const frozen = holdTimer.paused.left;
+    holdTimer.endAt = Date.now() - 1; tickHoldTimer(); // time passing while paused changes nothing
+    out.paused = [kind(), holdTimer.paused.left === frozen, clock().querySelector('.hc-phase').textContent, /Resume/.test(btns())];
+    clock().querySelector('[data-hc="pause"]').click();
+    out.resumed = !holdTimer.paused && holdTimer.endAt > Date.now();
+    holdTimer.endAt = Date.now() + 20000; // 22 of 42 sec held, then skip to the rest
+    clock().querySelector('[data-hc="skip"]').click();
+    out.skipped = [kind(), JSON.stringify(holdTimer.held)];
+    out.restBtns = btns();
+    const left0 = holdTimer.endAt - Date.now();
+    clock().querySelector('[data-hc="more"]').click();
+    out.more = [Math.round((holdTimer.endAt - Date.now() - left0) / 1000), holdTimer.rest, restPrefs['Dead Hang'], holdTimer.steps.filter(x => x.kind === 'rest').map(x => x.secs).join(',')];
+    clock().querySelector('[data-hc="skip"]').click();
+    out.afterRest = kind();
+    clearHoldTimer();
+    startHoldTimer('Dead Hang');
+    out.kept = holdTimer.rest;
+    clearHoldTimer();
+    restPrefs = JSON.parse(saved.prefs);
+    const hang = JSON.parse(saved.hang); if(hang) data['Dead Hang'] = hang; else delete data['Dead Hang'];
+    view = saved.view; selected = saved.selected; render();
+    return out;
+  });
+  if(r97.firstRest !== 45 || r97.holdBtns !== '❚❚ Pause|Rest ⏭' || !/underline/.test(r97.underline) || JSON.stringify(r97.paused) !== '["hold",true,"Paused",true]' || !r97.resumed
+    || JSON.stringify(r97.skipped) !== '["rest","[[22]]"]' || r97.restBtns !== '−15|❚❚ Pause|Next set ⏭|+15' || JSON.stringify(r97.more) !== '[15,60,60,"55,55"]' || r97.afterRest !== 'ready' || r97.kept !== 60)
+    throw new Error('expected pause, skip and -15/+15 on the hold clock, with the new rest kept, got: ' + JSON.stringify(r97));
+  console.log('OK: Pause freezes the clock (Resume picks up), Skip ends the hold at 22 sec and goes to the rest, +15 makes the rest 60 sec for this run and the next, Skip on a rest goes to the count-in, "Tap twice to stop" is underlined');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

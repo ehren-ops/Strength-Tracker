@@ -259,7 +259,7 @@
   .hold-action-btn{background:var(--emerald);border:1.5px solid var(--emerald);color:var(--card);font-weight:700;border-radius:7px;cursor:pointer;}
   .hold-action-btn .btn-icon{stroke-width:2;}
   .action-row .hold-action-btn{height:var(--input-h);width:100%;margin:0;padding:0 0.3rem;display:flex;align-items:center;justify-content:center;font-size:0.8rem;white-space:nowrap;}
-  .hold-clock{--phase:var(--slate);position:fixed;inset:0 0 auto 0;height:calc(30vh + env(safe-area-inset-top, 0px));min-height:calc(13rem + env(safe-area-inset-top, 0px));padding-top:env(safe-area-inset-top, 0px);z-index:70;
+  .hold-clock{--phase:var(--slate);position:fixed;inset:0 0 auto 0;height:calc(30vh + env(safe-area-inset-top, 0px));min-height:calc(15.5rem + env(safe-area-inset-top, 0px));padding-top:env(safe-area-inset-top, 0px);z-index:70;
     background:var(--pine);color:var(--header-text);border-bottom:5px solid var(--phase);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.15rem;
     font-family:var(--font-body);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 6px 24px rgba(0,0,0,0.35);}
   .hold-clock.ready{--phase:var(--amber-light);} .hold-clock.hold{--phase:var(--emerald);} .hold-clock.rest{--phase:var(--amber);} .hold-clock.done{--phase:var(--emerald);}
@@ -273,7 +273,13 @@
   .hc-dots{display:flex;gap:0.5rem;margin-top:0.2rem;}
   .hc-dots i{width:0.7rem;height:0.7rem;border-radius:50%;border:2px solid rgba(241,239,231,0.6);}
   .hc-dots i.done{background:var(--phase);border-color:var(--phase);}
-  .hc-stop{font-size:0.8rem;opacity:0.7;margin-top:0.4rem;}
+  .hc-stop{font-size:0.8rem;opacity:0.8;margin-top:0.35rem;text-decoration:underline;text-underline-offset:3px;}
+  /* Pause, Skip and the rest's -15 / +15: one row of outlined buttons under the dots. */
+  .hc-controls{display:flex;gap:0.45rem;margin-top:0.45rem;}
+  .hc-btn{background:rgba(255,255,255,0.08);border:1.5px solid rgba(241,239,231,0.55);color:inherit;border-radius:999px;padding:0.4rem 0.8rem;font:inherit;font-size:0.85rem;font-weight:700;line-height:1;cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .hold-clock.paused .hc-time{opacity:0.55;}
+  .hold-clock.compact .hc-controls{display:none;}
+  .hold-clock:not(.compact){padding-bottom:1.6rem;} /* keeps the hint clear of the shrink handle */
   .hc-stop.armed{opacity:1;color:var(--phase);font-weight:700;}
   .hold-clock[hidden]{display:none;}
   .hc-handle, .hc-close{position:absolute;background:none;border:none;color:inherit;opacity:0.75;font-size:1.1rem;line-height:1;padding:0.5rem 0.9rem;cursor:pointer;}

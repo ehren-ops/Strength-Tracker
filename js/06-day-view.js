@@ -381,7 +381,7 @@ function renderExerciseCard(name, ex){
   } else {
     const sideTag = s => s ? `<span class="side-tag">${s}</span>` : "";
     const bigOf = v => ex.trackBy==="weight" ? v.weight+" lb" + sideTag(weightSuffix(name).trim() === "total" ? "" : weightSuffix(name))
-      : ex.trackBy==="duration" ? v.minutes+" min" + (v.tempF != null ? sideTag(` ${v.tempF}°F`) : "") : v.reps+" "+repsWord(name) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
+      : ex.trackBy==="duration" ? v.minutes+" min" + (v.tempF != null ? sideTag(` ${v.tempF}°F`) : "") : v.reps+" "+(ex.unit === "sec" ? "sec" : repsWord(name)) + sideTag(sidesOf(name).reps === "steps" ? " total" : repsSuffix(name));
     let bigVal, bigLabel;
     if(recovery){ bigVal = bigOf(work); bigLabel = "Last"; }
     else if(todayLog){ bigVal = bigOf(todayLog); bigLabel = "Logged today ✓" + (prs[ex.entries.lastIndexOf(todayLog)] ? " · PR" : ""); }
