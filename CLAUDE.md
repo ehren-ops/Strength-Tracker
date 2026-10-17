@@ -11,6 +11,8 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   screenshot check (light and dark) before pushing to `main`.
 - Weights are "lb" everywhere (never "lbs"). Short, plain coaching language.
 - No emoji in the UI: outline icons only, via `icon(key)` (04, `ICON_PATHS`). Scenario 100 checks.
+- No disclaimers or safety warnings anywhere ("not a substitute for a PT or doctor", "get it checked",
+  "not medical advice"), in the app or the coach prompt. They are clutter; say what to change instead.
 - Leave destructive Supabase actions (drops, deletes) to the owner.
 
 ## Layout

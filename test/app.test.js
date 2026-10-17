@@ -3298,6 +3298,50 @@ async function main(){
   if(Object.values(r101).some(d => d === 'missing' || d > 0.5)) throw new Error('expected TODAY and the record label on one baseline on every card, got offsets: ' + JSON.stringify(r101));
   console.log('OK: TODAY and EST. 1RM / MOST REPS / LONGEST HOLD share a baseline on Squat, Bulgarian Split Squat, Dead Hang and Push-Ups');
 
+  console.log('=== 102: ski and deload dates survive stray taps: repair from the log, flip-back restore, Undo, hand-set dates ===');
+  const r102 = await page.evaluate(() => {
+    const saved = { data: JSON.stringify({ bj: data['Box Jumps'] || null, sq: data['Squat'] || null }), modes: { ...modes }, ski: JSON.stringify(skiPhase), deload: JSON.stringify(deloadDates), view };
+    const d = n => shiftISO(todayISO(), n);
+    MODE_DEFS.forEach(m => setModeFlag(m.key, false));
+    data['Box Jumps'] = Object.assign(newExerciseShell('Box Jumps'), { entries: [-42, -26, -24, -15].map((n, i) => ({ clientId: 'bj102' + i, date: d(n), weight: 0, sets: 3, reps: 5 })) });
+    data['Squat'] = Object.assign(newExerciseShell('Squat'), { entries: [-5, -3].map((n, i) => ({ clientId: 'sq102' + i, date: d(n), weight: 150, sets: 4, reps: 5, preseason: true })) });
+    const out = {};
+    // Restamped to yesterday by a stray tap: the logged preseason run puts it back to day -26 (day -42 is more than two weeks before it).
+    setModeFlag('preseason', true); skiPhase = { phase: 'preseason', startedOn: d(-1), snoozeUntil: null };
+    out.repair = [repairSkiPhaseStart(), skiPhase.startedOn === d(-26), preseasonWeek()];
+    // Off and back on within two weeks: the start date comes back.
+    setSkiPhase('off'); setSkiPhase('preseason');
+    out.flipBack = skiPhase.startedOn === d(-26);
+    // An Overview tap offers Undo, which puts everything back as it was.
+    userSetSkiPhase('season');
+    out.undoBar = !document.getElementById('undo-bar').hidden && document.getElementById('undo-bar').textContent;
+    document.querySelector('#undo-bar button').click();
+    out.undone = [currentSkiPhase(), skiPhase.startedOn === d(-26), document.getElementById('undo-bar').hidden];
+    userToggleMode('knee');
+    out.kneeUndo = document.getElementById('undo-bar').textContent;
+    undoSettings();
+    out.kneeBack = modes.knee;
+    // A hand-set date stays put, even with earlier preseason sessions in the log.
+    setSkiStart(d(-10));
+    out.manual = [skiPhase.startedOn === d(-10), repairSkiPhaseStart(), skiPhase.startedOn === d(-10)];
+    // Deload: a hand-set window with no deload sessions is not repaired away.
+    deloadDates = { startedOn: d(-30), endedOn: d(-23), plannedEndOn: d(-23) };
+    setDeloadDate('startedOn', d(-31)); setDeloadDate('endedOn', d(-24));
+    out.deload = [deloadDates.startedOn === d(-31), deloadDates.endedOn === d(-24), repairDeloadDates(), deloadDates.startedOn === d(-31)];
+    // No disclaimers on a care card.
+    setModeFlag('knee', true); view = 'full'; selected = 'Squat'; render();
+    out.disclaimer = /substitute|doctor|physio/i.test(document.getElementById('app').textContent);
+    const sv = JSON.parse(saved.data);
+    ['Box Jumps', 'Squat'].forEach((n, i) => { const v = i ? sv.sq : sv.bj; if(v) data[n] = v; else delete data[n]; });
+    MODE_DEFS.forEach(m => setModeFlag(m.key, !!saved.modes[m.key]));
+    skiPhase = JSON.parse(saved.ski); saveSkiPhase(); deloadDates = JSON.parse(saved.deload); saveDeloadDates();
+    hideUndo(); view = saved.view; render();
+    return out;
+  });
+  const want102 = { repair: [true, true, 4], flipBack: true, undoBar: 'In season onUndo', undone: ['preseason', true, true], kneeUndo: 'Knee Care onUndo', kneeBack: false, manual: [true, false, true], deload: [true, true, false, true], disclaimer: false };
+  if(JSON.stringify(r102) !== JSON.stringify(want102)) throw new Error('expected ski and deload dates to hold up to stray taps, got: ' + JSON.stringify(r102));
+  console.log('OK: a restamped preseason start goes back to its first logged session (week 4), Off then back on keeps it, Undo restores a phase or a modifier, hand-set ski and deload dates stay put, and care cards carry no disclaimer');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

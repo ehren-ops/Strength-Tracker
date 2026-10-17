@@ -249,13 +249,104 @@ function setModeFlag(key, on){
   modes[key] = on;
   try{ window.localStorage.setItem(def.storageKey, on ? "1" : "0"); }catch(e){}
 }
+// Switching back to a phase left within SKI_RESUME_DAYS picks up its old start date instead of
+// restarting the count at today, so a stray tap never resets the preseason week.
+const SKI_RESUME_DAYS = 14;
 function setSkiPhase(phase){
-  if(phase === currentSkiPhase()) return;
+  const cur = currentSkiPhase();
+  if(phase === cur) return;
+  const recent = { ...(skiPhase.recent || {}) };
+  if(cur !== "off" && skiPhase.startedOn) recent[cur] = { startedOn: skiPhase.startedOn, leftOn: todayISO(), manual: !!skiPhase.manual };
   setModeFlag("preseason", phase === "preseason");
   setModeFlag("ski", phase === "season");
-  skiPhase = phase === "off" ? { ...skiPhase, phase: "off", endedOn: todayISO(), snoozeUntil: null } : { phase, startedOn: todayISO(), snoozeUntil: null };
+  if(phase === "off") skiPhase = { ...skiPhase, phase: "off", endedOn: todayISO(), snoozeUntil: null, recent };
+  else {
+    const r = recent[phase], resume = r && r.startedOn && daysBetween(r.leftOn, todayISO()) <= SKI_RESUME_DAYS;
+    skiPhase = { phase, startedOn: resume ? r.startedOn : todayISO(), snoozeUntil: null, recent, ...(resume && r.manual ? { manual: true } : {}) };
+  }
   saveSkiPhase();
   enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  render();
+}
+// A preseason can't have started after its own sessions: when preseason lifts (or preseason-tagged
+// sets) run back from the start date with no gap of more than SKI_RESUME_DAYS, the start moves back
+// to the first of them. Never moves it later, and leaves a date set by hand alone. Runs at startup
+// and after each sign-in pull.
+const PRESEASON_EVIDENCE = new Set(["Box Jumps", "Trap Bar Jump", "Skater Bound", "Med Ball Slam", "Copenhagen Plank"]);
+function repairSkiPhaseStart(){
+  if(currentSkiPhase() !== "preseason" || !skiPhase.startedOn || skiPhase.manual) return false;
+  const days = [...new Set(Object.entries(data).flatMap(([n, ex]) => ex.entries.filter(e => e.preseason || PRESEASON_EVIDENCE.has(n)).map(e => e.date)))]
+    .filter(d => d < skiPhase.startedOn).sort().reverse();
+  let start = skiPhase.startedOn;
+  for(const d of days){ if(daysBetween(d, start) > SKI_RESUME_DAYS) break; start = d; }
+  if(start === skiPhase.startedOn) return false;
+  skiPhase = { ...skiPhase, startedOn: start };
+  saveSkiPhase();
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  return true;
+}
+// Start dates set by hand on the Overview. A hand-set date is never repaired away.
+function setSkiStart(iso){
+  if(!iso || iso > todayISO() || currentSkiPhase() === "off") return;
+  skiPhase = { ...skiPhase, startedOn: iso, manual: true };
+  saveSkiPhase();
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  render();
+}
+function setDeloadDate(which, iso){
+  if(!iso || iso > todayISO() || !deloadDates.startedOn) return;
+  const d = { ...deloadDates, [which]: iso, manual: true };
+  if(which === "startedOn"){
+    if(modes.deload) d.plannedEndOn = shiftISO(iso, DELOAD_LENGTH_DAYS);
+    if(d.endedOn && d.endedOn < iso) d.endedOn = iso;
+  } else if(iso < d.startedOn) return;
+  deloadDates = d;
+  saveDeloadDates();
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  render();
+}
+
+// Undo: the Overview switches keep what they replaced for a few seconds, so an accidental tap is
+// one tap to take back. Covers Deload, Ski, Knee Care and Low Back Care (Shoulder Rehab also
+// edits session notes, so it has none).
+const UNDO_MS = 10000;
+let undoState = null;
+function settingsSnapshot(){
+  return JSON.stringify({ modes: Object.fromEntries(MODE_DEFS.map(m => [m.key, !!modes[m.key]])), skiPhase, deloadDates });
+}
+function userToggleMode(key){
+  const snap = settingsSnapshot(), wasOn = !!modes[key];
+  toggleMode(key);
+  if(key !== "shoulder") offerUndo(`${MODE_DEFS.find(m => m.key === key).name} ${wasOn ? "off" : "on"}`, snap);
+}
+function userSetSkiPhase(phase){
+  if(phase === currentSkiPhase()) return;
+  const snap = settingsSnapshot();
+  setSkiPhase(phase);
+  offerUndo(phase === "off" ? "Ski off" : phase === "preseason" ? "Preseason on" : "In season on", snap);
+}
+function offerUndo(text, snap){
+  clearTimeout(undoState && undoState.timer);
+  undoState = { snap, timer: setTimeout(hideUndo, UNDO_MS) };
+  let el = document.getElementById("undo-bar");
+  if(!el){ el = document.createElement("div"); el.id = "undo-bar"; el.className = "undo-bar"; el.setAttribute("role", "status"); document.body.appendChild(el); }
+  el.innerHTML = `<span>${text}</span><button type="button" onclick="undoSettings()">Undo</button>`;
+  el.hidden = false;
+}
+function hideUndo(){
+  const el = document.getElementById("undo-bar");
+  if(el) el.hidden = true;
+  if(undoState) clearTimeout(undoState.timer);
+  undoState = null;
+}
+function undoSettings(){
+  if(!undoState) return;
+  const s = JSON.parse(undoState.snap);
+  MODE_DEFS.forEach(m => setModeFlag(m.key, !!s.modes[m.key]));
+  skiPhase = s.skiPhase; saveSkiPhase();
+  deloadDates = s.deloadDates; saveDeloadDates();
+  enqueueOp({ id: genId(), type: "upsert_settings", payload: {} });
+  hideUndo();
   render();
 }
 
@@ -265,7 +356,7 @@ function setSkiPhase(phase){
 // sessions in the log (sessions within a week of each other), or cleared when there are none.
 // Runs on switching it off, at startup and after each sign-in pull.
 function repairDeloadDates(){
-  if(modes.deload || !deloadDates.startedOn) return false;
+  if(modes.deload || !deloadDates.startedOn || deloadDates.manual) return false;
   const deloadDays = [...new Set(Object.values(data).flatMap(ex => ex.entries.filter(e => e.deload).map(e => e.date)))].sort();
   const backed = r => r && r.startedOn && deloadDays.some(d => d >= r.startedOn && d <= (r.endedOn || r.startedOn));
   if(backed(deloadDates)) return false;

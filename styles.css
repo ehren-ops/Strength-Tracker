@@ -219,7 +219,6 @@
   .card{--input-h:2.3rem;}
   .field input, .field input[type="date"]{height:var(--input-h) !important;line-height:normal;}
   .ex-tips b{color:var(--ink);font-weight:600;margin-right:0.2rem;}
-  .care-disclaimer{font-size:0.62rem;color:var(--slate);margin:0 0 0.4rem;font-style:italic;}
   .rec-desc b{font-family:var(--font-body);font-variant-numeric:tabular-nums;}
   .progression-btn{display:inline-block;background:var(--surface);border:1px solid var(--line);color:var(--slate);font-size:0.72rem;font-weight:600;padding:0.4rem 0.7rem;border-radius:7px;cursor:pointer;}
   .progression-btn:active{background:var(--panel-soft);}
@@ -486,7 +485,6 @@
   .rehab-foot{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;margin-top:0.6rem;}
   .rehab-check{font-size:0.72rem;color:var(--slate);line-height:1.35;}
   .rehab-foot .skip-btn{flex-shrink:0;}
-  .rehab-card .care-disclaimer{margin:0.6rem 0 0;}
   .theme-toggle{position:relative;width:52px;height:28px;border-radius:999px;background:var(--line);flex-shrink:0;border:none;cursor:pointer;padding:0;transition:background 0.25s ease;}
   .theme-toggle .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.25s ease;box-shadow:0 1px 3px rgba(0,0,0,0.3);}
   .theme-toggle.on{background:linear-gradient(90deg,#ff2d95,#b967ff,#00f0ff);}
@@ -504,6 +502,14 @@
   .seg-btn.preseason.on{background:var(--preseason);}
   .seg-btn.season.on{background:var(--ski);}
   .seg-btn.prog.on{background:var(--ink);color:var(--card);}
+  .date-edit-link{background:none;border:none;padding:0;font:inherit;font-weight:600;color:var(--amber);text-decoration:underline dotted;text-underline-offset:3px;cursor:pointer;}
+  .date-edit-row{display:flex;flex-wrap:wrap;gap:0.4rem 0.8rem;margin:0.4rem 0 0;font-size:0.76rem;color:var(--slate);}
+  .date-edit-row input{font:inherit;color:var(--ink);background:var(--input-bg);border:1px solid var(--line);border-radius:6px;padding:0.2rem 0.35rem;margin-left:0.25rem;}
+  /* Undo after an Overview switch: a slim bar above the bottom edge for a few seconds. */
+  .undo-bar{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom, 0px) + 1rem);transform:translateX(-50%);z-index:80;display:flex;align-items:center;gap:1rem;
+    background:var(--pine);color:var(--header-text);border-radius:999px;padding:0.55rem 0.55rem 0.55rem 1.1rem;font-size:0.85rem;box-shadow:0 4px 16px rgba(0,0,0,0.3);white-space:nowrap;}
+  .undo-bar[hidden]{display:none;}
+  .undo-bar button{background:var(--amber);border:none;color:#fff;font:inherit;font-weight:700;border-radius:999px;padding:0.35rem 0.9rem;cursor:pointer;}
   .ski-status{font-size:0.76rem;line-height:1.45;color:var(--ink);margin:0.35rem 0 0;}
   .tool-btn.seg-yes{color:var(--seg-on-text);}
   .tool-btn.seg-yes.season{background:var(--ski);border-color:var(--ski);}

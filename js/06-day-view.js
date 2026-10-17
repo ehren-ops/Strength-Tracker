@@ -345,9 +345,6 @@ function renderExerciseCard(name, ex){
   if(shoulderTip){
     modHtml += `<div class="care-line shoulder-care-line">${pill("shoulder")}${shoulderTip}</div>`;
   }
-  if(kneeActive || backActive){
-    modHtml += `<p class="care-disclaimer">Load adjustment only, not a substitute for a PT or doctor.</p>`;
-  }
   if(modes.ski && ex.inSeasonNote){
     modHtml += `<div class="ski-tempo-line">${pill("ski")}${ex.inSeasonNote}</div>`;
   }

@@ -237,7 +237,7 @@ function painSignals(){
 function painLine(sig){
   const what = `${sig.area[0].toUpperCase() + sig.area.slice(1)} pain was above 3 on ${sig.high} of your last ${sig.of} joint checks`;
   const mod = PAIN_CARE[sig.area] && MODE_DEFS.find(m => m.key === PAIN_CARE[sig.area]);
-  return mod && !modes[mod.key] ? `${what}: consider turning on ${mod.name}.` : `${what}: if it keeps up, get it checked by a physio or doctor.`;
+  return mod && !modes[mod.key] ? `${what}: consider turning on ${mod.name}.` : `${what}: keep the load down until it settles.`;
 }
 
 function generateCoachNotes(){

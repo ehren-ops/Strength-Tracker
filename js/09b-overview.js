@@ -72,6 +72,17 @@ function renderProgramCard(){
   </div>`;
 }
 
+// Start dates fixed by hand: Edit opens a date field under the status line; a change saves at once.
+let editingDates = null;
+function editLink(key){
+  return `<button type="button" class="date-edit-link" onclick="toggleDateEdit('${key}')">${editingDates === key ? "Done" : "Edit"}</button>`;
+}
+function toggleDateEdit(key){ editingDates = editingDates === key ? null : key; render(); }
+function dateEditRow(fields){
+  return `<div class="date-edit-row">${fields.map(([label, value, onchange]) =>
+    `<label>${label} <input type="date" value="${value || ""}" max="${todayISO()}" onchange="${onchange}"></label>`).join("")}</div>`;
+}
+
 // Ski: one row, a three-way phase control and one status line.
 const SKI_PHASES = [["off", "Off"], ["preseason", "Preseason"], ["season", "In season"]];
 function renderSkiModifier(){
@@ -86,10 +97,11 @@ function renderSkiModifier(){
   return `<div class="mod-row">
       <div class="mod-head"><span class="mod-title">${icon("ski")} Ski</span>
         <div class="seg" role="group" aria-label="Ski phase">${SKI_PHASES.map(([k, label]) =>
-          `<button class="seg-btn ${k}${k === phase ? " on" : ""}" aria-pressed="${k === phase}" onclick="setSkiPhase('${k}')">${label}</button>`).join("")}</div>
+          `<button class="seg-btn ${k}${k === phase ? " on" : ""}" aria-pressed="${k === phase}" onclick="userSetSkiPhase('${k}')">${label}</button>`).join("")}</div>
       </div>
       <p class="mod-desc">${desc}</p>
-      <div class="ski-status">${status}</div>
+      <div class="ski-status">${status}${phase !== "off" && start ? ` ${editLink("ski")}` : ""}</div>
+      ${editingDates === "ski" && phase !== "off" ? dateEditRow([["Started", start, "setSkiStart(this.value)"]]) : ""}
     </div>`;
 }
 // End of a phase: after the preseason weeks, offer In season; in spring, offer Off. Shares the
@@ -150,7 +162,7 @@ function renderModifierRow(key, extraHtml){
   return `<div class="mod-row">
       <div class="mod-head">
         <span class="mod-title">${icon(ic)} ${name}</span>
-        <button class="theme-toggle mod-switch${on ? " on" : ""}" style="--mod-color:var(--${key})" onclick="toggleMode('${key}')" aria-pressed="${on}" aria-label="${name}"><span class="knob"></span><span class="sr-only">${name}: ${on ? "ON" : "OFF"}</span></button>
+        <button class="theme-toggle mod-switch${on ? " on" : ""}" style="--mod-color:var(--${key})" onclick="userToggleMode('${key}')" aria-pressed="${on}" aria-label="${name}"><span class="knob"></span><span class="sr-only">${name}: ${on ? "ON" : "OFF"}</span></button>
       </div>
       <p class="mod-desc">${desc}</p>
       ${extraHtml || ""}
@@ -181,7 +193,11 @@ function renderDeloadModifier(){
     else if(st.daysUntilDue === 0) next = `Next recommended: today`;
     else next = `Next recommended: ${fmtShortDate(st.nextDue)} · <b>due now</b>`;
   }
-  return renderModifierRow("deload", `<div class="deload-status" id="deload-status"><div>${last}</div><div>${next}</div></div>`);
+  const edit = deloadDates.startedOn ? ` · ${editLink("deload")}` : "";
+  const rows = editingDates !== "deload" || !deloadDates.startedOn ? ""
+    : dateEditRow(st.on ? [["Started", deloadDates.startedOn, "setDeloadDate('startedOn', this.value)"]]
+      : [["Started", deloadDates.startedOn, "setDeloadDate('startedOn', this.value)"], ["Ended", deloadDates.endedOn || deloadDates.startedOn, "setDeloadDate('endedOn', this.value)"]]);
+  return renderModifierRow("deload", `<div class="deload-status" id="deload-status"><div>${last}${edit}</div><div>${next}</div></div>${rows}`);
 }
 
 // ---------- weekly balance ----------

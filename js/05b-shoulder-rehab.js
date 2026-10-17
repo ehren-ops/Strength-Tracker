@@ -249,7 +249,6 @@ function renderRehabCard(){
   if(phase === 2) html += `<button type="button" class="skip-btn" onclick="setRehabPhase3(true)">Move to Phase 3</button>`;
   if(phase === 3) html += `<button type="button" class="skip-btn" onclick="setRehabPhase3(false)">Back to Phase 2</button>`;
   html += `</div>`;
-  html += `<p class="care-disclaimer">General guidance, not a substitute for a PT or doctor. Sharp pain, night pain or weakness: get it checked.</p>`;
   html += `</div>`;
   return html;
 }
