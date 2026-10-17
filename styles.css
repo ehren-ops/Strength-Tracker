@@ -187,7 +187,11 @@
   .card-head .ex-name{line-height:1;flex:1 1 0;min-width:0;}
   .ch-side{justify-self:end;text-align:right;}
   .ch-side .last-line{margin-left:0;}
-  .card-head .big-label{align-self:center;}
+  /* The label under the weight and the record share a text baseline, so TODAY and EST. 1RM (or MOST
+     REPS, LONGEST HOLD) sit on one line on every card; no extra line height in that row. */
+  .card-head .big-label, .card-head .ch-rec{align-self:last baseline;}
+  .card-head .big-val{line-height:1.1;}
+  .ch-rec .onerm-box, .ch-rec .onerm-val, .ch-rec .onerm-label{line-height:1.2;}
   .big-label{display:block;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--slate);white-space:nowrap;line-height:1.2;}
   .big-label.locked{color:var(--emerald);font-weight:700;}
   .last-line{font:inherit;font-family:var(--font-body);font-variant-numeric:tabular-nums;font-size:0.78rem;font-weight:600;color:var(--slate);white-space:nowrap;flex:0 0 auto;margin-left:auto;background:none;border:none;padding:0;cursor:pointer;}
@@ -283,7 +287,19 @@
   .hc-btn .ic{width:1.05em;height:1.05em;stroke-width:2;}
   .hc-btn{display:inline-flex;align-items:center;gap:0.35rem;background:rgba(255,255,255,0.08);border:1.5px solid rgba(241,239,231,0.55);color:inherit;border-radius:999px;padding:0.4rem 0.8rem;font:inherit;font-size:0.85rem;font-weight:700;line-height:1;cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums;}
   .hold-clock.paused .hc-time{opacity:0.55;}
-  .hold-clock.compact .hc-controls{display:none;}
+  .hold-clock.compact .hc-controls, .hold-clock.compact .hc-ctl{display:none;}
+  /* The rest row with Min and Max under its ends. */
+  .hc-ctl{display:inline-flex;flex-direction:column;align-items:stretch;gap:0.4rem;margin-top:0.45rem;}
+  /* Rests carry a second row of buttons: a little more height, a little less clock. */
+  .hold-clock.rest:not(.compact){min-height:calc(18.5rem + env(safe-area-inset-top, 0px));}
+  .hold-clock.rest:not(.compact) .hc-time{font-size:clamp(3.6rem, 17vw, 6rem);}
+  .hc-ctl .hc-controls{margin-top:0;}
+  .hc-range{display:flex;justify-content:space-between;}
+  .hc-btn.hc-mini{font-size:0.75rem;padding:0.32rem 0.7rem;}
+  .hc-btn.hc-mini.on{background:var(--phase);border-color:var(--phase);color:#fff;}
+  /* Past the lift's rest: Ready, in the go color, counting up. */
+  .hold-clock.extra{--phase:var(--emerald);background:color-mix(in srgb, var(--emerald) 30%, var(--pine));}
+  .hold-clock.extra .hc-phase{color:color-mix(in srgb, var(--emerald) 40%, #fff);}
   /* Set by set: the reps in place of a clock, and a filled Done button. */
   .hold-clock.set{--phase:var(--amber-light);}
   .hc-reps small{font-size:0.32em;font-weight:600;opacity:0.8;margin-left:0.15em;}

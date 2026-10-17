@@ -400,7 +400,7 @@ function renderExerciseCard(name, ex){
     html += `<div class="card-head">
       ${titleHtml}
       <span class="big-val">${bigVal}</span><div class="ch-side">${priorHtml}</div>
-      <span class="big-label${todayLog ? " locked" : ""}">${bigLabel}</span><div class="ch-side">${topRightSlot(name, ex, work, todayLog || suggestion || work, isCustom)}</div>
+      <span class="big-label${todayLog ? " locked" : ""}">${bigLabel}</span><div class="ch-side ch-rec">${topRightSlot(name, ex, work, todayLog || suggestion || work, isCustom)}</div>
     </div>`;
     html += modHtml;
 

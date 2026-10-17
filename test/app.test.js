@@ -3144,6 +3144,12 @@ async function main(){
     const left0 = holdTimer.endAt - Date.now();
     clock().querySelector('[data-hc="more"]').click();
     out.more = [Math.round((holdTimer.endAt - Date.now() - left0) / 1000), holdTimer.rest, restPrefs['Dead Hang'], holdTimer.steps.filter(x => x.kind === 'rest').map(x => x.secs).join(',')];
+    // Max and Min under the ends set the whole rest at once (and it is kept).
+    clock().querySelector('[data-hc="max"]').click();
+    out.max = [holdTimer.rest, restPrefs['Dead Hang'], holdTimer.steps.filter(x => x.kind === 'rest').map(x => x.secs).join(','), clock().querySelector('[data-hc="max"]').classList.contains('on')];
+    clock().querySelector('[data-hc="min"]').click();
+    out.min = [holdTimer.rest, restPrefs['Dead Hang']];
+    clock().querySelector('[data-hc="more"]').click(); // back to 60
     clock().querySelector('[data-hc="skip"]').click();
     out.afterRest = kind();
     clearHoldTimer();
@@ -3156,7 +3162,7 @@ async function main(){
     return out;
   });
   if(r97.firstRest !== 45 || !r97.stable || r97.holdBtns !== 'Pause|Rest' || !/underline/.test(r97.underline) || JSON.stringify(r97.paused) !== '["hold",true,"Paused",true]' || !r97.resumed
-    || JSON.stringify(r97.skipped) !== '["rest","[[22]]"]' || r97.restBtns !== '−15|Pause|Next set|+15' || JSON.stringify(r97.more) !== '[15,60,60,"55,55"]' || r97.afterRest !== 'ready' || r97.kept !== 60)
+    || JSON.stringify(r97.skipped) !== '["rest","[[22]]"]' || r97.restBtns !== '−15|Pause|Next set|+15|Min 0:45|Max 3:00' || JSON.stringify(r97.max) !== '[180,180,"175,175",true]' || JSON.stringify(r97.min) !== '[45,45]' || JSON.stringify(r97.more) !== '[15,60,60,"55,55"]' || r97.afterRest !== 'ready' || r97.kept !== 60)
     throw new Error('expected pause, skip and -15/+15 on the hold clock, with the new rest kept, got: ' + JSON.stringify(r97));
   console.log('OK: Pause freezes the clock (Resume picks up), Skip ends the hold at 22 sec and goes to the rest, +15 makes the rest 60 sec for this run and the next, Skip on a rest goes to the count-in, "Tap twice to stop" is underlined');
 
@@ -3179,7 +3185,9 @@ async function main(){
     clock().querySelector('[data-hc="more"]').click();
     out.nextRests = holdTimer.steps.filter(x => x.kind === 'rest').map(x => x.secs).join(',');
     out.planAfter = document.querySelector('.card-head .timer-plan').textContent;
-    holdTimer.endAt = Date.now() - 1; tickHoldTimer(); // the rest runs out: set 2
+    holdTimer.endAt = Date.now() - 1; tickHoldTimer(); // the rest runs out: Ready, counting up to 3:00
+    out.extra = [holdTimer.steps[holdTimer.idx].kind, text(), [...clock().querySelectorAll('.hc-btn')].map(b => b.textContent).join('|')];
+    holdTimer.endAt = Date.now() - 1; tickHoldTimer(); // 3:00 reached: set 2 comes up on its own
     out.set2 = text();
     clock().querySelector('.hc-done').click();
     clock().querySelector('[data-hc="skip"]').click(); // skip the rest
@@ -3199,10 +3207,10 @@ async function main(){
     view = saved.view; selected = saved.selected; render();
     return out;
   });
-  if(r98.btn !== '3x8' || r98.plan !== '3 × 8 repsRest 1:30' || r98.planAfter !== '3 × 8 repsRest 1:45' || !/^Set 1 of 3 8 reps Squat · 185 lb total/.test(r98.set1) || !/Set done/.test(r98.done1) || r98.rest[0] !== 'rest' || r98.rest[1] !== 90 || !/^Rest 1:30 Next: set 2 of 3/.test(r98.rest[2])
+  if(r98.btn !== '3x8' || r98.plan !== '3 × 8 repsRest 1:30–3:00' || r98.planAfter !== '3 × 8 repsRest 1:45–3:00' || r98.extra[0] !== 'extra' || !/^Ready 1:45 Next: set 2 of 3 · go when ready, up to 3:00/.test(r98.extra[1]) || r98.extra[2] !== 'Pause|Start set' || !/^Set 1 of 3 8 reps Squat · 185 lb total/.test(r98.set1) || !/Set done/.test(r98.done1) || r98.rest[0] !== 'rest' || r98.rest[1] !== 90 || !/^Rest 1:30 Next: set 2 of 3/.test(r98.rest[2])
     || r98.nextRests !== '105,105' || !/^Set 2 of 3/.test(r98.set2) || !/^Done 3x8/.test(r98.end) || r98.form !== '185,3,8' || !/^Stopped 1x8/.test(r98.stopped) || !/\| 1$/.test(r98.stopped))
     throw new Error('expected Squat to run 3 sets of 8 at 185 with Done and a 90 sec rest, fill the form, and keep only finished sets when stopped, got: ' + JSON.stringify(r98));
-  console.log('OK: the clock button runs Squat 3x8 at 185: Set done, Rest 1:30 (+15 makes the rests 1:45), set 2 when the rest ends, Done 3x8 fills the form; stopped after one set it fills 1 set');
+  console.log('OK: the clock button runs Squat 3x8 at 185: Set done, Rest 1:30 (+15 makes the rests 1:45), then Ready counting up to 3:00 with Start set, set 2 on its own at 3:00, Done 3x8 fills the form; stopped after one set it fills 1 set');
 
   console.log('=== 99: the Mobility card and Shoulder Rehab play their moves from the dose, checking each off as it ends ===');
   const r99 = await page.evaluate(() => {
@@ -3272,6 +3280,23 @@ async function main(){
   });
   if(r100.found.length || r100.icons < 2) throw new Error('expected outline icons and no emoji, got: ' + JSON.stringify(r100));
   console.log('OK: no emoji on any day, Overview or the clock; modifier pills carry outline icons (' + r100.icons + ' on Squat)');
+
+  console.log('=== 101: the label under the weight and the record share a baseline on every card ===');
+  const r101 = await page.evaluate(() => {
+    const saved = { view, selected };
+    const base = el => { const m = document.createElement('span'); m.style.cssText = 'display:inline-block;width:0;height:0;'; el.appendChild(m); const y = m.getBoundingClientRect().bottom; m.remove(); return Math.round(y * 10) / 10; };
+    const out = {};
+    [['Squat', 'full'], ['Bulgarian Split Squat', 'lower'], ['Dead Hang', 'upper'], ['Push-Ups', 'upper']].forEach(([n, v]) => {
+      if(!data[n] || !data[n].entries.length) data[n] = Object.assign(newExerciseShell(n), { entries: [{ clientId: 'b101' + n, date: shiftISO(todayISO(), -5), weight: n === 'Squat' ? 180 : n === 'Bulgarian Split Squat' ? 30 : 0, sets: 3, reps: n === 'Dead Hang' ? 40 : 8 }] });
+      view = v; selected = n; render();
+      const lab = document.querySelector('.card-head .big-label'), rec = document.querySelector('.card-head .ch-rec .onerm-label');
+      out[n] = lab && rec ? Math.abs(base(lab) - base(rec)) : 'missing';
+    });
+    view = saved.view; selected = saved.selected; render();
+    return out;
+  });
+  if(Object.values(r101).some(d => d === 'missing' || d > 0.5)) throw new Error('expected TODAY and the record label on one baseline on every card, got offsets: ' + JSON.stringify(r101));
+  console.log('OK: TODAY and EST. 1RM / MOST REPS / LONGEST HOLD share a baseline on Squat, Bulgarian Split Squat, Dead Hang and Push-Ups');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

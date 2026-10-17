@@ -73,7 +73,10 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   `hold`, `set` waits for Done, `rest`), all on absolute end times. `timerButtonFor` puts the round
   clock button at the top of the card head's side column (in the title row before any history);
   `routineButton` does the same for checklist cards and each rehab group. A rest changed with
-  -15/+15 is saved per lift in `restPrefs` and synced in `user_settings.settings.rest`. Routine
+  -15/+15 or the Min / Max buttons (`restRangeFor`: 90, 60 or the lift's own shorter rest, up to
+  3:00) is saved per lift in `restPrefs` and synced in `user_settings.settings.rest`; the clock
+  always starts on the rest set last. Set by set, each rest is a range: it counts down to that rest,
+  then an `extra` step ("Ready") counts up to the max before the next set starts on its own. Routine
   doses are parsed by `parseDose`; keep new checklist doses in the same shapes ("45 sec each side",
   "10 reps", "3 × 12-15, 3-5 lb").
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
