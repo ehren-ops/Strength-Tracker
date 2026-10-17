@@ -41,6 +41,7 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 | `js/08-calendar-notes.js` | Calendar, `guessDayForNames`, due lifts (`dueLifts`), rule-based Coach's Notes |
 | `js/09-coach.js` | AI coach: cached analyses, payloads (`buildSessionCoachPayload`/`buildWeeklyCoachPayload`), trends, heart rate, panels |
 | `js/09b-overview.js` | Overview page: deload status and popup, modifier rows, Weekly Balance, % change, backup card |
+| `js/09c-muscle-map.js` | Muscle Map card on the Overview: `LIFT_MUSCLES` (main muscles full sets, helpers half), `muscleWeek` (last 7 days), `muscleRecovery` (last 2 days: 5+ sets hard, 2+ recovering), front and back SVG figures, Sets / Recovery toggle, tap a muscle for its lifts |
 | `js/10-interactions.js` | Selecting, adding exercises, `logEntry` |
 | `js/11-init.js` | Startup and event wiring |
 | `supabase/functions/coach/index.ts` | Edge function: session/weekly AI notes (Claude), `hr` mode, prompts in `PRINCIPLES` |
@@ -97,6 +98,8 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   exercises, before the finishers: dashed for today only, solid once kept. Its card says so in the
   tips (`addedLiftTip`). New lifts for the library want a `LIFT_PATTERNS` group (09) and a
   `LIBRARY_EQUIPMENT` line (06d). On Extra the "+" still adds a custom exercise by name.
+- A new lift wants a `LIFT_MUSCLES` row (09c) too, or the Muscle Map leaves it out. Shading is by
+  class (`mm-b0`..`mm-b4`, `mm-hard` / `mm-recovering` / `mm-ready`) on `--mm-*` tokens in both themes.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double

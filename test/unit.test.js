@@ -247,6 +247,15 @@ test("modifier registry rows are complete", () => {
   eq(bad, [], "incomplete rows");
 });
 
+test("muscle map: main muscles get full sets, helpers half, and recent work sets recovery", () => {
+  reset();
+  lift("Squat", [[1, 185, 5], [3, 180, 5], [9, 175, 5]]);
+  lift("Bench Press", [[0, 155, 8]]);
+  run(`data["Bench Press"].entries[0].sets = 6;`);
+  const w = run(`(() => { const w = muscleWeek(); return { quads: w.sets.quads, glutes: w.sets.glutes, chest: w.sets.chest, triceps: w.sets.triceps, total: w.total, sessions: w.sessions, quadsFrom: w.lifts.quads, rec: ["chest", "quads", "triceps", "hamstrings"].map(k => muscleRecovery(w, k).state) }; })()`);
+  eq(w, { quads: 6, glutes: 3, chest: 6, triceps: 3, total: 12, sessions: 3, quadsFrom: [["Squat", 6]], rec: ["hard", "recovering", "recovering", "ready"] }, "muscle week");
+});
+
 if(failures.length){
   console.error(`UNIT TESTS FAILED (${failures.length} of ${passed + failures.length}):\n  ` + failures.join("\n  "));
   process.exit(1);

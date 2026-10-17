@@ -337,6 +337,7 @@ function renderOverview(){
   });
   html += `</div></div></div>`;
 
+  html += renderMuscleCard();
   html += renderBalanceCard();
 
   html += `<div class="card">`;

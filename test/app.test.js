@@ -3461,6 +3461,52 @@ async function main(){
   if(JSON.stringify(r105) !== JSON.stringify(want105)) throw new Error('expected view transitions on lift picks and tab switches, got: ' + JSON.stringify(r105));
   console.log('OK: a lift pick slides its card forward or back, a tab switch slides the page, neither is skipped, and the marks clear after');
 
+  console.log('=== 106: the Muscle Map shades each muscle by its sets, opens a muscle\'s lifts, and switches to recovery ===');
+  const r106 = await page.evaluate(() => {
+    const saved = { data, view, selected, mode: muscleMode, pick: musclePick, shoulder: modes.shoulder, collapsed: overviewCollapsed.muscles };
+    const out = {};
+    try{
+      data = {};
+      const add = (name, daysAgo, sets) => { data[name] = data[name] || newExerciseShell(name); data[name].entries.push({ clientId: name + daysAgo, date: shiftISO(todayISO(), -daysAgo), weight: 100, sets, reps: 8, difficulty: 7 }); };
+      add('Squat', 1, 3); add('Squat', 3, 3); add('Bench Press', 1, 6); add('RDL', 4, 3); add('Barbell Row', 20, 3);
+      modes.shoulder = true; overviewCollapsed.muscles = false; muscleMode = 'sets'; musclePick = null;
+      view = 'overview'; render();
+      const card = document.querySelector('.mm-card');
+      const cls = k => [...card.querySelectorAll('.mm-m')].filter(g => g.getAttribute('onclick') === `pickMuscle('${k}')`).map(g => g.getAttribute('class').split(' ').filter(c => c !== 'mm-m').join(' '));
+      const btn = k => [...card.querySelectorAll('.mm-list button')].find(b => b.getAttribute('onclick') === `pickMuscle('${k}')`);
+      out.sub = card.querySelector('.mm-sub').textContent;
+      out.shades = [cls('quads'), cls('chest'), cls('upperBack'), cls('sideDelts')];
+      out.listQuads = btn('quads').querySelector('b').textContent;
+      out.notes = [...card.querySelectorAll('.mm-note')].map(p => p.textContent);
+      btn('quads').click();
+      const c2 = document.querySelector('.mm-card');
+      out.detail = [c2.querySelector('.mm-detail h4').textContent, c2.querySelector('.mm-big b').textContent, [...c2.querySelectorAll('.mm-lift')].map(r => r.textContent), c2.querySelectorAll('.mm-m.mm-on').length];
+      setMuscleMode('recovery');
+      const c3 = document.querySelector('.mm-card');
+      out.recovery = [c3.querySelector('.mm-detail-head span').textContent, [...c3.querySelectorAll('.mm-list button')].find(b => b.getAttribute('onclick') === "pickMuscle('chest')").querySelector('b').textContent];
+      pickMuscle('quads');
+      out.recNotes = [...document.querySelectorAll('.mm-card .mm-note b')].map(b => b.textContent);
+    } finally {
+      data = saved.data; view = saved.view; selected = saved.selected; muscleMode = saved.mode; musclePick = saved.pick; modes.shoulder = saved.shoulder; overviewCollapsed.muscles = saved.collapsed;
+      try{ localStorage.setItem(MUSCLE_MODE_KEY, saved.mode); }catch(e){}
+      render();
+    }
+    return out;
+  });
+  const want106 = {
+    sub: 'Last 7 days · 3 sessions · 15 sets',
+    shades: [['mm-b2'], ['mm-b2'], ['mm-b0'], ['mm-b0', 'mm-b0']],
+    listQuads: '6',
+    notes: ['Quads 6: the most this week, from 1 lift.', 'No sets: side delts, triceps... '],
+    detail: ['Quads', '6', ['Squat6'], 1],
+    recovery: ['Ready today', new Date(Date.now() + 864e5).toLocaleDateString('en-US', { weekday: 'short' })],
+    recNotes: ['Ready now:', 'Ready today:', 'Ready tomorrow:'],
+  };
+  if(r106.notes.length < 2 || r106.notes[0] !== want106.notes[0] || !/^No sets: /.test(r106.notes[1])) throw new Error('expected Muscle Map notes, got: ' + JSON.stringify(r106.notes));
+  delete r106.notes; delete want106.notes;
+  if(JSON.stringify(r106) !== JSON.stringify(want106)) throw new Error('expected the Muscle Map to shade, open and switch, got: ' + JSON.stringify(r106));
+  console.log('OK: muscles shade by sets (half for helpers), a tapped muscle lists its lifts and outlines on both figures, and Recovery reads the last two days');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,
