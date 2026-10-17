@@ -2794,6 +2794,11 @@ async function main(){
     out.flyLabel = c.querySelector('.big-label').textContent;
     out.chips = c.querySelectorAll('.pr-val').length; // outlines were removed
     out.prDetail = (c.querySelector('.pr-detail') || {}).textContent || '';
+    // The PR line sits centered in the footer, between Earlier and Skip.
+    c.style.width = '330px'; document.body.appendChild(c);
+    const mid = el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; };
+    out.prOffCenter = Math.round(Math.abs(mid(c.querySelector('.pr-detail')) - mid(c.querySelector('.pr-foot'))));
+    c.remove();
     data['Squat'] = mk('Squat', [[-9, 175, 8], [-4, 175, 9]]);
     c = card('Squat');
     out.squatSlot = c.querySelector('.onerm-box').textContent.replace(/\s+/g, ' ').trim();
@@ -2809,10 +2814,10 @@ async function main(){
     return out;
   });
   const ok89 = JSON.stringify(r89.flags) === JSON.stringify([false, 'weight', false, false, false, 'reps']) && r89.record === 13 && r89.recordHeavier === 55 &&
-    /^Most reps ?12 reps$/.test(r89.flySlot) && /Logged today ✓ · PR/.test(r89.flyLabel) && r89.chips === 0 && /PR ?Most reps at 55 lb: 12/.test(r89.prDetail) && /^Est\. 1RM/.test(r89.squatSlot) &&
+    /^Most reps ?12 reps$/.test(r89.flySlot) && /Logged today ✓ · PR/.test(r89.flyLabel) && r89.chips === 0 && /PR ?Most reps at 55 lb: 12/.test(r89.prDetail) && r89.prOffCenter <= 1 && /^Est\. 1RM/.test(r89.squatSlot) &&
     /PRs?: .*\(\d+ lb x \d+\)/.test(r89.notes) && r89.back.plan === '3x11' && /Today: same weight, 11 reps a set/.test(r89.back.desc) && r89.back.reps === '11' && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
   if(!ok89) throw new Error('expected PRs, the rep record slot and trimmed Coach\'s Notes, got: ' + JSON.stringify(r89));
-  console.log('OK: fly 55 lb is a weight PR and 55x12 a rep PR (50x13 at a lighter weight and the deload are not), with the detail in the footer, no outlines, the fly shows "Most reps 12", squat keeps Est. 1RM, and Coach\'s Notes lead with the PR and skip modifier lines');
+  console.log('OK: fly 55 lb is a weight PR and 55x12 a rep PR (50x13 at a lighter weight and the deload are not), with the detail centered in the footer, no outlines, the fly shows "Most reps 12", squat keeps Est. 1RM, and Coach\'s Notes lead with the PR and skip modifier lines');
 
   console.log('=== 90: the joint check logs a 0-10 pain score and area, holds or drops the next weight, and nudges the matching care modifier ===');
   const r90 = await page.evaluate(() => {
