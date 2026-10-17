@@ -15,6 +15,10 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   (04, `ICON_PATHS`). Scenario 100 checks.
 - No disclaimers or safety warnings anywhere ("not a substitute for a PT or doctor", "get it checked",
   "not medical advice"), in the app or the coach prompt. They are clutter; say what to change instead.
+- No dangling lines: at 360px, card notes, tips, labels and tile text should not wrap a few words
+  onto a line of their own. Tighten the wording, merge related notes onto one line, or drop words
+  the context already says (a modifier's name after its pill, "today" under TODAY). Look for orphans
+  in the 360px screenshots before shipping.
 - Leave destructive Supabase actions (drops, deletes) to the owner.
 
 ## Layout
