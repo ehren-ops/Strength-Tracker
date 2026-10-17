@@ -203,7 +203,7 @@ function renderRehabCard(){
 
   rehabGroupsToday().forEach(g => {
     const n = g.idx.filter(i => done.has(i)).length;
-    html += `<h3 class="section rehab-group">${g.title}<span class="rehab-count">${n}/${g.idx.length}</span></h3>`;
+    html += `<h3 class="section rehab-group">${g.title}<span class="rehab-count">${n}/${g.idx.length}${routineButton(`playRehabGroup('${g.key}')`, g.title)}</span></h3>`;
     g.idx.forEach(idx => {
       const item = REHAB_ITEMS[idx];
       const key = name + "|" + idx;

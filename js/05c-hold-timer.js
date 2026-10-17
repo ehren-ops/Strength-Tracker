@@ -136,12 +136,14 @@ function holdLeftMs(t){ return t.paused ? t.paused.left : t.endAt - Date.now(); 
 
 // Moves on to the next step, timed from `from`; false once the last step is done.
 function nextHoldStep(t, from){
+  const left = t.steps[t.idx];
+  if(t.mode === "routine" && left.lastOfItem) markRoutineItem(t, left.item);
   t.idx++;
   if(t.idx >= t.steps.length){ finishHoldTimer(false); return false; }
   const next = t.steps[t.idx];
   t.endAt = from + next.secs * 1000;
   if(next.kind === "hold" || next.kind === "set"){ holdBeep(880, 250); holdBuzz(200); }
-  else if(next.kind === "rest"){ holdBeep(520, 400); holdBuzz([200, 100, 200]); recordRestTap(t.name); }
+  else if(next.kind === "rest"){ holdBeep(520, 400); holdBuzz([200, 100, 200]); if(t.mode !== "routine") recordRestTap(t.name); }
   return true;
 }
 
@@ -167,6 +169,7 @@ function tickHoldTimer(){
 
 function recordHold(set, secs){
   const t = holdTimer;
+  if(t.mode === "routine") return; // a routine checks items off instead
   (t.held[set - 1] = t.held[set - 1] || []).push(secs);
 }
 
@@ -205,7 +208,7 @@ function adjustHoldRest(delta){
   if(t.paused) t.paused.left = newLeft; else t.endAt += applied * 1000;
   step.secs += applied;
   t.rest = Math.max(t.mode === "sets" ? 15 : HOLD_COUNT_IN + 5, t.rest + applied);
-  t.steps.forEach((s, i) => { if(i > t.idx && s.kind === "rest") s.secs = restStepSecs(t); });
+  t.steps.forEach((s, i) => { if(i > t.idx && s.kind === "rest") s.secs = t.mode === "routine" ? Math.max(5, s.secs + applied) : restStepSecs(t); });
   saveRestPref(t.name, t.rest);
   renderHoldClock();
 }
@@ -238,6 +241,15 @@ function finishHoldTimer(early){
   const t = holdTimer;
   clearInterval(t.intervalId);
   t.finished = true;
+  if(t.mode === "routine"){
+    const n = t.items.filter(i => t.doneItems.has(i)).length;
+    if(!early){ holdBeep(880, 500); holdBuzz([300, 120, 300]); }
+    t.summary = `${n}/${t.items.length}`;
+    t.result = early ? `Stopped: ${n} of ${t.items.length} checked off` : "Done: all checked off";
+    renderHoldClock();
+    setTimeout(() => { if(holdTimer === t) clearHoldTimer(); }, early ? 3400 : 2400);
+    return;
+  }
   const perSet = t.held.filter(h => h && h.length).map(h => Math.min(...h));
   if(perSet.length && selected === t.name){
     const setsEl = document.getElementById("f-sets"), repsEl = document.getElementById("f-reps");
@@ -300,7 +312,9 @@ function renderHoldClock(){
   }
   el.hidden = false;
   const t = holdTimer, step = t.steps[Math.min(t.idx, t.steps.length - 1)];
-  const dots = Array.from({ length: t.sets }, (_, i) => `<i class="${(t.held[i] || []).length >= t.sides ? "done" : ""}"></i>`).join("");
+  const dots = t.mode === "routine"
+    ? t.items.map(i => `<i class="${t.doneItems.has(i) ? "done" : ""}"></i>`).join("")
+    : Array.from({ length: t.sets }, (_, i) => `<i class="${(t.held[i] || []).length >= t.sides ? "done" : ""}"></i>`).join("");
   const size = holdCompact ? " compact" : "";
   const handle = `<button type="button" class="hc-handle" data-hc="size" aria-label="${holdCompact ? "Show the big clock" : "Shrink to a bar"}">${holdCompact ? "▾" : "▴"}</button>`;
   if(t.finished){
@@ -310,6 +324,7 @@ function renderHoldClock(){
   }
   const armed = Date.now() - t.lastTap < HOLD_STOP_WINDOW;
   const stopHint = `<div class="hc-stop${armed ? " armed" : ""}">${armed ? "Tap again to stop" : "Tap twice to stop"}</div>`;
+  if(t.mode === "routine"){ renderRoutineClock(el, t, step, dots, handle, stopHint, size); return; }
   if(step.kind === "set"){
     // A set has no clock: the reps to do, the load, and Done.
     const load = t.weight > 0 ? ` · ${t.weight} lb${weightSuffix(t.name)}` : "";
@@ -334,6 +349,108 @@ function renderHoldClock(){
   el.innerHTML = `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${setLine}</div><div class="hc-dots">${dots}</div>${controls}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`;
 }
 function toggleHoldCompact(){ holdCompact = !holdCompact; renderHoldClock(); }
+
+// Routines (the Mobility card and Shoulder Rehab): each move in turn from its dose. Timed moves
+// ("45 sec each side", "5 × 30-45 s") count down per side and per set; rep moves ("10 reps",
+// "3 × 12") wait for Done. A short count-in names the next move, rests sit between sets, and each
+// move is checked off on the card as it ends. Ranges run at their low end.
+const ROUTINE_REST = 30;
+function parseDose(dose){
+  const d = String(dose || "").toLowerCase().replace(/×/g, "x");
+  const sides = /each (side|leg)/.test(d) ? 2 : 1;
+  const each = (d.match(/each (side|leg|way|arm)/) || [])[1] || "";
+  const range = (a, b) => b ? `${a}-${b}` : String(a);
+  let m = d.match(/(\d+)\s*x\s*(\d+)(?:\s*-\s*(\d+))?\s*(?:s|sec)\b/);
+  if(m) return { sets: +m[1], secs: +m[2], sides };
+  m = d.match(/(\d+)\s*x\s*(\d+)(?:\s*-\s*(\d+))?/);
+  if(m) return { sets: +m[1], reps: range(m[2], m[3]), sides, each };
+  m = d.match(/(\d+)(?:\s*-\s*(\d+))?\s*sec/);
+  if(m) return { sets: 1, secs: +m[1], sides };
+  m = d.match(/(\d+)(?:\s*-\s*(\d+))?\s*reps?/);
+  return { sets: 1, reps: m ? range(m[1], m[2]) : "", sides, each };
+}
+function routineItemsFor(name){ return name === REHAB_NAME ? REHAB_ITEMS : ((CHECKLIST_ROUTINES[name] || {}).items || []); }
+function routineSteps(name, idxs, rest){
+  const all = routineItemsFor(name), steps = [];
+  idxs.forEach(idx => {
+    const it = all[idx], p = parseDose(it.dose), label = it.name, start = steps.length;
+    for(let s = 1; s <= p.sets; s++){
+      // What follows the dose's comma (a load, "light", a pause) rides with the name on the clock.
+      const extra = (String(it.dose).split(",")[1] || "").trim();
+      const base = { item: idx, label: extra ? `${label} · ${extra}` : label, set: s, sets: p.sets };
+      if(p.secs){
+        const sides = p.sides === 2 ? ["Left side", "Right side"] : [null];
+        sides.forEach((side, i) => {
+          steps.push({ ...base, kind: "ready", secs: HOLD_COUNT_IN, side, switching: i > 0, next: s === 1 && i === 0 });
+          steps.push({ ...base, kind: "hold", secs: p.secs, side });
+        });
+      } else {
+        if(s === 1) steps.push({ ...base, kind: "ready", secs: HOLD_COUNT_IN, next: true });
+        steps.push({ ...base, kind: "set", secs: Infinity, reps: p.reps, each: p.each });
+      }
+      if(s < p.sets) steps.push({ ...base, kind: "rest", secs: p.secs ? Math.max(5, rest - HOLD_COUNT_IN) : rest });
+    }
+    for(let i = steps.length - 1; i >= start; i--) if(steps[i].kind === "hold" || steps[i].kind === "set"){ steps[i].lastOfItem = true; break; }
+  });
+  return steps;
+}
+// Plays the moves not yet checked off today (all of them when everything is done).
+function startRoutineTimer(name, idxs){
+  if(!idxs.length) return;
+  stopHoldTimer(true);
+  clearRestTimer();
+  const entry = data[name] && data[name].entries.find(e => e.date === todayISO());
+  const done = new Set(entry ? entry.completedIndices || [] : []);
+  const todo = idxs.filter(i => !done.has(i));
+  const run = todo.length ? todo : idxs;
+  const rest = restPrefs[name] || ROUTINE_REST;
+  const steps = routineSteps(name, run, rest);
+  holdTimer = { mode: "routine", name, items: idxs, doneItems: new Set([...done].filter(i => idxs.includes(i) && !run.includes(i))), rest, sides: 1, sets: 0,
+    steps, idx: 0, endAt: Date.now() + steps[0].secs * 1000, paused: null, held: [], lastTap: 0, beeped: {}, intervalId: setInterval(tickHoldTimer, 200), wake: null };
+  beginHoldTimer();
+}
+function playChecklist(name){ startRoutineTimer(name, routineItemsFor(name).map((_, i) => i)); }
+function playRehabGroup(key){
+  const g = rehabGroupsToday().find(x => x.key === key);
+  if(g) startRoutineTimer(REHAB_NAME, g.idx);
+}
+function markRoutineItem(t, idx){
+  t.doneItems.add(idx);
+  const entry = getOrCreateTodayChecklistEntry(t.name);
+  if((entry.completedIndices || []).includes(idx)) return;
+  entry.completedIndices = [...(entry.completedIndices || []), idx].sort((a, b) => a - b);
+  persist();
+  enqueueOp({ id: genId(), type: "upsert_entry", payload: { exerciseName: t.name, clientId: entry.clientId } });
+  render();
+}
+function routineButton(onclick, what){
+  return `<button type="button" class="timer-btn" onclick="${onclick}" aria-label="Play ${what}">${HOLD_ICON}</button>`;
+}
+function renderRoutineClock(el, t, step, dots, handle, stopHint, size){
+  const pos = `${t.items.indexOf(step.item) + 1} of ${t.items.length}`;
+  const setPart = step.sets > 1 ? ` · set ${step.set} of ${step.sets}` : "";
+  const sidePart = step.side ? ` · ${step.side}` : "";
+  if(step.kind === "set"){
+    el.className = `hold-clock set${size}`;
+    el.setAttribute("aria-label", `${step.label}, ${step.reps} reps`);
+    el.innerHTML = `<div class="hc-phase">Move ${pos}</div><div class="hc-time hc-reps">${step.reps}<small> reps${step.each ? " each " + step.each : ""}</small></div><div class="hc-set">${step.label}${setPart}</div><div class="hc-dots">${dots}</div><div class="hc-controls"><button type="button" class="hc-btn hc-done" data-hc="skip">✓ Done</button></div>${stopHint}${handle}`;
+    return;
+  }
+  const left = Math.max(0, Math.ceil(holdLeftMs(t) / 1000));
+  const phase = t.paused ? "Paused" : step.kind === "ready" ? (step.switching ? "Switch sides" : step.next ? `Move ${pos}` : "Get ready") : step.kind === "hold" ? "Hold" : "Rest";
+  const line = step.kind === "rest" ? `Next: set ${step.set + 1} of ${step.sets} · ${step.label}` : step.kind === "ready" && step.next ? `Next: ${step.label}` : `${step.label}${setPart}${sidePart}`;
+  const pct = Math.min(100, Math.max(0, 100 * (1 - holdLeftMs(t) / (step.secs * 1000))));
+  const skipLabel = step.kind === "rest" ? "Next set" : step.kind === "hold" ? "Next" : "Start";
+  const controls = `<div class="hc-controls">`
+    + (step.kind === "rest" ? `<button type="button" class="hc-btn" data-hc="less" aria-label="15 seconds less rest">−15</button>` : "")
+    + `<button type="button" class="hc-btn" data-hc="pause">${t.paused ? "▶ Resume" : "❚❚ Pause"}</button>`
+    + `<button type="button" class="hc-btn" data-hc="skip">${skipLabel} ⏭</button>`
+    + (step.kind === "rest" ? `<button type="button" class="hc-btn" data-hc="more" aria-label="15 seconds more rest">+15</button>` : "")
+    + `</div>`;
+  el.className = `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`;
+  el.setAttribute("aria-label", `${phase}, ${left} seconds, ${line}`);
+  el.innerHTML = `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${line}</div><div class="hc-dots">${dots}</div>${controls}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`;
+}
 
 // Sound needs a tap to start on phones; the Start tap creates the context, later beeps reuse it.
 let holdAudioCtx = null;

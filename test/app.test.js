@@ -3197,6 +3197,57 @@ async function main(){
     throw new Error('expected Squat to run 3 sets of 8 at 185 with Done and a 90 sec rest, fill the form, and keep only finished sets when stopped, got: ' + JSON.stringify(r98));
   console.log('OK: the clock button runs Squat 3x8 at 185: Set done, Rest 1:30 (+15 makes the rests 1:45), set 2 when the rest ends, Done 3x8 fills the form; stopped after one set it fills 1 set');
 
+  console.log('=== 99: the Mobility card and Shoulder Rehab play their moves from the dose, checking each off as it ends ===');
+  const r99 = await page.evaluate(() => {
+    const saved = { hip: JSON.stringify(data['Hip Stretch'] || null), rehab: JSON.stringify(data[REHAB_NAME] || null), view, selected, extraGroup, mobilityRoutine, modes: { ...modes }, sr: JSON.stringify(shoulderRehab) };
+    data['Hip Stretch'] = newExerciseShell('Hip Stretch');
+    view = 'extra'; extraGroup = 'mobility'; mobilityRoutine = 'Hip Stretch'; selected = 'Mobility'; render();
+    const clock = () => document.getElementById('hold-clock');
+    const text = () => [...clock().children].filter(c => !c.matches('button')).map(c => c.textContent).filter(Boolean).join(' ');
+    const step = () => holdTimer.steps[holdTimer.idx];
+    const tick = () => { holdTimer.endAt = Date.now() - 1; tickHoldTimer(); };
+    const out = { parse: ['45 sec each side', '10 reps', '5 × 30-45 s', '3 × 12-15, 3-5 lb', '8 reps each side'].map(d => JSON.stringify(parseDose(d))) };
+    document.querySelector('#app .card .timer-btn').click();
+    out.ready = text();
+    tick(); out.hold = text();
+    tick(); out.switching = text();
+    tick(); tick(); // right side held: 90/90 done
+    out.after1 = [JSON.stringify(data['Hip Stretch'].entries[0].completedIndices), text()];
+    while(step().kind !== 'set') tick();
+    out.reps = text();
+    clock().querySelector('.hc-done').click();
+    out.end = text();
+    out.checked = JSON.stringify(data['Hip Stretch'].entries[0].completedIndices);
+    clearHoldTimer();
+    // Played again after a partial day: it starts at the first move not checked off.
+    data['Hip Stretch'].entries[0].completedIndices = [0, 1];
+    document.querySelector('#app .card .timer-btn').click();
+    out.resume = text();
+    clearHoldTimer();
+    // Shoulder Rehab, phase 2: each group has its own play button.
+    modes.shoulder = true; shoulderRehab = { startedOn: shiftISO(todayISO(), -16), endedOn: null };
+    delete data[REHAB_NAME];
+    view = 'upper'; selected = REHAB_NAME; render();
+    out.rehabBtns = document.querySelectorAll('.rehab-group .timer-btn').length;
+    document.querySelector('.rehab-group .timer-btn').click();
+    tick();
+    out.rehab = text();
+    clock().querySelector('.hc-done').click();
+    out.rehabRest = text();
+    clearHoldTimer();
+    modes.shoulder = saved.modes.shoulder; shoulderRehab = JSON.parse(saved.sr);
+    const hip = JSON.parse(saved.hip); if(hip) data['Hip Stretch'] = hip; else delete data['Hip Stretch'];
+    const rehab = JSON.parse(saved.rehab); if(rehab) data[REHAB_NAME] = rehab; else delete data[REHAB_NAME];
+    view = saved.view; selected = saved.selected; extraGroup = saved.extraGroup; mobilityRoutine = saved.mobilityRoutine; render();
+    return out;
+  });
+  const want99 = { parse: ['{"sets":1,"secs":45,"sides":2}', '{"sets":1,"reps":"10","sides":1,"each":""}', '{"sets":5,"secs":30,"sides":1}', '{"sets":3,"reps":"12-15","sides":1,"each":""}', '{"sets":1,"reps":"8","sides":2,"each":"side"}'] };
+  if(JSON.stringify(r99.parse) !== JSON.stringify(want99.parse) || !/^Move 1 of 5 5 Next: 90\/90 Hip Stretch/.test(r99.ready) || !/^Hold 45 90\/90 Hip Stretch · Left side/.test(r99.hold) || !/^Switch sides 5 90\/90 Hip Stretch · Right side/.test(r99.switching)
+    || r99.after1[0] !== '[0]' || !/Next: Couch Stretch/.test(r99.after1[1]) || !/^Move 5 of 5 5 reps each side World's Greatest Stretch/.test(r99.reps) || !/^Done 5\/5/.test(r99.end) || r99.checked !== '[0,1,2,3,4]'
+    || !/Next: Pigeon Pose/.test(r99.resume) || r99.rehabBtns !== 2 || !/^Move 1 of 6 12-15 reps Side-lying external rotation · 3-5 lb · set 1 of 3/.test(r99.rehab) || !/^Rest 30 Next: set 2 of 3/.test(r99.rehabRest))
+    throw new Error('expected Mobility and Shoulder Rehab to play their moves and check them off, got: ' + JSON.stringify(r99));
+  console.log('OK: Hip Stretch plays 45 sec a side with a switch, rep moves wait for Done, each move is checked off as it ends (5/5), a second play starts at the first unchecked move; Shoulder Rehab has a play button per group (12-15 reps, 3-5 lb, set 1 of 3, then a 30 sec rest)');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

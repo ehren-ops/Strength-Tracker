@@ -266,7 +266,7 @@ function renderChecklistCard(name, ex, opts){
   const completed = new Set(entry ? entry.completedIndices || [] : []);
 
   let html = `<div class="card">`;
-  html += `<h2 class="ex-name">${opts && opts.title || name}</h2>`;
+  html += `<div class="ex-title-row"><h2 class="ex-name">${opts && opts.title || name}</h2>${routineButton(`playChecklist('${name.replace(/'/g,"\\'")}')`, name)}</div>`;
   if(opts && opts.chips) html += opts.chips;
   if(routine.intro) html += `<p style="font-size:0.78rem;color:var(--slate);margin:0 0 0.8rem;">${routine.intro}</p>`;
 

@@ -65,6 +65,13 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   an empty track from the estimated max. Read reps through `effectiveTargetReps` /
   `entryTargetReps`, which know the track. Browser scenarios that test other rules on a main lift
   stub `plannedHeavy = () => false` so they do not depend on the weekday.
+- The clock (05c): one `holdTimer` with `mode` holds / sets / routine and a list of steps (`ready`,
+  `hold`, `set` waits for Done, `rest`), all on absolute end times. `timerButtonFor` puts the round
+  clock button at the top of the card head's side column (in the title row before any history);
+  `routineButton` does the same for checklist cards and each rehab group. A rest changed with
+  -15/+15 is saved per lift in `restPrefs` and synced in `user_settings.settings.rest`. Routine
+  doses are parsed by `parseDose`; keep new checklist doses in the same shapes ("45 sec each side",
+  "10 reps", "3 × 12-15, 3-5 lb").
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double

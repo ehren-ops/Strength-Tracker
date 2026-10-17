@@ -442,7 +442,8 @@
   .rehab-phase{font-size:0.78rem;color:var(--slate);margin:0.2rem 0 0.5rem;line-height:1.4;}
   .rehab-rules{display:flex;flex-direction:column;gap:0.1rem;font-size:0.72rem;line-height:1.35;color:var(--shoulder-text);background:var(--shoulder-bg);border:1px solid var(--shoulder-border);border-radius:8px;padding:0.4rem 0.55rem;margin-bottom:0.3rem;}
   .rehab-group{display:flex;justify-content:space-between;align-items:baseline;gap:0.6rem;margin:0.8rem 0 0.1rem;}
-  .rehab-count{font-size:0.7rem;color:var(--slate);font-weight:500;flex-shrink:0;}
+  .rehab-count{font-size:0.7rem;color:var(--slate);font-weight:500;flex-shrink:0;display:inline-flex;align-items:center;gap:0.5rem;}
+  .rehab-count .timer-btn{width:1.6rem;height:1.6rem;}
   .rehab-pain{margin-top:0.8rem;}
   .rehab-pain-label{display:block;font-size:0.72rem;font-weight:600;color:var(--ink);margin-bottom:0.3rem;}
   .rehab-pain-scale{display:grid;grid-template-columns:repeat(11,1fr);gap:3px;}
