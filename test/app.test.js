@@ -3423,6 +3423,44 @@ async function main(){
   if(JSON.stringify(r104) !== JSON.stringify(want104)) throw new Error('expected the program record to hold up to stray taps, got: ' + JSON.stringify(r104));
   console.log('OK: quick looks at Full Body 2+1 are cleared and Classic counts from the first log, a flip there and back keeps the start, a real 2+1 stint stays, and the switch offers Undo');
 
+  console.log('=== 105: tab switches and lift picks animate with view transitions, then clean up ===');
+  const r105 = await page.evaluate(async () => {
+    const saved = { view, selected, vt: viewTransitions, start: document.startViewTransition };
+    const out = { api: typeof document.startViewTransition === 'function' };
+    if(!out.api) return out;
+    const runs = [];
+    document.startViewTransition = function(cb){ const t = saved.start.call(document, cb); runs.push(t); return t; };
+    viewTransitions = true;
+    const root = document.documentElement;
+    try{
+      switchView('upper'); render();
+      await new Promise(r => setTimeout(r, 50));
+      const row = [...document.querySelectorAll('#pill-scroll .pill[data-name]')].map(p => p.dataset.name);
+      const before = runs.length;
+      selectExercise(row[2]);
+      out.card = [root.dataset.vt, root.dataset.vtDir, selected === row[2]];
+      await runs[before].ready.then(() => 'ok', e => 'skipped: ' + e.name).then(v => { out.cardReady = v; });
+      await runs[before].finished; await new Promise(r => setTimeout(r, 0));
+      out.cardAfter = [root.dataset.vt || '', document.querySelector('#pill-scroll .pill.active').dataset.name === row[2], document.querySelector('#app .card').style.viewTransitionName];
+      selectExercise(row[0]);
+      out.cardBack = root.dataset.vtDir;
+      await runs[runs.length - 1].finished;
+      switchView('overview');
+      out.tab = [root.dataset.vt, root.dataset.vtDir];
+      await runs[runs.length - 1].ready.then(() => 'ok', e => 'skipped: ' + e.name).then(v => { out.tabReady = v; });
+      await runs[runs.length - 1].finished; await new Promise(r => setTimeout(r, 0));
+      out.tabAfter = [root.dataset.vt || '', document.getElementById('page-title').textContent];
+    } finally {
+      document.startViewTransition = saved.start;
+      viewTransitions = saved.vt;
+      view = saved.view; selected = saved.selected; render();
+    }
+    return out;
+  });
+  const want105 = { api: true, card: ['card', 'fwd', true], cardReady: 'ok', cardAfter: ['', true, ''], cardBack: 'back', tab: ['tab', 'fwd'], tabReady: 'ok', tabAfter: ['', 'Overview'] };
+  if(JSON.stringify(r105) !== JSON.stringify(want105)) throw new Error('expected view transitions on lift picks and tab switches, got: ' + JSON.stringify(r105));
+  console.log('OK: a lift pick slides its card forward or back, a tab switch slides the page, neither is skipped, and the marks clear after');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

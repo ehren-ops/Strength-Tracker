@@ -33,10 +33,44 @@ function renderTabs(){
 }
 
 function switchView(v){
+  const tabs = tabOrder(), from = tabs.indexOf(view);
   view = v;
   if(v === "extra") selected = extraList(extraGroup)[0];
   else if(v !== "overview" && DAY_ORDER[v] && DAY_ORDER[v].length) selected = DAY_ORDER[v][0];
-  render();
+  navTransition("tab", tabs.indexOf(v) < from ? "back" : "fwd", render);
+}
+
+// ---------- view transitions ----------
+// Tab switches and lift picks animate with the View Transitions API: the browser snapshots the old
+// screen, render() runs, and CSS slides the new one in from the side it came from (a tab: the whole
+// page below the header; a lift: its card, while the amber highlight glides to the new tab or pill).
+// State changes before the call; only the repaint waits a frame. No API, reduced motion or a test
+// browser (navigator.webdriver; scenario 105 turns it on) just renders.
+let viewTransitions = !navigator.webdriver;
+let vtSeq = 0;
+function navTransition(kind, dir, update){
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(!viewTransitions || !document.startViewTransition || reduce){ update(); return null; }
+  const root = document.documentElement, id = ++vtSeq;
+  const nameCard = () => { const c = kind === "card" && document.querySelector("#app .card"); if(c) c.style.viewTransitionName = "vt-card"; };
+  root.dataset.vt = kind;
+  root.dataset.vtDir = dir;
+  nameCard();
+  const t = document.startViewTransition(() => { update(); nameCard(); });
+  t.finished.catch(() => {}).then(() => {
+    if(id !== vtSeq) return; // a newer transition owns the marks
+    delete root.dataset.vt;
+    delete root.dataset.vtDir;
+    const c = document.querySelector("#app .card");
+    if(c) c.style.viewTransitionName = "";
+  });
+  return t;
+}
+// Which way a lift pick moves along the pill row, read from the row on screen.
+function pillDirection(name){
+  const pills = [...document.querySelectorAll("#pill-scroll .pill[data-name]")];
+  const from = pills.findIndex(p => p.classList.contains("active")), to = pills.findIndex(p => p.dataset.name === name);
+  return to < from ? "back" : "fwd";
 }
 
 // ---------- Extra groups and the Mobility card ----------
@@ -48,10 +82,11 @@ function extraList(group){
   return activeDayOrder("extra").concat(customs).filter(n => extraGroupOf(n) === group);
 }
 function selectExtraGroup(group){
+  const keys = EXTRA_GROUPS.map(g => g.key), dir = keys.indexOf(group) < keys.indexOf(extraGroup) ? "back" : "fwd";
   extraGroup = group;
   saveExtraPrefs();
   selected = extraList(group)[0];
-  render();
+  navTransition("card", dir, render);
 }
 function currentMobilityRoutine(){
   if(isMobilityRoutine(mobilityRoutine)) return mobilityRoutine;
@@ -150,7 +185,7 @@ function renderDay(day){
     if(!loggedToday && !skipped && !paused && due[name]) pillClasses.push('due');
     const title = skipped ? ` title="Skipped today: ${SKIP_REASONS[skipped]}"` : paused ? ` title="Paused: Shoulder Rehab"`
       : due[name] && !loggedToday ? ` title="Due: missed its last ${due[name].missedSessions} sessions"` : '';
-    html += `<div class="${pillClasses.join(' ')}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')"${title}>${(day !== "extra" && n >= 0 && n < activeDayOrder(day).length) ? (n+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
+    html += `<div class="${pillClasses.join(' ')}" data-name="${escapeHtml(name)}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')"${title}>${(day !== "extra" && n >= 0 && n < activeDayOrder(day).length) ? (n+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
   });
   html += `<div class="pill pill-add" onclick="${day === "extra" ? "toggleAddExercise()" : "openLibrary()"}" aria-label="${day === "extra" ? "Add an exercise" : "Exercise library"}">+</div></div>`;
   html += `<div id="add-ex-row" style="display:none" class="add-ex-row">

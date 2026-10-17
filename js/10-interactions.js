@@ -3,8 +3,10 @@
 
 // ---------- interactions ----------
 function selectExercise(name){
+  if(name === selected){ render(); return; }
+  const dir = pillDirection(name);
   selected = name;
-  render();
+  navTransition("card", dir, render);
 }
 function toggleHistory(name){ openHistory[name] = !openHistory[name]; render(); }
 function toggleAddExercise(){

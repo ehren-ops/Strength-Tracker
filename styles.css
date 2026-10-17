@@ -550,3 +550,20 @@ body.library-open{overflow:hidden;}
 .lib-empty{font-size:0.8rem;color:var(--slate);margin:1rem 0;}
 .lib-custom{display:flex;gap:0.5rem;padding-top:0.6rem;border-top:1px solid var(--hairline);margin-top:0.4rem;}
 .lib-custom input{flex:1 1 auto;min-width:0;font:inherit;padding:0.5rem 0.65rem;border:1px solid var(--line);border-radius:8px;background:var(--input-bg);color:var(--ink);}
+
+/* View transitions (navTransition, 06): a tab slides the page below the header in from its side and
+   the amber tab highlight glides across; a lift pick slides just its card while the pill highlight
+   glides along the row. Everything else crossfades. */
+:root[data-vt-dir="fwd"]{--vt-dir:1;}
+:root[data-vt-dir="back"]{--vt-dir:-1;}
+:root[data-vt="tab"] #app{view-transition-name:vt-app;}
+:root[data-vt="tab"] .tab.active{view-transition-name:vt-tab;}
+:root[data-vt="card"] .pill.active{view-transition-name:vt-pill;}
+:root[data-vt="card"] .group-chip.active{view-transition-name:vt-chip;}
+::view-transition-group(*){animation-duration:0.28s;animation-timing-function:cubic-bezier(0.2,0,0,1);}
+::view-transition-old(root),::view-transition-new(root){animation-duration:0.2s;}
+::view-transition-old(vt-app),::view-transition-old(vt-card){animation:vt-out 0.18s ease-in both;}
+::view-transition-new(vt-app),::view-transition-new(vt-card){animation:vt-in 0.28s cubic-bezier(0.2,0,0,1) both;}
+::view-transition-old(vt-card),::view-transition-new(vt-card){--vt-shift:18px;}
+@keyframes vt-out{to{opacity:0;transform:translateX(calc(var(--vt-dir,1) * -1 * var(--vt-shift,28px)));}}
+@keyframes vt-in{from{opacity:0;transform:translateX(calc(var(--vt-dir,1) * var(--vt-shift,28px)));}}

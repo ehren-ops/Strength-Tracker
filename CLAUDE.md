@@ -108,6 +108,12 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - The coach system prompt is cached (5 minutes). Keep anything that changes per call out of
   `PRINCIPLES` and the mode prompts, or every call pays the cache write for nothing.
 - Render is a full `innerHTML` rebuild on every change; keep helpers pure and cheap.
+- View transitions (`navTransition(kind, dir, update)`, 06): tab switches (`switchView`), lift picks
+  (`selectExercise`) and Extra group chips change state first, then repaint inside
+  `document.startViewTransition`, so the DOM updates a frame later. Animate new navigation through it
+  rather than CSS on rebuilt elements. Each `view-transition-name` must be unique on the page (a
+  duplicate skips the animation): names are set only under `html[data-vt]`. Off for reduced motion
+  and test browsers (`viewTransitions`, false under `navigator.webdriver`); scenario 105 turns it on.
 
 ## Commands
 - Tests: `cd test && npm install` once (with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`), then
