@@ -3480,7 +3480,8 @@ async function main(){
       out.notes = [...card.querySelectorAll('.mm-note')].map(p => p.textContent);
       btn('quads').click();
       const c2 = document.querySelector('.mm-card');
-      out.detail = [c2.querySelector('.mm-detail h4').textContent, c2.querySelector('.mm-big b').textContent, [...c2.querySelectorAll('.mm-lift')].map(r => r.textContent), c2.querySelectorAll('.mm-m.mm-on').length];
+      out.detail = [c2.querySelector('.mm-detail h4').textContent, c2.querySelector('.mm-big b').textContent, [...c2.querySelectorAll('.mm-lift:not(.mm-idea)')].map(r => r.textContent), c2.querySelectorAll('.mm-m.mm-on').length];
+      out.ideas = [...c2.querySelectorAll('.mm-idea')].map(r => [r.querySelector('span').textContent, r.querySelector('.mm-tag').textContent]);
       setMuscleMode('recovery');
       const c3 = document.querySelector('.mm-card');
       out.recovery = [c3.querySelector('.mm-detail-head span').textContent, [...c3.querySelectorAll('.mm-list button')].find(b => b.getAttribute('onclick') === "pickMuscle('chest')").querySelector('b').textContent];
@@ -3499,13 +3500,14 @@ async function main(){
     listQuads: '6',
     notes: ['Quads 6: the most this week, from 1 lift.', 'No sets: side delts, triceps... '],
     detail: ['Quads', '6', ['Squat6'], 1],
+    ideas: [['Front Squat', 'Not in app'], ['Leg Press', 'Not in app'], ['Leg Extension', 'Not in app']],
     recovery: ['Ready today', new Date(Date.now() + 864e5).toLocaleDateString('en-US', { weekday: 'short' })],
     recNotes: ['Ready now:', 'Ready today:', 'Ready tomorrow:'],
   };
   if(r106.notes.length < 2 || r106.notes[0] !== want106.notes[0] || !/^No sets: /.test(r106.notes[1])) throw new Error('expected Muscle Map notes, got: ' + JSON.stringify(r106.notes));
   delete r106.notes; delete want106.notes;
   if(JSON.stringify(r106) !== JSON.stringify(want106)) throw new Error('expected the Muscle Map to shade, open and switch, got: ' + JSON.stringify(r106));
-  console.log('OK: muscles shade by sets (half for helpers), a tapped muscle lists its lifts and outlines on both figures, and Recovery reads the last two days');
+  console.log('OK: muscles shade by sets (half for helpers), a tapped muscle lists its lifts and outlines on both figures, then 3 lifts tagged Not in app, and Recovery reads the last two days');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
