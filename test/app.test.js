@@ -3487,6 +3487,9 @@ async function main(){
       out.recovery = [c3.querySelector('.mm-detail-head span').textContent, [...c3.querySelectorAll('.mm-list button')].find(b => b.getAttribute('onclick') === "pickMuscle('chest')").querySelector('b').textContent];
       pickMuscle('quads');
       out.recNotes = [...document.querySelectorAll('.mm-card .mm-note b')].map(b => b.textContent);
+      pickMuscle('chest');
+      document.querySelector('.mm-card .mm-detail-head').click();
+      out.closedByName = [!document.querySelector('.mm-card .mm-detail'), musclePick];
     } finally {
       data = saved.data; view = saved.view; selected = saved.selected; muscleMode = saved.mode; musclePick = saved.pick; modes.shoulder = saved.shoulder; overviewCollapsed.muscles = saved.collapsed;
       try{ localStorage.setItem(MUSCLE_MODE_KEY, saved.mode); }catch(e){}
@@ -3503,11 +3506,12 @@ async function main(){
     ideas: [['Front Squat', 'Not in app'], ['Leg Press', 'Not in app'], ['Leg Extension', 'Not in app']],
     recovery: ['Ready today', new Date(Date.now() + 864e5).toLocaleDateString('en-US', { weekday: 'short' })],
     recNotes: ['Ready now:', 'Ready today:', 'Ready tomorrow:'],
+    closedByName: [true, null],
   };
   if(r106.notes.length < 2 || r106.notes[0] !== want106.notes[0] || !/^No sets: /.test(r106.notes[1])) throw new Error('expected Muscle Map notes, got: ' + JSON.stringify(r106.notes));
   delete r106.notes; delete want106.notes;
   if(JSON.stringify(r106) !== JSON.stringify(want106)) throw new Error('expected the Muscle Map to shade, open and switch, got: ' + JSON.stringify(r106));
-  console.log('OK: muscles shade by sets (half for helpers), a tapped muscle lists its lifts and outlines on both figures, then 3 lifts tagged Not in app, and Recovery reads the last two days');
+  console.log('OK: muscles shade by sets (half for helpers), a tapped muscle lists its lifts and outlines on both figures, then 3 lifts tagged Not in app, tapping its name closes it, and Recovery reads the last two days');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

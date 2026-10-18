@@ -1,7 +1,7 @@
 // Muscle Map on the Overview: front and back figures shaded by each muscle's working sets over the
 // last 7 days (the same window as Weekly Balance), or by how hard it was worked in the last two days.
 // A lift's main muscles get its full sets, helper muscles half. Tap a muscle (on the body or in the
-// list) to see the lifts behind its number.
+// list) to see the lifts behind its number; tap its name in the panel to close it.
 // Classic script sharing one global scope with the other js/NN-*.js files, run in order.
 
 const MUSCLES = [
@@ -140,35 +140,37 @@ function pickMuscle(k){ musclePick = musclePick === k ? null : k; render(); }
 // (x < 60) and mirrored, so both sides always match. Shapes carry no fill of their own; the muscle's
 // group sets it by class (mm-b0..4 for sets, mm-hard / mm-recovering / mm-ready).
 const mirror = s => s + `<g transform="matrix(-1 0 0 1 120 0)">${s}</g>`;
-const BODY_HALF = "M60 3 C52 3 48.5 9 49 17 C49.3 24 52.5 29.5 55.5 31 L55 37 C50 40 44 41 39 42.5 C33 43.5 30 47 29.5 53 C28.5 60 27.5 68 27 76 C26.5 80 25.5 84 24.5 88 C22.5 96 21.5 104 22 112 L22.5 118 C21 124 21.5 131 24 134 C26.5 135.5 28.5 132 28.5 127 C28.5 123 28 120 28.3 117 C29.5 108 31 98 32.5 90 C33.5 84 34 78 35 72 C35.5 66 36 61 37 57 L37.5 58 C38.5 66 39 74 40.5 82 C41.5 88 41 94 40 100 C38.5 106 37 112 37.5 120 C36.5 138 38.5 155 42.5 172 C43 178 40.5 186 40.5 196 C40.5 206 43 216 44.5 226 L45 234 C44 239 43 242 45.5 243.5 C49 244.5 54 244 55 242 C55.5 240 54.5 236 54 232 C54.5 222 55.5 212 55.5 200 C55.5 192 54 186 54.5 178 C55 172 56.5 165 57 155 C57.5 145 58.5 138 60 134";
+// Stretches a shape sideways (x' = a*x + b) to fit the broad-shouldered build.
+const widen = (a, b, s) => `<g transform="matrix(${a} 0 0 1 ${b} 0)">${s}</g>`;
+const BODY_HALF = "M60 4 C52.5 4 49 9.5 49.2 17 C49.3 22 50.5 27 53.5 30 L53 36 C48 39 42 40 37 41 C30 42 26.5 46.5 26.2 53 C25.5 60 24.8 68 24.8 76 C24.6 80 23.8 84 23 88 C21 96 20.3 104 21 112 L21.6 118 C20 124 20.5 131 23 134.5 C25.8 136 28 132.5 28 127.5 C28 123.5 27.5 120.5 27.8 117 C29 108 30.5 98 32 90 C33.2 84 33.8 78 34.6 72 C35.2 66 35.8 61 37 56.5 L37.6 57.5 C38.4 65 39.6 74 41 82 C41.8 88 41.6 95 41 101 C40.2 107 39.4 113 39.4 120 C38.2 137 39.2 155 42.6 172 C43 178 40 186 40 196 C40 206 42.8 216 44.4 226 L44.8 234 C43.8 239 43 242 45.5 243.5 C49 244.5 54 244 55 242 C55.5 240 54.5 236 54 232 C54.4 222 55.4 212 55.6 200 C55.8 192 54.2 186 54.6 178 C55 172 56.6 165 57 155 C57.5 145 58.5 138 60 134";
 // The center strip covers the hairline seam where the two filled halves meet.
 const BODY_SHAPES = `<g class="mm-skin">${mirror(`<path d="${BODY_HALF} Z"/>`)}<rect x="59" y="6" width="2" height="127"/></g><g class="mm-outline">${mirror(`<path d="${BODY_HALF}"/>`)}</g>`;
-const SIDE_DELTS = mirror(`<path d="M30.5 48 C29 52 28.5 57 29 62 C30.5 63 31.6 60 31.8 55 C31.8 51.5 31.4 49 30.5 48 Z"/>`);
-const FOREARMS = mirror(`<path d="M25 90 C23 98 23 108 24.5 114 C25.5 116 27.5 116 28 113 C29.5 105 31 97 31.5 91 C30 88 26.5 87.5 25 90 Z"/>`);
+const SIDE_DELTS = mirror(widen(1, -2.6, `<path d="M30.5 48 C29 52 28.5 57 29 62 C30.5 63 31.6 60 31.8 55 C31.8 51.5 31.4 49 30.5 48 Z"/>`));
+const FOREARMS = mirror(widen(1.06, -2.85, `<path d="M25 90 C23 98 23 108 24.5 114 C25.5 116 27.5 116 28 113 C29.5 105 31 97 31.5 91 C30 88 26.5 87.5 25 90 Z"/>`));
 const FRONT_DETAIL = mirror(`<path d="M45 41.5 C50 42.3 55 42.6 59 41.8"/>`);
 const BACK_DETAIL = mirror(`<path d="M59.4 40 V112"/>`);
 const FRONT_MUSCLES = [
   ["sideDelts", SIDE_DELTS],
-  ["frontDelts", mirror(`<path d="M40 43 C35 44 31.5 48 31.5 55 C33 60 35.5 62 37.5 62 C37.8 56 38.8 49.5 42 45.5 Z"/>`)],
-  ["chest", mirror(`<path d="M59.3 44 C52 42.5 45 43.5 41.5 46.5 C40 51 40.5 56 43 60 C47 63.5 53 64.5 59.3 63 Z"/>`)],
-  ["biceps", mirror(`<path d="M31.5 64 C29.5 69 29 76 30.5 82 C31.5 85 33.5 85 34 81 C35 75 35 69 33.5 64 C33 62 32 62 31.5 64 Z"/>`)],
+  ["frontDelts", mirror(widen(1.238, -10, `<path d="M40 43 C35 44 31.5 48 31.5 55 C33 60 35.5 62 37.5 62 C37.8 56 38.8 49.5 42 45.5 Z"/>`))],
+  ["chest", mirror(widen(1.078, -4.62, `<path d="M59.3 44 C52 42.5 45 43.5 41.5 46.5 C40 51 40.5 56 43 60 C47 63.5 53 64.5 59.3 63 Z"/>`))],
+  ["biceps", mirror(widen(1.25, -10.25, `<path d="M31.5 64 C29.5 69 29 76 30.5 82 C31.5 85 33.5 85 34 81 C35 75 35 69 33.5 64 C33 62 32 62 31.5 64 Z"/>`))],
   ["forearms", FOREARMS],
   ["obliques", mirror(`<path d="M42 66 C45 67 49 68 52 69 L52.5 96 C49 99 45 101 41.5 101 C41.8 95 42 88 41.2 82 C40.7 76 41 70 42 66 Z"/>`)],
   ["abs", mirror(`<rect x="53.5" y="67" width="5.8" height="7.6" rx="2"/><rect x="53.4" y="76.6" width="5.9" height="7.6" rx="2"/><rect x="53.6" y="86.2" width="5.7" height="7.6" rx="2"/><path d="M54 95.8 H59.3 V110 C57 109 55 105 54 100 Z"/>`)],
   ["adductors", mirror(`<path d="M56 128 C58 131 58.4 136 58.2 142 C57.6 150 56.4 156 55 160 C54.5 150 54.5 140 54 132 C54.2 129 55 127.5 56 128 Z"/>`)],
-  ["quads", mirror(`<path d="M42 124 C40.5 136 41 152 44.5 166 C46 171 50 172.5 52.5 169 C55 160 55.5 146 54 134 C52.5 127 48.5 122 42 124 Z"/><path class="mm-cut" d="M47.5 129 C46.2 145 47 158 49.5 168"/>`)],
+  ["quads", mirror(widen(1.067, -3.7, `<path d="M42 124 C40.5 136 41 152 44.5 166 C46 171 50 172.5 52.5 169 C55 160 55.5 146 54 134 C52.5 127 48.5 122 42 124 Z"/><path class="mm-cut" d="M47.5 129 C46.2 145 47 158 49.5 168"/>`))],
   ["calves", mirror(`<path d="M54 186 C55.5 192 55.4 200 54 207 C52.6 206 52 198 52.5 190 C52.8 188 53.3 186.5 54 186 Z"/>`)],
 ];
 const BACK_MUSCLES = [
-  ["upperBack", mirror(`<path d="M59.3 31 C57 33 54 36 50 39 C46 41.5 42 42.5 40 43.5 C45 46 50 50 54 57 C56.5 63 58.3 71 59.3 77 Z"/>`)],
+  ["upperBack", mirror(widen(1.13, -7.7, `<path d="M59.3 31 C57 33 54 36 50 39 C46 41.5 42 42.5 40 43.5 C45 46 50 50 54 57 C56.5 63 58.3 71 59.3 77 Z"/>`))],
   ["sideDelts", SIDE_DELTS],
-  ["rearDelts", mirror(`<path d="M40 44 C35 45 31.8 48.5 31.5 55 C33 59 36 60 38.5 58 C38.5 53 40 48.5 42 46 Z"/>`)],
-  ["lats", mirror(`<path d="M43 60 C47 61 51 64 54 70 C56 78 57.5 88 58 96 C54 96 49 93 45.5 88 C42 83 41 75 41.2 68 C41.2 64 41.8 61 43 60 Z"/>`)],
-  ["triceps", mirror(`<path d="M31 62 C29 68 28.5 76 30 83 C31.5 87 34.5 86 35 81 C35.5 75 35.5 68 34 63 C33.2 60.5 31.8 60.5 31 62 Z"/>`)],
+  ["rearDelts", mirror(widen(1.238, -10, `<path d="M40 44 C35 45 31.8 48.5 31.5 55 C33 59 36 60 38.5 58 C38.5 53 40 48.5 42 46 Z"/>`))],
+  ["lats", mirror(widen(1.101, -5.86, `<path d="M43 60 C47 61 51 64 54 70 C56 78 57.5 88 58 96 C54 96 49 93 45.5 88 C42 83 41 75 41.2 68 C41.2 64 41.8 61 43 60 Z"/>`))],
+  ["triceps", mirror(widen(1.25, -10.25, `<path d="M31 62 C29 68 28.5 76 30 83 C31.5 87 34.5 86 35 81 C35.5 75 35.5 68 34 63 C33.2 60.5 31.8 60.5 31 62 Z"/>`))],
   ["forearms", FOREARMS],
   ["lowerBack", mirror(`<path d="M54.5 82 C56.5 82 58.3 83 59.3 84 V113 C57 113 55 111 54 108 C53.5 99 53.8 90 54.5 82 Z"/>`)],
-  ["glutes", mirror(`<path d="M59.3 116 C59.3 128 57 136 50 137 C43 137 39 131 39 124 C39.5 117 44 113 50 113 C54 113 57.5 114 59.3 116 Z"/>`)],
-  ["hamstrings", mirror(`<path d="M41.5 140 C40.5 152 42 164 45.5 172 C47.5 175 50 175 51.5 172 C54.5 162 55.5 150 55 141 C52 139.5 45 139 41.5 140 Z"/><path class="mm-cut" d="M48.5 142 C48.2 152 48.4 162 48.8 171"/>`)],
+  ["glutes", mirror(widen(0.951, 2.91, `<path d="M59.3 116 C59.3 128 57 136 50 137 C43 137 39 131 39 124 C39.5 117 44 113 50 113 C54 113 57.5 114 59.3 116 Z"/>`))],
+  ["hamstrings", mirror(widen(1.067, -3.7, `<path d="M41.5 140 C40.5 152 42 164 45.5 172 C47.5 175 50 175 51.5 172 C54.5 162 55.5 150 55 141 C52 139.5 45 139 41.5 140 Z"/><path class="mm-cut" d="M48.5 142 C48.2 152 48.4 162 48.8 171"/>`))],
   ["calves", mirror(`<path d="M43 184 C41 191 41.5 200 44 208 C45.5 211 47.5 211 48 207 C48.5 200 48.5 192 47.5 185 C46.5 182 44 182 43 184 Z"/><path d="M49.5 185 C49 193 49.5 201 50.5 207 C51.5 211 53.5 210 54.5 206 C55.5 199 55 191 53 185 C52 182.5 50 182.5 49.5 185 Z"/>`)],
 ];
 // Two or three lifts per muscle that the app doesn't have, shown under its own lifts and tagged
@@ -224,7 +226,7 @@ function renderMuscleCard(){
     const k = musclePick, n = w.sets[k], r = muscleRecovery(w, k), ideas = muscleIdeas(k);
     const pct = v => Math.min(v / 25, 1) * 100;
     html += `<div class="mm-detail">
-      <div class="mm-detail-head"><h4>${MUSCLE_NAME[k]}</h4><span>${rec ? r.when : MUSCLE_BAND_WORDS[muscleBand(n)]}</span></div>
+      <button type="button" class="mm-detail-head" onclick="pickMuscle('${k}')" aria-label="Close ${MUSCLE_NAME[k]}"><h4>${MUSCLE_NAME[k]}</h4><span>${rec ? r.when : MUSCLE_BAND_WORDS[muscleBand(n)]}</span></button>
       <div class="mm-big"><b>${fmtSets(n)}</b> sets in 7 days</div>
       <div class="mm-bar"><span class="mm-band" style="left:${pct(MUSCLE_TARGET[0])}%;width:${pct(MUSCLE_TARGET[1]) - pct(MUSCLE_TARGET[0])}%"></span><span class="mm-fill ${muscleClass(w, k)}" style="width:${pct(n)}%"></span>
         <i style="left:${pct(MUSCLE_TARGET[0])}%">${MUSCLE_TARGET[0]}</i><i style="left:${pct(MUSCLE_TARGET[1])}%">${MUSCLE_TARGET[1]}</i></div>

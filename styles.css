@@ -600,7 +600,8 @@ body.library-open{overflow:hidden;}
 .mm-note{font-size:0.82rem;line-height:1.4;margin:0 0 0.35rem;padding:0.45rem 0.6rem;border-radius:8px;background:var(--panel-soft);color:var(--ink);}
 .mm-note b{font-weight:600;}
 .mm-detail{border:1px solid var(--line);border-radius:9px;background:var(--panel-soft);padding:0.7rem;margin-bottom:0.6rem;}
-.mm-detail-head{display:flex;align-items:baseline;justify-content:space-between;gap:0.5rem;}
+.mm-detail-head{display:flex;align-items:baseline;justify-content:space-between;gap:0.5rem;width:100%;min-height:2.2rem;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;}
+.mm-detail-head span::after{content:"\2715";margin-left:0.55rem;font-size:0.75rem;}
 .mm-detail-head h4{margin:0;font-family:var(--font-display);font-weight:400;font-size:1.15rem;text-transform:uppercase;color:var(--ink);}
 .mm-detail-head span{font-size:0.78rem;font-weight:600;color:var(--slate);}
 .mm-big{font-size:0.8rem;color:var(--slate);margin:0.3rem 0 0.5rem;}
