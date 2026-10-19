@@ -104,8 +104,19 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double
-  progression (add a rep, add weight once every set reaches the top). Read targets through
-  `effectiveTargetReps` / `activeRepRange` (03), never `ex.targetReps` directly.
+  progression: weight goes up once every set reaches the top, or a session reaches the middle at
+  RPE 7 or easier (`rangeEarly`); until then +2 reps after RPE 7 or easier, +1 at 8, none at 9+. A
+  typical set (median of `repsBySet`) 3+ reps under the bottom refits the weight from the estimated
+  max (`refit`). Read targets through `effectiveTargetReps` / `activeRepRange` (03), never
+  `ex.targetReps` directly.
+- Weight should move, not just reps. Only pain words hold a lift that hit its reps
+  (`noteConcernWord`, 05; "no pain" doesn't count; "heavy" and "grip" never hold). Knee/Back Care
+  trims once to about 90% of the 6-week peak and then holds, never compounding. A Deload Week
+  session done heavier than the regular one before it counts as the baseline.
+- Shoulder Rehab held lifts (`applyShoulder`, 05b): the first session under rehab starts at
+  `SHOULDER_HOLD_PCT` of the pre-rehab weight; after that the load follows the log (never below a
+  weight that is holding) and two clean sessions in a row (reps hit, RPE 8 or less, pain 3 or less)
+  add one `increment`, up to the pre-rehab weight. Reps stay at the target.
 - Joint check: `pain` (0-10) and `painArea` on an entry. `applyPain` (05) holds the load above 3
   and drops about 10% at 6+; `painSignals` (08) nudges the matching care modifier. Rep records
   come from `prFlags` / `repRecord` (04); only `COMPOUND_LIFTS` (02) show Est. 1RM.
@@ -123,7 +134,8 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - Tests: `cd test && npm install` once (with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`), then
   `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium npm test`: unit tests first (`npm run unit`,
   under a second), then the browser suite. Prints `UNIT TESTS PASSED` and `ALL SCENARIOS PASSED`.
-  Add a unit test for any new progression rule; use the browser suite for UI and sync.
+  Add a unit test for any new progression rule; use the browser suite for UI and sync. Unit tests
+  pin main lifts to a volume day (`reset` stubs `plannedHeavy`); heavy-day tests call `heavyDays()`.
   Scenarios share one page, so save and restore any global state a scenario changes.
 - Local server for screenshots: `cd test && TEST_PORT=8133 node server.js`, then Playwright at
   `viewport {width:360}` with the Supabase script routed to `test/mock-supabase.js`.

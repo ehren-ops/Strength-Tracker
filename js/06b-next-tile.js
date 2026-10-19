@@ -121,7 +121,7 @@ function progressionRule(name, ex){
   if(maxW) return `At ${maxW} lb, progress with reps, then single-arm.`;
   const inc = ex.increment || 5;
   const range = activeRepRange(ex);
-  if(range) return `Add a rep each session; add ${inc} lb once every set reaches ${range[1]}.`;
+  if(range) return `Add reps each session; add ${inc} lb at ${Math.ceil((range[0] + range[1]) / 2)} reps with some left, or ${range[1]}.`;
   return ex.unit === "sec" ? `Add ${inc} lb once every hold reaches ${target} sec.` : `Add ${inc} lb once every set reaches ${target} ${repsWord(name)}.`;
 }
 function effortLine(ex){

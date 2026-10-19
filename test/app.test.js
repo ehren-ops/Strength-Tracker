@@ -1360,15 +1360,15 @@ async function main(){
   await page.locator('.pill').filter({ hasText: /Back Extension/ }).click();
   await sleep(150);
   if(await page.locator('#f-weight').count() !== 1) throw new Error('expected a Weight field on Back Extension');
-  // Log 3x11, then the re-rendered form follows the Next tile's plan: one more rep (12) at the
-  // same weight, inside the 10-15 range, rather than repeating the last reps.
+  // Log 3x11 at RPE 7, then the re-rendered form follows the Next tile's plan: two more reps (13)
+  // at the same weight, inside the 10-15 range, rather than repeating the last reps.
   await page.fill('#f-weight', '55');
   await page.fill('#f-sets', '3');
   await page.fill('#f-reps', '11');
   await page.click('button.log:has-text("Log set")');
   await sleep(150);
   const backExtRepsVal = await page.inputValue('#f-reps');
-  if(backExtRepsVal !== '12') throw new Error('expected the Reps field to pre-fill the planned next rep (12), got: ' + backExtRepsVal);
+  if(backExtRepsVal !== '13') throw new Error('expected the Reps field to pre-fill the planned next reps (13), got: ' + backExtRepsVal);
   console.log('OK: Back Extension has a weight field and pre-fills the planned next rep');
 
   console.log('=== 53: Dead Hang exercise defaults to a 3x45 second time interval ===');
@@ -1862,7 +1862,7 @@ async function main(){
     out.fly = [fly.weight, !!fly.postDeloadHold]; out.calf = calf.weight;
     // a non-press repeats its pre-deload weight when that session was hard or flagged
     data['RDL'] = mk('RDL', [[-9, 235], [-2, 212.5, 2, 8, true]]); data['RDL'].entries[0].difficulty = 8;
-    data['Barbell Row'] = mk('Barbell Row', [[-9, 135], [-2, 117.5, 2, 8, true]]); data['Barbell Row'].entries[0].note = 'grip slipping';
+    data['Barbell Row'] = mk('Barbell Row', [[-9, 135], [-2, 117.5, 2, 8, true]]); data['Barbell Row'].entries[0].note = 'elbow sore';
     const rdl = computeSuggestion(data['RDL'], 'RDL'), row = computeSuggestion(data['Barbell Row'], 'Barbell Row');
     out.hard = [rdl.weight, rdl.postDeloadHold && rdl.postDeloadHold.why, row.weight, row.postDeloadHold && row.postDeloadHold.why];
     // 20 days with no training: 90%, then 95%, then the full weight
@@ -1884,7 +1884,7 @@ async function main(){
   });
   if(JSON.stringify(comeback) !== JSON.stringify({ fly: [60, true], calf: 100, hard: [235, 'last full session was RPE 8', 135, null], ramp: [162.5, 1, 170, 180], skipped: false })) throw new Error('expected press hold after deload and a 90/95/100% ramp after time off, got: ' + JSON.stringify(comeback));
   console.log('OK: after a deload pressing lifts hold (fly 60) while others add (calf 100); after 20 days off squat ramps 162.5, 170, 180; a skipped lift is not a break');
-  // Accessory rep ranges: add a rep inside the range, add weight once every set reaches the top.
+  // Accessory rep ranges: two more reps inside the range at RPE 7, add weight once every set reaches the top.
   const ranged = await page.evaluate(() => {
     const savedData = data, savedModes = { ...modes };
     MODE_DEFS.forEach(m => { modes[m.key] = false; });
@@ -1896,9 +1896,9 @@ async function main(){
     data = savedData; Object.assign(modes, savedModes);
     return out;
   });
-  if(JSON.stringify(ranged) !== JSON.stringify({ range: [10, 15], mid: [50, 13, false], top: [55, 10, true], under: [50, 10, false], preseasonRange: null }))
+  if(JSON.stringify(ranged) !== JSON.stringify({ range: [10, 15], mid: [50, 14, false], top: [55, 10, true], under: [50, 10, false], preseasonRange: null }))
     throw new Error('expected double progression inside 10-15 for the fly, got: ' + JSON.stringify(ranged));
-  console.log('OK: fly in a 10-15 range holds 50 and aims for 13 after 12 reps, adds to 55 and drops to 10 reps at 15, holds at 10 after a miss; a preseason rep target overrides the range');
+  console.log('OK: fly in a 10-15 range holds 50 and aims for 14 after 12 reps at RPE 7, adds to 55 and drops to 10 reps at 15, holds at 10 after a miss; a preseason rep target overrides the range');
   await page.click('.tab:has-text("Overview")');
   await page.click('button:has-text("Deload Week: ON")');
   await sleep(150);
@@ -2091,7 +2091,7 @@ async function main(){
     return { bss: read('Bulgarian Split Squat'), squat: read('Squat'), fly: read('Cable Chest Fly'), copen: read('Copenhagen Plank'),
       walk: read('Walking Lunge'), lateral: read('Lateral Lunge'), walkUnits: sidesText('Walking Lunge') };
   });
-  if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lb\/hand · 3x9\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
+  if(!sides.bss.labels.includes('Lb / hand') || !sides.bss.labels.includes('Reps / leg') || !/lb\/hand · 3x10\/leg/.test(sides.bss.next)) throw new Error('expected Bulgarian Split Squat labeled per hand and per leg, got: ' + JSON.stringify(sides.bss));
   if(!sides.squat.labels.includes('Lb total') || !/^[\d.]+ lb · (Heavy · 4x5|Volume · 3x8)/.test(sides.squat.next)) throw new Error('expected Squat labeled total, got: ' + JSON.stringify(sides.squat));
   if(!sides.fly.labels.includes('Lb / hand')) throw new Error('expected Cable Chest Fly labeled per hand (each stack), got: ' + JSON.stringify(sides.fly));
   if(!sides.copen.labels.includes('Seconds / side') || !/\/side/.test(sides.copen.next)) throw new Error('expected Copenhagen Plank seconds per side, got: ' + JSON.stringify(sides.copen));
@@ -2476,7 +2476,7 @@ async function main(){
     /incline/i.test(r79.pushupCard.tip || '') && r79.pushupCard.note === 'Rehab' && r79.pushupCard.exists &&
     r79.benchP3.first === 157.5 && r79.benchP3.build && r79.benchP3.next === 155 &&
     r79.fly && r79.curlWeek1 && /paused/i.test(r79.flyCard.next) && !r79.flyCard.skip && /Paused/.test(r79.flyCard.paused) && /Right arm/.test(r79.flyCard.tip) &&
-    r79.benchNote === 'Rehab' && r79.benchLogged === 'Rehab, felt fine' && /85% of pre-rehab weight, palms-in grip/.test(r79.row.tip || '') && r79.row.badge && r79.row.note === 'Rehab' &&
+    r79.benchNote === 'Rehab' && r79.benchLogged === 'Rehab, felt fine' && /85% of pre-rehab weight; two clean sessions add 5 lb\. Palms-in grip/.test(r79.row.tip || '') && r79.row.badge && r79.row.note === 'Rehab' &&
     /right arm/.test(r79.week2Hammer || '') &&
     r79.p1.items === 3 && r79.p1.week === 'Week 1 · Phase 1' && r79.p1.done && r79.p1.pain === 2 && r79.p1.painOn === '2' && r79.p1.notTraining &&
     r79.p2.items === 9 && r79.p2.week === 'Week 3 · Phase 2' && r79.p2.curl.weight === 20 && r79.p2.curl.hold &&
@@ -2728,7 +2728,8 @@ async function main(){
 
   console.log('=== 87: reps per set log as 8/8/6 and count as a miss; the Weekly Balance card compares pulling with pressing ===');
   const r87 = await page.evaluate(() => {
-    const saved = { data, modes: JSON.stringify(modes) };
+    const saved = { data, modes: JSON.stringify(modes), plannedHeavy };
+    plannedHeavy = () => false; // a volume day, so 8/8/6 is a miss whatever the weekday
     MODE_DEFS.forEach(m => { modes[m.key] = false; });
     const d = n => shiftISO(todayISO(), n);
     const mk = (n, rows) => Object.assign(newExerciseShell(n), { entries: rows.map((r, i) => ({ clientId: n + i, date: d(r[0]), weight: r[1], sets: r[2], reps: 8, difficulty: 7 })) });
@@ -2755,7 +2756,7 @@ async function main(){
     out.balance = { ratio: (document.querySelector('.bal-ratio') || {}).textContent, bars: [...document.querySelectorAll('.bal-row .bal-name')].map(e => e.textContent), rows: [...document.querySelectorAll('.bal-table tbody tr')].map(r => [...r.children].map(c => c.textContent).join(' ')), target: (document.querySelector('.bal-key') || {}).textContent };
     out.coach = buildWeeklyCoachPayload().weeklySets;
     out.notes = generateCoachNotes() || '';
-    data = saved.data; Object.assign(modes, JSON.parse(saved.modes)); render();
+    plannedHeavy = saved.plannedHeavy; data = saved.data; Object.assign(modes, JSON.parse(saved.modes)); render();
     return out;
   });
   const ok87 = r87.boxes === 4 && r87.boxes4 === 5 && r87.entry.sets === 3 && r87.entry.reps === 6 && JSON.stringify(r87.entry.by) === '[8,8,6]' && JSON.stringify(r87.entry.row) === '[8,8,6]' &&
@@ -2819,7 +2820,7 @@ async function main(){
   });
   const ok89 = JSON.stringify(r89.flags) === JSON.stringify([false, 'weight', false, false, false, 'reps']) && r89.record === 13 && r89.recordHeavier === 55 &&
     /^Most reps ?12 reps$/.test(r89.flySlot) && /Logged today ✓ · PR/.test(r89.flyLabel) && r89.chips === 0 && /PR ?Most reps at 55 lb: 12/.test(r89.prDetail) && r89.prOffCenter <= 1 && /^Est\. 1RM/.test(r89.squatSlot) &&
-    /PRs?: .*\(\d+ lb x \d+\)/.test(r89.notes) && r89.back.plan === '3x11' && /Today: same weight, 11 reps a set/.test(r89.back.desc) && r89.back.reps === '11' && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
+    /PRs?: .*\(\d+ lb x \d+\)/.test(r89.notes) && r89.back.plan === '3x12' && /Today: 12 reps, same weight\. Add weight at 13 with reps left, or 15\./.test(r89.back.desc) && r89.back.reps === '12' && !/Knee care/i.test(r89.notes) && !/ - /.test(r89.notes);
   if(!ok89) throw new Error('expected PRs, the rep record slot and trimmed Coach\'s Notes, got: ' + JSON.stringify(r89));
   console.log('OK: fly 55 lb is a weight PR and 55x12 a rep PR (50x13 at a lighter weight and the deload are not), with the detail centered in the footer, no outlines, the fly shows "Most reps 12", squat keeps Est. 1RM, and Coach\'s Notes lead with the PR and skip modifier lines');
 
@@ -3512,6 +3513,29 @@ async function main(){
   delete r106.notes; delete want106.notes;
   if(JSON.stringify(r106) !== JSON.stringify(want106)) throw new Error('expected the Muscle Map to shade, open and switch, got: ' + JSON.stringify(r106));
   console.log('OK: muscles shade by sets (half for helpers), a tapped muscle lists its lifts and outlines on both figures, then 3 lifts tagged Not in app, tapping its name closes it, and Recovery reads the last two days');
+
+  console.log('=== 107: a main lift\'s chart joins its newest session to the one before it across tracks; Farmer\'s Carry is a general finisher ===');
+  const r107 = await page.evaluate(() => {
+    const saved = { data, view, selected, preseason: modes.preseason };
+    const d = n => shiftISO(todayISO(), n);
+    const out = {};
+    try{
+      data = { 'RDL': Object.assign(newExerciseShell('RDL'), { entries: [[-12, 225, 3, 8, false], [-7, 230, 3, 8, false], [-5, 235, 3, 8, false], [-1, 242.5, 4, 5, true]].map((r, i) => ({ clientId: 'rd' + i, date: d(r[0]), weight: r[1], sets: r[2], reps: r[3], difficulty: 7, heavy: r[4], label: 'S' + (i + 1) })) }) };
+      view = 'full'; selected = 'RDL'; render();
+      const svg = document.querySelector('svg.chart');
+      const seg = svg && svg.querySelector('.session-line');
+      out.session = seg ? (seg.getAttribute('d').match(/[ML]/g) || []).length : 0;
+      out.volumePoints = ((svg.querySelector('.volume-line') || { getAttribute: () => '' }).getAttribute('d').match(/[ML]/g) || []).length;
+      modes.preseason = true;
+      out.farmerPreseason = MODE_DEFS.find(m => m.key === 'preseason').applies("Farmer's Carry", Object.assign(newExerciseShell("Farmer's Carry"), {}));
+      out.farmerFinisher = finishersFor('full').includes("Farmer's Carry");
+    } finally {
+      data = saved.data; view = saved.view; selected = saved.selected; modes.preseason = saved.preseason; render();
+    }
+    return out;
+  });
+  if(JSON.stringify(r107) !== JSON.stringify({ session: 4, volumePoints: 3, farmerPreseason: false, farmerFinisher: true })) throw new Error('expected the session line through all 4 RDL points and Farmer\'s Carry as a plain finisher, got: ' + JSON.stringify(r107));
+  console.log('OK: the faint session line runs through all 4 RDL sessions (the volume line through its 3), and Farmer\'s Carry stays a finisher without the Preseason tag');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

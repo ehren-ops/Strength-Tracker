@@ -18,9 +18,9 @@ const RIGHT_PRESS_TIP = "Right arm: single-arm DB floor press or landmine press 
 // Held lifts start at a share of the last working weight from before rehab and stay there.
 const SHOULDER_HOLD_PCT = { "Bench Press": 0.85, "Bicep Curl": 0.7, "Barbell Row": 0.85 };
 const SHOULDER_CARE_TIP = {
-  "Bench Press": "85% of pre-rehab weight, medium grip (forearms vertical), elbows ~45°, stop 2-3 in above the chest. Over 3 of 10: drop 10 lb. Incline push-ups or a right-arm DB floor press also work.",
+  "Bench Press": "Starts at 85% of pre-rehab weight; two clean sessions add 5 lb. Medium grip (forearms vertical), elbows ~45°, stop 2-3 in above the chest. Over 3 of 10: drop 10 lb.",
   "Bicep Curl": "Hammer curls only, both arms, light, lower over 3 seconds. Skip if the front of the left shoulder aches.",
-  "Barbell Row": "85% of pre-rehab weight, palms-in grip (neutral handle, or single-arm DB rows), elbows ~45°, pull to the lower ribs, no shrug. Over 3 of 10: drop 10 lb.",
+  "Barbell Row": "Starts at 85% of pre-rehab weight; two clean sessions add 5 lb. Palms-in grip (neutral handle, or single-arm DB rows), elbows ~45°, pull to the lower ribs, no shrug. Over 3 of 10: drop 10 lb.",
 };
 const SHOULDER_PAUSED_TIP = "Back once the side-raise press is pain-free.";
 const SHOULDER_PAUSED_TIPS = {
@@ -243,7 +243,7 @@ function renderRehabCard(){
 
   const paused = [...SHOULDER_PAUSED].filter(n => data[n] || allDayNames().includes(n));
   if(week < HAMMER_FROM_WEEK) paused.push("Bicep Curl for the left arm (hammer curls from week 3)");
-  html += `<div class="rehab-hold"><b>Paused in the app:</b> ${paused.join(", ")}. <b>Bench:</b> ${phase === 3 ? "full range, building back up" : "85% of your pre-rehab weight, medium grip, elbows about 45°, stop short of the chest"}. <b>Pressing bridge:</b> ${phase === 3 ? "floor push-ups" : "incline push-ups"}, on Upper and Full Body.${week >= HAMMER_FROM_WEEK ? " <b>Curls:</b> hammer only, light." : ""} <b>Also hold off:</b> dips, upright rows, behind-neck pressing, straight-bar curls, racquet and throwing.</div>`;
+  html += `<div class="rehab-hold"><b>Paused in the app:</b> ${paused.join(", ")}. <b>Bench:</b> ${phase === 3 ? "full range, building back up" : "from 85% of your pre-rehab weight, 5 lb more after two clean sessions, medium grip, elbows about 45°, stop short of the chest"}. <b>Pressing bridge:</b> ${phase === 3 ? "floor push-ups" : "incline push-ups"}, on Upper and Full Body.${week >= HAMMER_FROM_WEEK ? " <b>Curls:</b> hammer only, light." : ""} <b>Also hold off:</b> dips, upright rows, behind-neck pressing, straight-bar curls, racquet and throwing.</div>`;
 
   html += `<div class="rehab-foot"><span class="rehab-check">Through it when a full-effort side-raise press is pain-free.</span>`;
   if(phase === 2) html += `<button type="button" class="skip-btn" onclick="setRehabPhase3(true)">Move to Phase 3</button>`;
@@ -263,8 +263,8 @@ function applyShoulder(core, ex, name, baseline){
     if(!isShoulderHeld(name)) return core;
     const last = baseline[baseline.length - 1];
     const pre = shoulderRehab.startedOn ? baseline.filter(e => e.date < shoulderRehab.startedOn).pop() : null;
-    // Never above the rehab share of the pre-rehab weight (bench 85%, hammer curls 70%), and never
-    // above what was last logged, so a step down for pain sticks.
+    // The first session under rehab starts at the rehab share of the pre-rehab weight (bench 85%,
+    // hammer curls 70%), never above what was last logged, so a step down for pain sticks.
     const start = pre && pre.weight > 0 ? roundLoad(pre.weight * SHOULDER_HOLD_PCT[name]) : last.weight;
     const cap = Math.min(start, last.weight);
     // Phase 3: full-range bench builds back up from there, 5 lb a session, up to the pre-rehab weight.
@@ -274,7 +274,23 @@ function applyShoulder(core, ex, name, baseline){
       const weight = last.date < (shoulderRehab.startedOn || "") ? start : Math.min(top, hit ? last.weight + 5 : last.weight);
       return { ...core, weight, reps: effectiveTargetReps(ex), readyToProgress: hit, reentry: undefined, shoulderBuild: { fullWeight: top } };
     }
-    return { ...core, weight: Math.min(core.weight, cap), readyToProgress: false, shoulderHold: { pct: SHOULDER_HOLD_PCT[name], fullWeight: pre ? pre.weight : null } };
+    const full = pre && pre.weight > 0 ? pre.weight : null, pct = SHOULDER_HOLD_PCT[name];
+    const range = activeRepRange(ex), reps = range ? range[0] : effectiveTargetReps(ex);
+    const since = shoulderRehab.startedOn ? baseline.filter(e => e.date >= shoulderRehab.startedOn) : [];
+    // First session under rehab: the rehab share of the pre-rehab weight, never above the last log.
+    if(!since.length) return { ...core, weight: Math.min(core.weight, cap), reps, readyToProgress: false, shoulderHold: { pct, fullWeight: full, first: true } };
+    // After that the load follows what is logged: it never drops below a weight that is holding, and
+    // two clean sessions in a row (every rep, RPE 8 or easier, pain 3 or less) add one step, up to the
+    // pre-rehab weight. Reps stay put; a held lift progresses by load. A miss streak or a lower weight
+    // in the note still wins, and the joint check runs after this.
+    const clean = e => e.weight === last.weight && e.reps >= reps && !(e.difficulty >= 9) && !(e.pain > PAIN_HOLD_ABOVE);
+    let streak = 0;
+    for(let i = since.length - 1; i >= 0 && clean(since[i]); i--) streak++;
+    const inc = ex.increment || 5;
+    const step = streak >= 2 && (full == null || last.weight + inc <= full);
+    let weight = step ? last.weight + inc : last.weight;
+    if(core.deload || (core.noteTarget != null && core.noteTarget < weight)) weight = Math.min(weight, core.weight);
+    return { ...core, weight, reps, readyToProgress: step, shoulderHold: { pct, fullWeight: full, streak, step, inc, atFull: !step && full != null && last.weight >= full } };
   }
   if(!shoulderRehab.startedOn || !SHOULDER_RETURN.has(name)) return core;
   if((core.careFlags && core.careFlags.length) || core.noteTarget != null || core.reentry || core.trackStart) return core;

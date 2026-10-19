@@ -302,6 +302,15 @@ function applyNoteTarget(core, ex, last){
   return { ...core, weight: w, deload: false, readyToProgress: w > last.weight, noteTarget: w, noteText: last.note };
 }
 
+// A note holds the next weight up only for pain words ("tender", "sore", ...), never when negated
+// ("no pain", "not sore"). "Heavy" is what RPE is for, and grip has its own tip, so neither stops a
+// lift that hit its reps from moving up.
+const HOLD_WORDS = ["tender", "pain", "sore", "ache", "hurt"];
+function noteConcernWord(note){
+  const n = String(note || "").toLowerCase();
+  return HOLD_WORDS.find(w => new RegExp(String.raw`\b${w}`).test(n) && !new RegExp(String.raw`\b(?:no|not|without|zero)\s+(?:\w+\s+)?${w}`).test(n)) || null;
+}
+
 // Coming back, two rules on top of the normal progression (Deload Week, when on, overrides both):
 // - Time off: a gap of BREAK_DAYS or more since the last session restarts at ~90% of the last
 //   working weight, then 95%, then the full weight, one session each, while targets are hit.
@@ -355,7 +364,7 @@ function applyReturn(core, ex, name, baseline){
   // lifts always repeat it once, for the shoulders. A weight set in that note still wins.
   if(last.deload && !modes.deload && core.noteTarget == null && !core.trackStart){
     const pre = baseline[baseline.length - 1];
-    const flagged = CONCERN_WORDS.find(w => (pre.note || "").toLowerCase().includes(w));
+    const flagged = noteConcernWord(pre.note);
     const why = LIFT_PATTERNS[name] === "push" ? "pressing repeats it once"
       : pre.reps < effectiveTargetReps(ex) ? "missed reps last full session"
       : pre.difficulty >= 8 ? `last full session was RPE ${pre.difficulty}`
@@ -404,11 +413,18 @@ function computeSuggestion(full, name){
     fresh = !track.some(e => !e.deload) && full.entries.some(e => !e.deload && e.weight > 0);
     ex = { ...full, entries: fresh ? full.entries : track, heavyPlanned: heavy };
   }
-  const baseline = ex.entries.filter(e => !e.deload);
+  // Deload Week sessions are skipped, except one done heavier than the regular session before it:
+  // that load is real and the plan builds from it, at the regular session's sets.
+  let regular = null;
+  const baseline = ex.entries.filter(e => {
+    if(!e.deload){ regular = e; return true; }
+    return !!(regular && e.weight > regular.weight);
+  });
   const baseEntries = baseline.length ? baseline : ex.entries;
   const lastBaseEntry = baseEntries[baseEntries.length - 1];
   const start = fresh ? startTrack(ex, lastBaseEntry) : computeSuggestionCore(baseline.length ? { ...ex, entries: baseline } : ex, name);
   let core = applyPain(applyShoulder(applyReturn(capAtMaxWeight(fresh ? start : applyNoteTarget(start, ex, lastBaseEntry), ex, name, lastBaseEntry), ex, name, baseline), ex, name, baseline), ex, full);
+  if(core && lastBaseEntry && lastBaseEntry.deload && regular && regular.sets) core = { ...core, sets: regular.sets };
   if(core && ex.heavyPlanned != null) core = { ...core, heavy: ex.heavyPlanned, sets: ex.heavyPlanned ? HEAVY_SETS : core.sets };
   if(!modes.deload || !core || ex.trackBy === "duration") return core;
   const lastBase = lastBaseEntry;
@@ -471,7 +487,10 @@ function computeSuggestionCore(ex, name){
     if(modes.knee && KNEE_SENSITIVE_EXERCISES.has(name)) careFlags.push("knee");
     if(modes.back && LOW_BACK_SENSITIVE_EXERCISES.has(name)) careFlags.push("back");
     if(careFlags.length){
-      const careWeight = Math.round((last.weight * 0.90) / 2.5) * 2.5;
+      // About 10% under the heaviest load of the last 6 weeks, and never under the last log: a lift
+      // already trimmed holds there instead of dropping another 10% every session.
+      const recentPeak = Math.max(...ex.entries.filter(e => e.date >= shiftISO(last.date, -42)).map(e => e.weight || 0));
+      const careWeight = Math.min(last.weight, roundLoad(recentPeak * 0.9));
       return {
         weight: careWeight,
         sets: last.sets,
@@ -489,16 +508,32 @@ function computeSuggestionCore(ex, name){
     const requiredStreak = ex.conservative ? 2 : 1;
     const hitTarget = last.reps >= targetReps;
     let readyToProgress = streak >= requiredStreak;
-    // Rep range: weight goes up only once every set reaches the top; until then, one more rep.
+    // Rep range: weight goes up once every set reaches the top, or once a session reaches the middle
+    // of the range at RPE 7 or easier (reps to spare). Conservative lifts want two of those in a row.
     const range = activeRepRange(ex);
+    const mid = range ? Math.ceil((range[0] + range[1]) / 2) : null;
+    let rangeEarly = false, refit = null;
     if(range){
-      let atTop = 0;
+      const earned = e => e.reps >= range[1] || (e.reps >= mid && e.difficulty > 0 && e.difficulty <= 7);
+      let earnedStreak = 0;
       for(let i = ex.entries.length - 1; i >= 0; i--){
         const e = ex.entries[i];
-        if(e.weight !== last.weight || e.reps < range[1]) break;
-        atTop++;
+        if(e.weight !== last.weight || !earned(e)) break;
+        earnedStreak++;
       }
-      readyToProgress = atTop >= requiredStreak;
+      readyToProgress = earnedStreak >= requiredStreak;
+      rangeEarly = readyToProgress && last.reps < range[1];
+      // Well under the bottom of the range: asking for twice the reps at the same weight makes no
+      // sense, so the weight comes down to one that lands at the bottom (from the estimated max). It
+      // reads the typical set, so one short set in 5/8/8 doesn't count as a 5-rep session.
+      const by = Array.isArray(last.repsBySet) && last.repsBySet.length ? [...last.repsBySet].sort((a, b) => a - b) : null;
+      const typical = by ? by[Math.floor(by.length / 2)] : last.reps;
+      if(typical < range[0] - 2 && last.weight > 0){
+        const fit = roundLoad(last.weight * (1 + typical / 30) / (1 + range[0] / 30));
+        if(fit < last.weight) refit = { from: last.weight, fromReps: typical };
+        if(refit) return { weight: fit, sets: last.sets, reps: range[0], range, mid, hitTarget: false, readyToProgress: false,
+          streak: 0, requiredStreak, difficultyNote: null, noteConcern: null, noteText: last.note || null, deload: false, refit };
+      }
     }
     let difficultyNote = null;
 
@@ -512,21 +547,16 @@ function computeSuggestionCore(ex, name){
       }
     }
 
-    // A concerning word in the prior session's note (tender, pain, grip, etc.)
-    // is a real signal too, not just decoration - it holds back progression
-    // the same way a brutal RPE does, even if the numbers alone said "go".
-    let noteConcern = null;
-    if(last.note){
-      const noteLower = last.note.toLowerCase();
-      if(CONCERN_WORDS.some(w => noteLower.includes(w))) noteConcern = last.note;
-    }
+    // A pain word in the prior session's note holds progression the same way a brutal RPE does,
+    // even if the numbers alone said "go".
+    const noteConcern = noteConcernWord(last.note) ? last.note : null;
     if(noteConcern && readyToProgress) readyToProgress = false;
 
     // Plain-language cues in the last note steer the call too: "stay", "hold", "fell apart",
     // "tired" hold the weight; "move up", "easy", "starting light" add it once the target reps
     // were hit and the RPE wasn't brutal. A concern word or an explicit weight in the note wins.
     let noteCue = null;
-    if(last.note && !noteConcern){
+    if(last.note && !noteConcern && !last.deload){
       if(NOTE_HOLD_CUES.test(last.note)){
         if(readyToProgress){ readyToProgress = false; noteCue = "hold"; }
       } else if(NOTE_UP_CUES.test(last.note) && hitTarget && !readyToProgress && difficultyNote !== "hard"){
@@ -534,11 +564,16 @@ function computeSuggestionCore(ex, name){
       }
     }
 
+    // Inside a range and not adding weight yet: two more reps after a session at RPE 7 or easier,
+    // one at RPE 8 (or unrated), the same reps at 9 or 10.
+    const repStep = !last.difficulty || last.difficulty === 8 ? 1 : last.difficulty <= 7 ? 2 : 0;
     return {
       weight: readyToProgress ? last.weight + increment : last.weight,
       sets: last.sets,
-      reps: !range ? targetReps : readyToProgress ? range[0] : hitTarget ? Math.min(range[1], last.reps + 1) : range[0],
+      reps: !range ? targetReps : readyToProgress ? range[0] : hitTarget ? Math.min(range[1], Math.max(range[0], last.reps + repStep)) : range[0],
       range,
+      mid,
+      rangeEarly,
       hitTarget,
       readyToProgress,
       streak,

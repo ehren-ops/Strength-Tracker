@@ -51,10 +51,14 @@ function eq(actual, expected, what){
   const a = JSON.stringify(actual), b = JSON.stringify(expected);
   if(a !== b) throw new Error(`${what || "value"}: expected ${b}, got ${a}`);
 }
-// Fresh state for each test: no modifiers, no rehab or deload records, an empty log.
+// Fresh state for each test: no modifiers, no rehab or deload records, an empty log. Main lifts plan
+// a volume day so the result never depends on the weekday (Classic runs heavy on the week's first
+// session); the heavy-day tests put the real rule back with heavyDays().
+run(`var __plannedHeavy = plannedHeavy;`);
 function reset(){
-  run(`data = {}; MODE_DEFS.forEach(m => { modes[m.key] = false; }); shoulderRehab = {}; deloadDates = {}; skips = {};`);
+  run(`data = {}; MODE_DEFS.forEach(m => { modes[m.key] = false; }); shoulderRehab = {}; deloadDates = {}; skips = {}; plannedHeavy = () => false;`);
 }
+const heavyDays = () => run(`plannedHeavy = __plannedHeavy;`);
 // A lift with sessions [daysAgo, weight, reps, extra fields] at 3 sets and RPE 7.
 function lift(name, rows){
   run(`data[${JSON.stringify(name)}] = Object.assign(newExerciseShell(${JSON.stringify(name)}), { entries: ${JSON.stringify(rows)}.map((r, i) => Object.assign({ clientId: "u" + i, date: shiftISO(todayISO(), -r[0]), weight: r[1], sets: 3, reps: r[2], difficulty: 7 }, r[3] || {})) });`);
@@ -74,10 +78,69 @@ test("three straight misses drop about 15%", () => {
   const s = suggest("Squat");
   eq([s.weight, s.deload], [150, true], "squat");
 });
-test("rep range: inside the range aims for one more rep", () => {
+test("rep range: inside the range, two more reps at RPE 7, one at RPE 8, none at 9", () => {
   reset(); lift("Cable Chest Fly", [[3, 50, 12]]);
   const s = suggest("Cable Chest Fly");
-  eq([s.weight, s.reps, s.readyToProgress], [50, 13, false], "fly");
+  eq([s.weight, s.reps, s.readyToProgress], [50, 14, false], "fly at RPE 7");
+  lift("Cable Chest Fly", [[3, 50, 12, { difficulty: 8 }]]);
+  eq(suggest("Cable Chest Fly").reps, 13, "RPE 8");
+  lift("Cable Chest Fly", [[3, 50, 12, { difficulty: 9 }]]);
+  eq(suggest("Cable Chest Fly").reps, 12, "RPE 9");
+});
+test("rep range: the middle of the range at RPE 7 or easier adds weight (twice in a row when conservative)", () => {
+  reset(); lift("Cable Chest Fly", [[3, 50, 13]]);
+  const s = suggest("Cable Chest Fly");
+  eq([s.weight, s.reps, s.readyToProgress, s.rangeEarly], [55, 10, true, true], "fly");
+  lift("Cable Chest Fly", [[3, 50, 13, { difficulty: 8 }]]);
+  eq(suggest("Cable Chest Fly").weight, 50, "not at RPE 8");
+  lift("Cable Chest Fly", [[3, 50, 13]]); run(`data["Cable Chest Fly"].conservative = true;`);
+  eq(suggest("Cable Chest Fly").weight, 50, "conservative wants two");
+  lift("Cable Chest Fly", [[6, 50, 13], [3, 50, 14]]); run(`data["Cable Chest Fly"].conservative = true;`);
+  eq(suggest("Cable Chest Fly").weight, 55, "conservative after two");
+});
+test("rep range: well under the bottom refits the weight instead of doubling the reps", () => {
+  reset(); lift("Cable Chest Fly", [[3, 60, 5]]);
+  const s = suggest("Cable Chest Fly");
+  eq([s.weight, s.reps, !!s.refit], [52.5, 10, true], "fly");
+  lift("Cable Chest Fly", [[3, 60, 5, { repsBySet: [5, 8, 8] }]]);
+  eq([suggest("Cable Chest Fly").weight, !!suggest("Cable Chest Fly").refit], [60, false], "one short set in 5/8/8 is not a 5-rep session");
+});
+test("notes: grip and heavy never hold a lift that hit its reps; pain words do unless negated", () => {
+  reset(); lift("Squat", [[3, 180, 8, { note: "Staggered grip, heavy but good" }]]);
+  eq(suggest("Squat").weight, 185, "grip and heavy");
+  lift("Squat", [[3, 180, 8, { note: "no pain at all" }]]);
+  eq(suggest("Squat").weight, 185, "no pain");
+  lift("Squat", [[3, 180, 8, { note: "knee a bit sore" }]]);
+  eq(suggest("Squat").weight, 180, "sore holds");
+});
+test("Knee Care trims about 10% once, then holds instead of dropping every session", () => {
+  reset(); run(`modes.knee = true;`);
+  lift("Bulgarian Split Squat", [[9, 50, 8]]);
+  eq(suggest("Bulgarian Split Squat").weight, 45, "first trim");
+  lift("Bulgarian Split Squat", [[9, 50, 8], [5, 45, 8], [2, 45, 8]]);
+  eq(suggest("Bulgarian Split Squat").weight, 45, "holds after the trim");
+});
+test("a Deload Week session done heavier than the regular one counts", () => {
+  reset(); lift("Standing Calf Raise", [[9, 0, 22], [2, 35, 20, { deload: true, sets: 2, note: "Deload" }]]);
+  const s = suggest("Standing Calf Raise");
+  eq([s.weight, s.sets, s.reps], [40, 3, 12], "calf");
+});
+test("Shoulder Rehab: the first session starts at 85%, then the load follows the log and two clean sessions add 5 lb", () => {
+  reset(); run(`modes.shoulder = true; shoulderRehab = { startedOn: shiftISO(todayISO(), -8), endedOn: null, phase3: false };`);
+  lift("Bench Press", [[12, 170, 8]]);
+  let s = suggest("Bench Press");
+  eq([s.weight, !!s.shoulderHold.first], [145, true], "first session");
+  lift("Bench Press", [[12, 170, 8], [6, 155, 8]]);
+  s = suggest("Bench Press");
+  eq([s.weight, s.shoulderHold.streak], [155, 1], "never below a weight that is holding");
+  lift("Bench Press", [[12, 170, 8], [6, 155, 8], [3, 155, 8]]);
+  s = suggest("Bench Press");
+  eq([s.weight, s.reps, s.readyToProgress], [160, 8, true], "two clean sessions add 5 lb");
+  lift("Bench Press", [[12, 170, 8], [6, 170, 8], [3, 170, 8]]);
+  s = suggest("Bench Press");
+  eq([s.weight, s.shoulderHold.atFull], [170, true], "never above the pre-rehab weight");
+  lift("Bench Press", [[12, 170, 8], [6, 155, 8], [3, 155, 8, { difficulty: 9 }]]);
+  eq(suggest("Bench Press").weight, 155, "an RPE 9 session is not clean");
 });
 test("rep range: top of the range adds weight and resets reps", () => {
   reset(); lift("Cable Chest Fly", [[3, 50, 15]]);
@@ -209,7 +272,7 @@ function onDay(iso, fn){
 }
 const at = (date, weight, reps, extra) => Object.assign({ clientId: "h" + date + weight, date, weight, sets: 3, reps, difficulty: 7 }, extra || {});
 test("Classic: main lifts heavy (4x5) first in the week, volume (3x8) after, each on its own track", () => {
-  reset(); run(`program = { key: "classic" }; view = "full";`);
+  reset(); run(`program = { key: "classic" }; view = "full";`); heavyDays();
   lift("Squat", []); run(`data["Squat"].entries = ${JSON.stringify([at("2026-10-01", 175, 8), at("2026-10-06", 180, 8)])};`);
   let s = onDay("2026-10-15", () => suggest("Squat"));
   eq([s.heavy, s.weight, s.sets, s.reps, !!s.trackStart], [true, 185, 4, 5, true], "first heavy day: worked out from 180x8");
@@ -227,7 +290,7 @@ test("Classic: main lifts heavy (4x5) first in the week, volume (3x8) after, eac
   run(`modes.preseason = false;`);
 });
 test("Full Body 2+1: heavy by day (Squat, Bench, Row on A; RDL on B); v107 entries count as heavy", () => {
-  reset(); run(`program = { key: "fullbody", startedOn: "2026-10-10", history: [{ key: "fullbody", startedOn: "2026-10-10" }] };`);
+  reset(); run(`program = { key: "fullbody", startedOn: "2026-10-10", history: [{ key: "fullbody", startedOn: "2026-10-10" }] };`); heavyDays();
   lift("Squat", [[30, 180, 8]]); lift("RDL", [[30, 225, 8]]); lift("Bench Press", [[30, 150, 8]]);
   const heavyOn = day => onDay("2026-10-15", () => run(`view = "${day}"; ["Squat", "RDL", "Bench Press"].map(n => computeSuggestion(data[n], n).heavy)`));
   eq(heavyOn("a"), [true, false, true], "Day A");

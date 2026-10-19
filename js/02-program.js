@@ -222,7 +222,8 @@ const EXERCISE_DEFAULTS = {
   "Bicep Curl": { repRange: "8-12" },
   "Tricep Pushdown": { repRange: "10-15" },
   "Lateral Raise": { repRange: "12-15" },
-  "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: true, preseasonNote: "3x8 @ 60 lb, keep building load." },
+  // A year-round grip and trunk finisher, not Preseason work (preseason: false clears the old flag).
+  "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: false },
   "Kettlebell Swings": { maxWeight: 35, preseason: true, preseasonPower: true, preseasonNote: "Power: do this first. 4x10 at 35 lb; add reps, then go single-arm." },
   "Standing Calf Raise": { trackBy: "weight", targetReps: 15, repRange: "12-20", preseason: true, preseasonNote: "3x15, loaded. Log the total: both dumbbells added together, or the bar." },
   "Box Jumps": { trackBy: "reps", targetReps: 3, preseason: true, preseasonPower: true, preseasonNote: "4x3, 12-18 in box. Step down, never jump down; stop if speed drops. Gentler: slow 3 sec step-down.", inSeasonNote: "In season: 3x3, first in the session, full rest between jumps. Skip it the day before a big ski day." },
@@ -339,6 +340,6 @@ function backfillExerciseDefaults(){
 function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v132";
+const APP_VERSION = "v133";
 const APP_UPDATED = "Oct 15, 2026";
 

@@ -134,9 +134,13 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
   });
 
   // Solid line through actual points. A main lift with heavy days gets two: heavy (bold) and
-  // volume (thin), so the two loads never read as a zigzag.
+  // volume (thin), so the two loads never read as a zigzag, over a faint line through every session
+  // in order, so the newest session always joins the one before it even when it starts a track.
   const heavyOf = p => isHeavyEntry(ex, p.entry);
   const tracked = isRealExercise && ex.trackBy === "weight" && !!ex.targetRepsStrength && points.some(heavyOf);
+  if(tracked && points.length > 1){
+    svg += `<path d="${points.map((p, i) => `${i ? "L" : "M"}${xAt(i).toFixed(1)},${yAt(p.y).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--chart-line)" stroke-width="1" opacity="0.3" class="session-line"/>`;
+  }
   const lines = tracked ? [true, false].map(h => ({ h, idx: points.map((p, i) => i).filter(i => heavyOf(points[i]) === h) })) : [{ h: null, idx: points.map((p, i) => i) }];
   lines.forEach(({ h, idx }) => {
     if(idx.length < 2) return;

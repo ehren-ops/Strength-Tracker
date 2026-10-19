@@ -464,12 +464,13 @@ function renderExerciseCard(name, ex){
         } else if(suggestion.painHold){
           msg = painMessage(suggestion, `${suggestion.weight} lb`);
         } else if(suggestion.shoulderHold){
-          const h = suggestion.shoulderHold;
-          const share = h.fullWeight ? ` (${Math.round(h.pct * 100)}% of ${h.fullWeight})` : "";
-          msg = name === "Bicep Curl"
-            ? `Shoulder Rehab: hammer curls only at ${suggestion.weight} lb, lower over 3 sec. No adding weight yet.`
-            : name === "Barbell Row" ? `Rehab: ${suggestion.weight} lb${share}, palms-in grip, no shrug. Held until rehab is off.`
-            : `Rehab: ${suggestion.weight} lb${share}, medium grip, short of the chest. Hold until phase 3.`;
+          const h = suggestion.shoulderHold, inc = h.inc || ex.increment || 5;
+          const share = h.first && h.fullWeight ? ` (${Math.round(h.pct * 100)}% of ${h.fullWeight})` : "";
+          const cue = name === "Bicep Curl" ? "hammer curls, lower over 3 sec" : name === "Barbell Row" ? "palms-in grip, no shrug" : "medium grip, short of the chest";
+          const next = h.atFull ? `Held at your pre-rehab weight until rehab is off.`
+            : h.step ? `Up ${inc} lb after two clean sessions.`
+            : h.streak === 1 ? `One more clean session adds ${inc} lb.` : `Two clean sessions add ${inc} lb.`;
+          msg = `Rehab: ${suggestion.weight} lb${share}, ${cue}. ${next}`;
         } else if(suggestion.trackStart && !suggestion.deloadWeek && !suggestion.reentry){
           const ts = suggestion.trackStart;
           msg = `First ${suggestion.heavy ? "heavy" : "volume"} day: ${suggestion.weight} lb, worked out from your ${ts.from} lb x ${ts.fromReps}. Progresses on its own from here.`;
@@ -501,7 +502,7 @@ function renderExerciseCard(name, ex){
         } else if(suggestion.deload){
           msg = `Missed target ${unitWord} ${suggestion.missStreak} sessions straight: drop ~15% and rebuild.`;
         } else if(suggestion.noteConcern){
-          const flagged = CONCERN_WORDS.find(w => suggestion.noteConcern.toLowerCase().includes(w)) || "a concern";
+          const flagged = noteConcernWord(suggestion.noteConcern) || "a concern";
           msg = suggestion.hitTarget
             ? `${hitLeadIn}, but your note flagged ${flagged}: ${chg} today.`
             : `Missed target ${unitWord} and your note flagged ${flagged}: ${chg} today.`;
@@ -518,10 +519,13 @@ function renderExerciseCard(name, ex){
           msg = `${hitLeadIn}, but rated 9-10: ${chg} today.`;
         } else if(suggestion.difficultyNote === "easy"){
           msg = `${hitLeadIn} and it felt easy: ${chg} today.`;
+        } else if(suggestion.refit && !suggestion.deloadWeek){
+          const [lo, hi] = suggestion.range;
+          msg = `${suggestion.refit.fromReps} reps at ${suggestion.refit.from} lb is under the ${lo}-${hi} range: ${suggestion.weight} lb lands back in it.`;
         } else if(suggestion.range && !suggestion.deloadWeek){
           const [lo, hi] = suggestion.range;
-          msg = suggestion.readyToProgress ? `Every set reached ${hi} reps: ${chg} today, back to ${lo} reps a set.`
-            : suggestion.hitTarget ? `${trackWork.reps} reps a set last time. Today: same weight, ${suggestion.reps} reps a set. Add weight at ${hi}.`
+          msg = suggestion.readyToProgress ? (suggestion.rangeEarly ? `${trackWork.reps} reps with reps to spare: ${chg} today, back to ${lo} reps a set.` : `Every set reached ${hi} reps: ${chg} today, back to ${lo} reps a set.`)
+            : suggestion.hitTarget ? `${trackWork.reps} reps a set last time. Today: ${suggestion.reps} reps, same weight. Add weight at ${suggestion.mid} with reps left, or ${hi}.`
             : `Under ${lo} reps last time: same weight, build back to ${lo} reps a set.`;
         } else if(suggestion.readyToProgress){
           if(ex.conservative){

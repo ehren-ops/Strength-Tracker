@@ -38,7 +38,7 @@ function describeSuggestion(ex, name){
   const s = computeSuggestion(ex, name);
   if(!s) return null;
   if(ex.trackBy === "weight"){
-    const why = s.shoulderPaused ? "paused for shoulder rehab" : s.shoulderHold ? (name === "Bicep Curl" ? "shoulder rehab: hammer curls only, held" : name === "Barbell Row" ? "shoulder rehab: held at about 85% of pre-rehab weight, palms-in grip" : "shoulder rehab: held at about 85% of pre-rehab weight, medium grip, short range")
+    const why = s.shoulderPaused ? "paused for shoulder rehab" : s.shoulderHold ? (s.shoulderHold.atFull ? "shoulder rehab: held at the pre-rehab weight" : s.shoulderHold.step ? `shoulder rehab: up ${s.shoulderHold.inc} lb after two clean sessions` : s.shoulderHold.first ? "shoulder rehab: first session, about " + Math.round(s.shoulderHold.pct * 100) + "% of pre-rehab weight" : "shoulder rehab: held until two clean sessions in a row")
       : s.shoulderBuild ? `shoulder rehab phase 3: full range, building back toward ${s.shoulderBuild.fullWeight} lb`
       : s.shoulderReturn ? `back from shoulder rehab, step ${s.shoulderReturn.step} of 3 back to ${s.shoulderReturn.fullWeight} lb`
       : s.deloadWeek ? "deload week" : s.reentry ? `rebuilding after time off, step ${s.reentry.step} of 3 back to ${s.reentry.fullWeight} lb` : s.postDeloadHold ? `first session back from deload, repeating the pre-deload weight (${s.postDeloadHold.why})` : s.noteTarget != null ? "set by last note" : s.noteCue === "up" ? "add weight, note said so" : s.deload ? "deload" : s.careFlags ? "care-mode trim" : s.readyToProgress ? "add weight"
