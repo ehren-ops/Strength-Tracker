@@ -303,12 +303,12 @@ function applyNoteTarget(core, ex, last){
 }
 
 // A note holds the next weight up only for pain words ("tender", "sore", ...), never when negated
-// ("no pain", "not sore"). "Heavy" is what RPE is for, and grip has its own tip, so neither stops a
+// ("no pain", "not sore", "less tender"). "Heavy" is what RPE is for, and grip has its own tip, so neither stops a
 // lift that hit its reps from moving up.
 const HOLD_WORDS = ["tender", "pain", "sore", "ache", "hurt"];
 function noteConcernWord(note){
   const n = String(note || "").toLowerCase();
-  return HOLD_WORDS.find(w => new RegExp(String.raw`\b${w}`).test(n) && !new RegExp(String.raw`\b(?:no|not|without|zero)\s+(?:\w+\s+)?${w}`).test(n)) || null;
+  return HOLD_WORDS.find(w => new RegExp(String.raw`\b${w}`).test(n) && !new RegExp(String.raw`\b(?:no|not|less|without|zero)\s+(?:\w+\s+)?${w}`).test(n)) || null;
 }
 
 // Coming back, two rules on top of the normal progression (Deload Week, when on, overrides both):

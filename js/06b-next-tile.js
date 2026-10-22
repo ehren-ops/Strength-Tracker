@@ -179,7 +179,10 @@ function loadText(name, ex, sug){
   const w = sug.weight;
   if(!(w > 0)) return "Bodyweight";
   // The total first, then how it's made: "Load 180 lb = 1×45 + 2×10 + 1×2.5 per side".
-  if(ex.equipment === "barbell") return `Load ${w} lb = ${platesLabel(w, ex.equipment).replace("No plates needed", "the bar alone")}`;
+  if(ex.equipment === "barbell"){
+    const bar = barWeightFor(name);
+    return `Load ${w} lb = ${platesLabel(w, ex.equipment, bar).replace("No plates needed", bar ? "the bar alone" : "no plates")}`;
+  }
   const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;
   if(maxW) return `Load ${w} lb = one bell${w >= maxW ? " (heaviest available)" : ""}`;
   return sidesOf(name).weight === "hand" ? `Load ${w} lb in each hand` : `Load ${w} lb total`;

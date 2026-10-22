@@ -125,6 +125,12 @@ function logEntry(){
   if(modes.preseason && ex.targetRepsPreseason && ex.trackBy !== "duration") entry.preseason = true;
   // When it was logged, so a session's actual exercise order can be compared with the planned one.
   entry.loggedAt = new Date().toISOString();
+  // The plan the Next tile showed, so the chart and Coach's Notes judge the session against what
+  // was asked of it (2 sets under Shoulder Rehab, 17 sec on a hang building up) and not a default.
+  if(ex.trackBy !== "duration" && ex.trackBy !== "checklist" && ex.entries.length){
+    const plan = computeSuggestion(ex, selected);
+    if(plan && plan.reps > 0) entry.plan = { sets: plan.sets || null, reps: plan.reps, weight: plan.weight ?? null };
+  }
   ex.entries.push(entry);
   if(entry.date === todayISO()) undoSkip(selected, true); // logged after all: the skip no longer applies
   persist();

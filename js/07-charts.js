@@ -148,7 +148,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     svg += `<path d="${path}" fill="none" stroke="var(--chart-line)" stroke-width="${h === false ? 1.5 : 2.5}"${h === false ? ' opacity="0.55"' : ""} class="track-line${h ? " heavy-line" : h === false ? " volume-line" : ""}"/>`;
   });
   // dots + x labels for actual points - deload gets a hollow red marker,
-  // under 3 sets gets dark red, missed target reps gets red, extra reps/sets
+  // fewer sets than planned gets dark red, missed planned reps gets red, extra reps/sets
   // (that actually hit target) gets green - each with a small sets×reps label
   points.forEach((p,i) => {
     // A Deload Week session (tagged when logged with the modifier on) is planned, so it gets its own
@@ -164,11 +164,13 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     const isBlock = !!tag && tag.kind === "block";
     const isDeload = !tag && deloadFlags[i];
     const targetReps = modTarget || entryTargetReps(ex, p.entry);
-    const isUnder = isRealExercise && !isPlanned && !isDeload && ex.trackBy !== "duration" && p.entry.sets < 3;
-    const isMissed = isRealExercise && !isPlanned && !isDeload && !isUnder && ex.trackBy !== "duration" && p.entry.reps < targetReps;
-    const isExtra = isRealExercise && !tag && !isDeload && !isUnder && !isMissed && ex.trackBy !== "duration" &&
-      (p.entry.reps > targetReps || p.entry.sets > (isHeavyEntry(ex, p.entry) ? HEAVY_SETS : 3));
-    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${tracked ? (heavyOf(p) ? " (heavy)" : " (volume)") : ""}${p.entry.note?" - "+p.entry.note:""}${isPlanned?` - ${tag.title || tag.label} (planned)`:""}${isDeload?" - dropped after missed sessions":""}${isBlock?` - ${tag.label} target ${targetReps} reps`:""}${isExtra?" - extra volume":""}${isUnder?" - under 3 sets":""}${isMissed?" - missed target reps":""}`;
+    // Judged against the plan it was logged under (see sessionVerdict), so 2x12 when 2x12 was asked
+    // for is a hit, not a short session.
+    const verdict = isRealExercise && ex.trackBy !== "duration" ? sessionVerdict(ex, ex.entries.indexOf(p.entry), targetReps) : null;
+    const isUnder = !!verdict && !isPlanned && !isDeload && verdict.under;
+    const isMissed = !!verdict && !isPlanned && !isDeload && !isUnder && verdict.missed;
+    const isExtra = !!verdict && !tag && !isDeload && !isUnder && !isMissed && verdict.extra;
+    const titleText = `${fmtDate(p.entry.date)}: ${formatEntryValue(p.entry, ex)}${tracked ? (heavyOf(p) ? " (heavy)" : " (volume)") : ""}${p.entry.note?" - "+p.entry.note:""}${isPlanned?` - ${tag.title || tag.label} (planned)`:""}${isDeload?" - dropped after missed sessions":""}${isBlock?` - ${tag.label} target ${targetReps} reps`:""}${isExtra?" - extra volume":""}${isUnder?" - fewer sets than planned":""}${isMissed?" - missed target reps":""}`;
 
     function labelWithHalo(text, color){
       // Above the point when there's room, otherwise just below it so it never covers the dot.

@@ -110,6 +110,8 @@ test("notes: grip and heavy never hold a lift that hit its reps; pain words do u
   eq(suggest("Squat").weight, 185, "grip and heavy");
   lift("Squat", [[3, 180, 8, { note: "no pain at all" }]]);
   eq(suggest("Squat").weight, 185, "no pain");
+  lift("Squat", [[3, 180, 8, { note: "shoulder less tender" }]]);
+  eq(suggest("Squat").weight, 185, "less tender");
   lift("Squat", [[3, 180, 8, { note: "knee a bit sore" }]]);
   eq(suggest("Squat").weight, 180, "sore holds");
 });
@@ -317,6 +319,33 @@ test("muscle map: main muscles get full sets, helpers half, and recent work sets
   run(`data["Bench Press"].entries[0].sets = 6;`);
   const w = run(`(() => { const w = muscleWeek(); return { quads: w.sets.quads, glutes: w.sets.glutes, chest: w.sets.chest, triceps: w.sets.triceps, total: w.total, sessions: w.sessions, quadsFrom: w.lifts.quads, rec: ["chest", "quads", "triceps", "hamstrings"].map(k => muscleRecovery(w, k).state) }; })()`);
   eq(w, { quads: 6, glutes: 3, chest: 6, triceps: 3, total: 12, sessions: 3, quadsFrom: [["Squat", 6]], rec: ["hard", "recovering", "recovering", "ready"] }, "muscle week");
+});
+
+test("plates: Hip Thrust is a plate-loaded machine with no bar; barbell lifts keep the 45 lb bar", () => {
+  eq(run(`platesLabel(180, "barbell", barWeightFor("Hip Thrust"))`), "2×45 per side", "hip thrust");
+  eq(run(`platesLabel(180, "barbell", barWeightFor("Squat"))`), "1×45 + 2×10 + 1×2.5 per side", "squat");
+});
+test("hit or miss: judged against the saved plan, or the previous session when there is none", () => {
+  reset(); lift("Face Pulls", [[6, 110, 10, { sets: 2 }], [3, 130, 12, { sets: 2, plan: { sets: 2, reps: 12, weight: 110 } }]]);
+  let v = run(`sessionVerdict(data["Face Pulls"], 1, 12)`);
+  eq([v.under, v.missed], [false, false], "2x12 when 2x12 was planned");
+  lift("Face Pulls", [[6, 110, 10, { sets: 2 }], [3, 130, 12, { sets: 2 }]]);
+  v = run(`sessionVerdict(data["Face Pulls"], 1, 12)`);
+  eq([v.under, v.missed], [false, false], "no plan: 2 sets after a 2-set session is not short");
+  lift("Face Pulls", [[6, 110, 12], [3, 110, 12, { sets: 2 }]]);
+  eq(run(`sessionVerdict(data["Face Pulls"], 1, 12).under`), true, "2 sets after 3 with no plan is short");
+  run(`data["Dead Hang"] = Object.assign(newExerciseShell("Dead Hang"), { entries: [{ clientId: "d1", date: shiftISO(todayISO(), -6), sets: 3, reps: 15 }, { clientId: "d2", date: shiftISO(todayISO(), -1), sets: 3, reps: 17, plan: { sets: 3, reps: 17 } }] });`);
+  eq(run(`sessionVerdict(data["Dead Hang"], 1, 45).missed`), false, "17 sec when 17 was planned");
+});
+test("lifting time: first lift logged to the last, leaving out cardio, mobility and recovery", () => {
+  reset();
+  const at = (h, m) => { const d = new Date(2026, 9, 19, h, m); return d.toISOString(); };
+  run(`data = {
+    "Squat": Object.assign(newExerciseShell("Squat"), { entries: [{ clientId: "s", date: "2026-10-19", weight: 195, sets: 3, reps: 5, loggedAt: ${JSON.stringify(at(18, 35))} }] }),
+    "Farmer's Carry": Object.assign(newExerciseShell("Farmer's Carry"), { entries: [{ clientId: "f", date: "2026-10-19", weight: 60, sets: 3, reps: 40, loggedAt: ${JSON.stringify(at(19, 50))} }] }),
+    "Incline Treadmill Walk": Object.assign(newExerciseShell("Incline Treadmill Walk"), { entries: [{ clientId: "t", date: "2026-10-19", minutes: 20, loggedAt: ${JSON.stringify(at(20, 15))} }] }),
+    "Hip Stretch": Object.assign(newExerciseShell("Hip Stretch"), { entries: [{ clientId: "h", date: "2026-10-19", loggedAt: ${JSON.stringify(at(18, 10))} }] }) };`);
+  eq([run(`liftMinutes("2026-10-19")`), run(`fmtLiftTime(liftMinutes("2026-10-19"))`)], [75, "1 h 15 min"], "Oct 19");
 });
 
 if(failures.length){

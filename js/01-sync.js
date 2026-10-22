@@ -186,6 +186,8 @@ function entryToRow(entry, exerciseId, userId){
     preseason: !!entry.preseason,
     // Main lifts: heavy (4x5) or volume (3x8). Null on everything else and on older entries.
     heavy: entry.heavy ?? null,
+    // What the Next tile asked for when it was logged ({ sets, reps, weight }), for hit/miss.
+    plan: entry.plan || null,
     // undefined (dropped from the request) rather than null for entries logged before this
     // existed, so an edit never wipes the time the server backfilled.
     logged_at: entry.loggedAt || undefined,
@@ -214,6 +216,7 @@ function rowToEntry(row){
     deload: row.deload || undefined,
     preseason: row.preseason || undefined,
     heavy: row.heavy ?? undefined,
+    plan: row.plan || undefined,
     loggedAt: row.logged_at || undefined,
     updatedAt: row.updated_at || undefined,
     synced: true,

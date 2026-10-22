@@ -166,8 +166,10 @@
   .pill.cat-recovery.active{background:var(--cat-recovery);border-color:var(--cat-recovery);color:#fff;}
   .pill.logged-today:not(.active){opacity:0.55;}
   /* Due: a small amber dot after the name. */
-  .pill.due::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);margin-left:0.35rem;vertical-align:middle;}
-  .pill.due.active::after{background:#fff;}
+  /* A due lift: amber ring and a "12d" tag, clear at a glance in the row. */
+  .pill.due{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber);color:var(--ink);}
+  .pill.due .due-tag{display:inline-block;margin-left:0.35rem;padding:0 0.3rem;border-radius:4px;background:var(--amber);color:#fff;font-size:0.6rem;font-weight:700;line-height:1.35;}
+  .pill.due.active .due-tag{background:#fff;color:var(--amber);}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:0.7rem;}
   .ex-name{font-family:var(--font-display);font-size:var(--name-size);line-height:1.1;text-transform:uppercase;color:var(--accent-2);margin:0 0 0.6rem;}
   .ex-name-row{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;margin:0 0 0.6rem;flex-wrap:wrap;}
@@ -623,3 +625,6 @@ body.library-open{overflow:hidden;}
 .mm-list button b{flex-shrink:0;font-weight:600;font-variant-numeric:tabular-nums;font-size:0.74rem;}
 .mm-list button.on{border-color:var(--ink);background:var(--panel-soft);}
 .mm-key{margin:0;}
+
+/* Lifting time on a calendar day (liftMinutes, 08). */
+.cal-lift-time{font-weight:400;color:var(--slate);margin-left:0.5rem;}

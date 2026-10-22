@@ -116,8 +116,13 @@ function daysBetween(dateStrA, dateStrB){
   return Math.round((Date.UTC(by,bm-1,bd) - Date.UTC(ay,am-1,ad)) / 86400000);
 }
 
-function calcPlates(totalWeight){
-  const perSide = (totalWeight - BAR_WEIGHT) / 2;
+// Plate-loaded machines with no bar (Hip Thrust) set barWeight: 0 in EXERCISE_DEFAULTS.
+function barWeightFor(name){
+  const b = (EXERCISE_DEFAULTS[name] || {}).barWeight;
+  return b != null ? b : BAR_WEIGHT;
+}
+function calcPlates(totalWeight, bar){
+  const perSide = (totalWeight - (bar != null ? bar : BAR_WEIGHT)) / 2;
   if(perSide <= 0) return { perSide:0, plates:[], unreachable:false };
   let remaining = Math.round(perSide*100)/100;
   const plates = [];
@@ -127,9 +132,9 @@ function calcPlates(totalWeight){
   }
   return { perSide, plates, unreachable: remaining > 0.01 };
 }
-function platesLabel(totalWeight, equipment){
+function platesLabel(totalWeight, equipment, bar){
   if(equipment !== "barbell") return null;
-  const { perSide, plates, unreachable } = calcPlates(totalWeight);
+  const { perSide, plates, unreachable } = calcPlates(totalWeight, bar);
   if(perSide === 0) return `No plates needed`;
   const parts = plates.map(p => `${p.count}×${p.plate}`).join(" + ");
   return `${parts} per side${unreachable ? " - closest with standard plates" : ""}`;
@@ -347,4 +352,24 @@ function shiftISO(iso, days){
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(y, m - 1, d + days);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+}
+
+// How a session went against what was asked of it: the plan the Next tile showed when it was
+// logged, or for sessions logged before plans were saved, the lift's previous regular session (its
+// sets, up to 3; the bottom of a rep range or the target reps; a bodyweight or timed lift's previous
+// reps). target is the reps a modifier asked for that day (Preseason: 5), or the lift's own.
+function sessionVerdict(ex, i, target){
+  const e = ex.entries[i];
+  const prev = ex.entries.slice(0, i).reverse().find(p => !p.deload);
+  const plan = e.plan || null;
+  const range = activeRepRange(ex);
+  const sets = plan && plan.sets ? plan.sets : prev ? Math.min(3, prev.sets || 3) : 3;
+  const reps = plan && plan.reps ? plan.reps
+    : ex.trackBy === "weight" ? (range ? range[0] : target)
+    : prev && prev.reps > 0 ? Math.min(prev.reps, target) : target;
+  const under = (e.sets || 0) < sets;
+  const missed = !under && (e.reps || 0) < reps;
+  const fullSets = plan && plan.sets ? plan.sets : isHeavyEntry(ex, e) ? HEAVY_SETS : 3;
+  const extra = !under && !missed && ((e.reps || 0) > reps || (e.sets || 0) > fullSets);
+  return { under, missed, extra, sets, reps };
 }

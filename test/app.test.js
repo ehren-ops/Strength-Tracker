@@ -3537,6 +3537,44 @@ async function main(){
   if(JSON.stringify(r107) !== JSON.stringify({ session: 4, volumePoints: 3, farmerPreseason: false, farmerFinisher: true })) throw new Error('expected the session line through all 4 RDL points and Farmer\'s Carry as a plain finisher, got: ' + JSON.stringify(r107));
   console.log('OK: the faint session line runs through all 4 RDL sessions (the volume line through its 3), and Farmer\'s Carry stays a finisher without the Preseason tag');
 
+  console.log('=== 108: plans saved with sessions, dated PR footer, due tag, lifting time on the calendar ===');
+  const r108 = await page.evaluate(() => {
+    const saved = { data, view, selected, dueLifts, plannedHeavy, cal: calendarSelectedDate, expanded: calendarExpanded, month: [calendarYear, calendarMonth], modes: JSON.stringify(modes) };
+    const d = n => shiftISO(todayISO(), n);
+    const out = {};
+    try{
+      MODE_DEFS.forEach(m => { modes[m.key] = false; });
+      plannedHeavy = () => false;
+      const mk = (name, rows) => Object.assign(newExerciseShell(name), { entries: rows.map((r, i) => ({ clientId: name + i, date: d(r[0]), weight: r[1], sets: r[2], reps: r[3], difficulty: 7, label: 'S' + (i + 1) })) });
+      data = { 'Bench Press': mk('Bench Press', [[-50, 150, 3, 8], [-40, 170, 3, 8], [-9, 155, 3, 8], [-5, 155, 3, 8], [-2, 155, 3, 8]]), 'Face Pulls': mk('Face Pulls', [[-3, 110, 2, 10]]) };
+      view = 'upper'; selected = 'Bench Press'; render();
+      out.pr = (document.querySelector('.pr-detail') || {}).textContent || '';
+      selected = 'Face Pulls'; render();
+      document.getElementById('f-weight').value = '110'; document.getElementById('f-sets').value = '2'; document.getElementById('f-reps').value = '12';
+      logEntry();
+      const fp = data['Face Pulls'].entries[data['Face Pulls'].entries.length - 1];
+      out.plan = fp.plan && [fp.plan.sets, fp.plan.reps];
+      out.verdict = sessionVerdict(data['Face Pulls'], data['Face Pulls'].entries.length - 1, 12);
+      out.row = entryToRow(fp, 'x', 'y').plan && true;
+      dueLifts = () => ({ 'Bench Press': { missedSessions: 2, lastDone: d(-12), daysSince: 12 } });
+      selected = 'Face Pulls'; render();
+      out.dueTag = (document.querySelector('.pill.due .due-tag') || {}).textContent || '';
+      dueLifts = saved.dueLifts;
+      const now = Date.now();
+      data['Bench Press'].entries.push({ clientId: 'bt', date: todayISO(), weight: 160, sets: 3, reps: 8, loggedAt: new Date(now - 50 * 60000).toISOString(), label: 'x' });
+      fp.loggedAt = new Date(now).toISOString();
+      calendarSelectedDate = todayISO(); calendarExpanded = true; calendarYear = new Date().getFullYear(); calendarMonth = new Date().getMonth(); view = 'overview'; render();
+      out.calTime = (document.querySelector('.cal-lift-time') || {}).textContent || '';
+    } finally {
+      data = saved.data; view = saved.view; selected = saved.selected; dueLifts = saved.dueLifts; plannedHeavy = saved.plannedHeavy; calendarSelectedDate = saved.cal; calendarExpanded = saved.expanded; [calendarYear, calendarMonth] = saved.month; Object.assign(modes, JSON.parse(saved.modes)); render();
+    }
+    return out;
+  });
+  const ok108 = /^PR ?Heaviest yet: 170 lb x 8, \w{3} \d+$/.test(r108.pr) && JSON.stringify(r108.plan) === JSON.stringify([2, 12]) &&
+    !r108.verdict.under && !r108.verdict.missed && r108.row === true && r108.dueTag === '12d' && r108.calTime === 'About 50 min of lifting';
+  if(!ok108) throw new Error('expected saved plans, a dated PR footer, a due tag and lifting time, got: ' + JSON.stringify(r108));
+  console.log('OK: the footer shows the last PR with its date, a logged session keeps its 2x12 plan and counts as a hit, a due pill says 12d, and the calendar day shows about 50 min of lifting');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

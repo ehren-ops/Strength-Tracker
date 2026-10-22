@@ -126,7 +126,8 @@ function renderCalendar(){
 
     if(calendarSelectedDate && sessionsByDate[calendarSelectedDate]){
       const names = sessionsByDate[calendarSelectedDate];
-      html += `<div class="cal-detail"><p style="font-weight:600;font-size:0.8rem;margin:0 0 0.35rem;">${fmtDate(calendarSelectedDate)}</p>`;
+      const dayLift = liftMinutes(calendarSelectedDate);
+      html += `<div class="cal-detail"><p style="font-weight:600;font-size:0.8rem;margin:0 0 0.35rem;">${fmtDate(calendarSelectedDate)}${dayLift ? `<span class="cal-lift-time">About ${fmtLiftTime(dayLift)} of lifting</span>` : ""}</p>`;
       names.forEach(n => {
         const ex = data[n];
         const entry = ex.entries.slice().reverse().find(e => e.date === calendarSelectedDate);
@@ -170,7 +171,7 @@ function getLastSessionDate(){
 }
 
 // ---------- lifts that are due ----------
-// A program lift is due once the days it belongs to were trained at least twice since it was last
+// A program lift (finishers included) is due once the days it belongs to were trained at least twice since it was last
 // done, counting only real misses. A session where it was skipped with a reason (injury, equipment,
 // time, other), one in a deload week, or one while Shoulder Rehab had it paused doesn't count. A lift
 // a modifier pauses or hides right now (rehab pause, preseason-only, knee-only), or one never logged,
@@ -199,18 +200,19 @@ function dueLifts(){
   const dates = trainingDates(), today = todayISO();
   const sorted = Object.keys(dates).filter(d => d < today).sort();
   const due = {};
-  programDays().forEach(day => activeDayOrder(day).forEach(name => {
+  const onDay = d => [...activeDayOrder(d), ...finishersFor(d)];
+  programDays().forEach(day => onDay(day).forEach(name => {
     if(name in due) return;
     due[name] = null;
     if(isShoulderPaused(name)) return;
-    const homes = programDays().filter(d => activeDayOrder(d).includes(name));
+    const homes = programDays().filter(d => onDay(d).includes(name));
     const ex = data[name];
     // Never logged: not part of the routine yet, so never due.
     if(!ex || !ex.entries.length) return;
     const last = ex.entries[ex.entries.length - 1].date;
     const missed = sorted.filter(d => d > last && homes.includes(dates[d].day) && !dates[d].names.has(name)
       && !skipReason(name, d) && !dates[d].deload && !pausedByRehabOn(name, d));
-    if(missed.length >= DUE_AFTER_MISSES) due[name] = { missedSessions: missed.length, lastDone: last };
+    if(missed.length >= DUE_AFTER_MISSES) due[name] = { missedSessions: missed.length, lastDone: last, daysSince: daysBetween(last, today) };
   }));
   Object.keys(due).forEach(n => { if(!due[n]) delete due[n]; });
   return due;
@@ -240,6 +242,28 @@ function painLine(sig){
   return mod && !modes[mod.key] ? `${what}: consider turning on ${mod.name}.` : `${what}: keep the load down until it settles.`;
 }
 
+// Lifting time on a date, roughly: from the first lift logged (or rest clock started) to the last.
+// Cardio, mobility and core routines, recovery and the rehab card don't count, so a walk or a
+// stretch before or after never stretches it. Only times stamped on that same local day count
+// (older imports carry their sync time), and a span under 5 minutes or over 4 hours is no estimate.
+function liftMinutes(date){
+  const local = t => { const d = new Date(t); return isNaN(d) ? "" : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+  const isLift = name => { const ex = data[name]; return !!ex && name !== REHAB_NAME && !isRecovery(name) && ex.trackBy !== "duration" && ex.trackBy !== "checklist"; };
+  const times = [];
+  Object.entries(data).forEach(([name, ex]) => {
+    if(!isLift(name)) return;
+    ex.entries.forEach(e => { if(e.date === date && e.loggedAt && local(e.loggedAt) === date) times.push(Date.parse(e.loggedAt)); });
+  });
+  ((typeof restTaps !== "undefined" && restTaps[date]) || []).forEach(t => { if(isLift(t.name) && local(t.at) === date) times.push(Date.parse(t.at)); });
+  if(times.length < 2) return null;
+  const min = Math.round((Math.max(...times) - Math.min(...times)) / 60000);
+  return min >= 5 && min <= 240 ? min : null;
+}
+function fmtLiftTime(min){
+  const m = Math.round(min / 5) * 5;
+  return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`;
+}
+
 function generateCoachNotes(){
   const lastDate = getLastSessionDate();
   if(!lastDate) return null;
@@ -250,7 +274,7 @@ function generateCoachNotes(){
     for(let i = ex.entries.length - 1; i >= 0; i--){
       if(ex.entries[i].date === lastDate){
         const entry = ex.entries[i];
-        const hit = ex.trackBy === "weight" ? entry.reps >= entryTargetReps(ex, entry) : true;
+        const hit = !sessionVerdict(ex, i, entryTargetReps(ex, entry)).missed;
         items.push({ name, entry, hit, ex });
         break;
       }
@@ -267,10 +291,11 @@ function generateCoachNotes(){
   const total = items.length;
   const hitCount = items.filter(i => i.hit).length;
   const missed = items.filter(i => !i.hit && !i.entry.deload);
-  const concerns = items.filter(i => i.entry.note && CONCERN_WORDS.some(w => i.entry.note.toLowerCase().includes(w)));
+  const concerns = items.filter(i => noteConcernWord(i.entry.note));
   const records = items.filter(i => prFlags(i.ex)[i.ex.entries.indexOf(i.entry)]);
 
-  const sentences = [`${dayLabel} on ${fmtDate(lastDate)}: ${hitCount}/${total} lifts hit target.`];
+  const liftTime = liftMinutes(lastDate);
+  const sentences = [`${dayLabel} on ${fmtDate(lastDate)}: ${hitCount}/${total} lifts hit target${liftTime ? `, about ${fmtLiftTime(liftTime)} of lifting` : ""}.`];
   if(records.length){
     sentences.push(`PR${records.length > 1 ? "s" : ""}: ${records.slice(0, 3).map(i => i.ex.trackBy === "weight" ? `${i.name} (${i.entry.weight} lb x ${i.entry.reps})` : `${i.name} (${i.entry.reps})`).join(", ")}.`);
   }
@@ -285,7 +310,8 @@ function generateCoachNotes(){
   }
   const bal = weeklyBalance();
   if(bal.ratio != null && bal.ratio < bal.target){
-    sentences.push(`Pulling is behind pressing: ${bal.pull} pull sets to ${bal.push} press over 4 weeks. About ${bal.short} more pull set${bal.short === 1 ? "" : "s"} a week evens it out.`);
+    const under = bal.target === 1 ? "Pulling is behind pressing" : "Pulling is under the 1.5 to 1 rehab target";
+    sentences.push(`${under}: ${bal.pull} pull sets to ${bal.push} press over 4 weeks; add about ${bal.short} a week.`);
   }
   const dueNow = Object.keys(dueLifts());
   if(dueNow.length){

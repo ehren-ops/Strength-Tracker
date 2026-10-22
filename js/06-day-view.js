@@ -185,7 +185,9 @@ function renderDay(day){
     if(!loggedToday && !skipped && !paused && due[name]) pillClasses.push('due');
     const title = skipped ? ` title="Skipped today: ${SKIP_REASONS[skipped]}"` : paused ? ` title="Paused: Shoulder Rehab"`
       : due[name] && !loggedToday ? ` title="Due: missed its last ${due[name].missedSessions} sessions"` : '';
-    html += `<div class="${pillClasses.join(' ')}" data-name="${escapeHtml(name)}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')"${title}>${(day !== "extra" && n >= 0 && n < activeDayOrder(day).length) ? (n+1)+'. ' : ''}${name}${loggedToday?' ✓':''}</div>`;
+    // A due lift says how long it has been ("12d") in amber, so it stands out in the row.
+    const dueTag = pillClasses.includes('due') ? `<span class="due-tag">${due[name].daysSince}d</span>` : "";
+    html += `<div class="${pillClasses.join(' ')}" data-name="${escapeHtml(name)}" onclick="selectExercise('${name.replace(/'/g,"\\'")}')"${title}>${(day !== "extra" && n >= 0 && n < activeDayOrder(day).length) ? (n+1)+'. ' : ''}${name}${loggedToday?' ✓':''}${dueTag}</div>`;
   });
   html += `<div class="pill pill-add" onclick="${day === "extra" ? "toggleAddExercise()" : "openLibrary()"}" aria-label="${day === "extra" ? "Add an exercise" : "Exercise library"}">+</div></div>`;
   html += `<div id="add-ex-row" style="display:none" class="add-ex-row">
@@ -585,11 +587,13 @@ function renderExerciseCard(name, ex){
     html += `<div class="hist-row header${cardioCls}"><span>Date</span><span>${histColLabel}</span><span>RPE</span><span>Note</span></div>`;
     recent.forEach((r, idx) => { html += renderHistRow(r.e, r.i, idx === 0, ex, name, prs[r.i]); });
 
-    // One footer row: earlier history on the left, the newest PR in the rows above in the middle,
-    // Skip today on the right. While picking a skip reason the reasons take the whole row.
-    const prRow = recent.find(r => prs[r.i]);
+    // One footer row: earlier history on the left, the newest PR in the middle (dated when it is
+    // older than the rows shown, so every card with a record shows it), Skip today on the right.
+    // While picking a skip reason the reasons take the whole row.
+    const prRow = reversed.find(r => prs[r.i]);
+    const prOld = prRow && !recent.includes(prRow);
     const picking = skipPicking === name;
-    const prHtml = prRow && !picking ? `<span class="pr-detail"><b>PR</b> ${prText(prRow.e, ex, prs[prRow.i])}</span>` : "";
+    const prHtml = prRow && !picking ? `<span class="pr-detail"><b>PR</b> ${prText(prRow.e, ex, prs[prRow.i])}${prOld ? `, ${fmtShortDate(prRow.e.date)}` : ""}</span>` : "";
     // A fixed three-slot grid, so the PR line starts in the same place on every card.
     html += `<div class="hist-foot pr-foot${picking ? " picking" : ""}"><span class="foot-left">${older.length && !picking ? `<button class="hist-toggle" onclick="toggleHistory('${name.replace(/'/g,"\\'")}')">Earlier (${older.length})</button>` : ""}</span>${prHtml || "<span></span>"}${renderSkipControl(name)}</div>`;
     if(older.length){

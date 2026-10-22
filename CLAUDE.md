@@ -101,6 +101,16 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - A new lift wants a `LIFT_MUSCLES` row (09c) too, or the Muscle Map leaves it out (it also drops off
   `MUSCLE_IDEAS` by itself once the app has it). Shading is by
   class (`mm-b0`..`mm-b4`, `mm-hard` / `mm-recovering` / `mm-ready`) on `--mm-*` tokens in both themes.
+- Hit or miss is `sessionVerdict(ex, i, target)` (04): against `entry.plan` (the Next tile's
+  `{ sets, reps, weight }`, saved by `logEntry` in column `plan`), or for older entries the previous
+  regular session (its sets up to 3; a range's bottom or the target; a bodyweight or timed lift's
+  previous reps). The chart and Coach's Notes both use it; never compare against a fixed 3 sets.
+- Lifting time is `liftMinutes(date)` (08): first to last lift log or rest-clock start that local
+  day, leaving out cardio, checklists, recovery and the rehab card; 5 min to 4 h or nothing. It
+  shows in Coach's Notes and the calendar day (`fmtLiftTime`).
+- Plate math reads `barWeightFor(name)` (04): `barWeight: 0` in `EXERCISE_DEFAULTS` marks a
+  plate-loaded machine (Hip Thrust). Due lifts (08) include finishers; a due pill gets an amber ring
+  and a days tag (`daysSince`). The card footer shows the newest PR, dated when older than the rows.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double

@@ -210,7 +210,7 @@ const EXERCISE_DEFAULTS = {
   "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec lowering each step" },
   "Bench Press": { equipment: "barbell", targetRepsStrength: 5 },
   "RDL": { equipment: "barbell", targetRepsStrength: 5 },
-  "Hip Thrust": { equipment: "barbell", targetReps: 10 },
+  "Hip Thrust": { equipment: "barbell", targetReps: 10, barWeight: 0 }, // plate-loaded machine, no bar
   "Barbell Row": { equipment: "barbell", targetRepsStrength: 5 },
   "Back Extension": { trackBy: "weight", autoloadLastReps: true, repRange: "10-15" },
   // Accessories progress by reps inside a range before adding weight (double progression): +5 lb is
@@ -340,6 +340,6 @@ function backfillExerciseDefaults(){
 function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v133";
+const APP_VERSION = "v134";
 const APP_UPDATED = "Oct 15, 2026";
 
