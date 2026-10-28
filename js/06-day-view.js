@@ -565,7 +565,7 @@ function renderExerciseCard(name, ex){
       if(todayLog) headline = suggestion.heavy != null ? `Next ${suggestion.heavy ? "heavy" : "volume"} day: ${nextLabel}` : `Next time: ${nextLabel}`;
       else if(suggestion.shoulderPaused) headline = "Paused today";
       else headline = [suggestion.heavy != null ? (suggestion.heavy ? "Heavy" : "Volume") : "", planShape(name, ex, suggestion)].filter(Boolean).join(" · ");
-      recHtml = renderNextTile(headline, ex, composeGuidance(msg, name, ex, last, work, suggestion), suggestion.shoulderPaused ? "No load today" : loadText(name, ex, suggestion));
+      recHtml = renderNextTile(headline, ex, composeGuidance(msg, name, ex, last, work, suggestion), suggestion.shoulderPaused ? "No load today" : loadText(name, ex, suggestion), !!todayLog);
     }
 
     // Recovery: this week's total and the last session instead of a plan and a graph.

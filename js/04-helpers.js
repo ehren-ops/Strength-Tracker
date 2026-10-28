@@ -134,10 +134,11 @@ function calcPlates(totalWeight, bar){
 }
 function platesLabel(totalWeight, equipment, bar){
   if(equipment !== "barbell") return null;
-  const { perSide, plates, unreachable } = calcPlates(totalWeight, bar);
+  const { perSide, plates } = calcPlates(totalWeight, bar);
   if(perSide === 0) return `No plates needed`;
-  const parts = plates.map(p => `${p.count}×${p.plate}`).join(" + ");
-  return `${parts} per side${unreachable ? " - closest with standard plates" : ""}`;
+  // Short enough for one line on a phone: "45 + 2×10 + 2.5 a side", a single plate without "1×".
+  const parts = plates.map(p => p.count > 1 ? `${p.count}×${p.plate}` : `${p.plate}`).join(" + ");
+  return `${parts} a side`;
 }
 // Labels that say whether a number is per hand, per side, per leg or total (EXERCISE_SIDES).
 function sidesOf(name){

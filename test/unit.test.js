@@ -296,6 +296,17 @@ test("Classic: main lifts heavy (4x5) first in the week, volume (3x8) after, eac
   eq(run(`isHeavyEntry(data["Squat"], data["Squat"].entries[data["Squat"].entries.length - 1])`), true, "a Preseason tempo session counts as heavy");
   run(`modes.preseason = false;`);
 });
+test("a stale track restarts from the latest estimated max, not a weeks-old weight", () => {
+  reset(); run(`program = { key: "classic" }; view = "full"; modes.preseason = true;`); heavyDays();
+  lift("Squat", []);
+  run(`data["Squat"].entries = ${JSON.stringify([at("2026-09-21", 175, 8), at("2026-09-28", 205, 5, { sets: 4, preseason: true }), at("2026-10-05", 210, 5, { sets: 4, preseason: true }), at("2026-10-12", 215, 5, { sets: 4, preseason: true }), at("2026-10-19", 220, 5, { sets: 4, preseason: true })])};`);
+  let s = onDay("2026-10-21", () => suggest("Squat"));
+  eq([s.heavy, s.reps, s.sets, s.weight, !!s.trackStart], [false, 8, 3, 202.5, true], "3x8 after four weeks of tempo 5s: worked out from 220x5");
+  run(`data["Squat"].entries.splice(1, 1, ${JSON.stringify(at("2026-09-30", 180, 8))});`);
+  s = onDay("2026-10-21", () => suggest("Squat"));
+  eq([s.weight, !!s.trackStart], [185, false], "19 days back: still its own track, +5 from 180x8");
+  run(`modes.preseason = false;`);
+});
 test("Full Body 2+1: heavy by day (Squat, Bench, Row on A; RDL on B); v107 entries count as heavy", () => {
   reset(); run(`program = { key: "fullbody", startedOn: "2026-10-10", history: [{ key: "fullbody", startedOn: "2026-10-10" }] };`); heavyDays();
   lift("Squat", [[30, 180, 8]]); lift("RDL", [[30, 225, 8]]); lift("Bench Press", [[30, 150, 8]]);
@@ -327,8 +338,8 @@ test("muscle map: main muscles get full sets, helpers half, and recent work sets
 });
 
 test("plates: Hip Thrust is a plate-loaded machine with no bar; barbell lifts keep the 45 lb bar", () => {
-  eq(run(`platesLabel(180, "barbell", barWeightFor("Hip Thrust"))`), "2×45 per side", "hip thrust");
-  eq(run(`platesLabel(180, "barbell", barWeightFor("Squat"))`), "1×45 + 2×10 + 1×2.5 per side", "squat");
+  eq(run(`platesLabel(180, "barbell", barWeightFor("Hip Thrust"))`), "2×45 a side", "hip thrust");
+  eq(run(`platesLabel(180, "barbell", barWeightFor("Squat"))`), "45 + 2×10 + 2.5 a side", "squat");
 });
 test("hit or miss: judged against the saved plan, or the previous session when there is none", () => {
   reset(); lift("Face Pulls", [[6, 110, 10, { sets: 2 }], [3, 130, 12, { sets: 2, plan: { sets: 2, reps: 12, weight: 110 } }]]);

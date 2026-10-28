@@ -379,8 +379,9 @@ function applyReturn(core, ex, name, baseline){
   return core;
 }
 
-// A main lift's first session on a track it has never done (its first heavy day, or its first
-// volume day after only heavy ones) works out from the last working set's estimated max. Moving to
+const TRACK_STALE_DAYS = 21;
+// A main lift's first session on a track it has never done or has let go stale (its first heavy day,
+// or its first volume day after weeks of heavy ones) works out from the last working set's estimated max. Moving to
 // heavier, lower-rep sets it starts a little under (95%), so it lands around RPE 7 to 8.
 function startTrack(ex, last){
   const target = effectiveTargetReps(ex), lastTarget = entryTargetReps(ex, last);
@@ -415,7 +416,13 @@ function computeSuggestion(full, name){
   if(full.targetRepsStrength && full.trackBy === "weight"){
     const heavy = plannedHeavy(name, full);
     const track = full.entries.filter(e => isHeavyEntry(full, e) === heavy);
-    fresh = !track.some(e => !e.deload) && full.entries.some(e => !e.deload && e.weight > 0);
+    // A track with no working session, or one gone stale (its last session TRACK_STALE_DAYS older
+    // than the other track's, like Squat's 3x8 after weeks of Preseason tempo 5s), starts over
+    // from the latest session's estimated max instead of an old weight or note.
+    const lastOf = list => (list.filter(e => !e.deload).pop() || {}).date || "";
+    const own = lastOf(track), other = lastOf(full.entries.filter(e => isHeavyEntry(full, e) !== heavy));
+    const stale = !!(own && other && daysBetween(own, other) >= TRACK_STALE_DAYS);
+    fresh = (!own || stale) && full.entries.some(e => !e.deload && e.weight > 0);
     ex = { ...full, entries: fresh ? full.entries : track, heavyPlanned: heavy };
   }
   // Deload Week sessions are skipped, except one done heavier than the regular session before it:

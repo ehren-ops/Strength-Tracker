@@ -76,7 +76,8 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   and carries the modifier's note tag and tempo line. `logEntry` stores `entry.heavy`
   (column `heavy`); `isHeavyEntry` reads it (v107 2+1 entries without it count as heavy via
   `programOn`). `computeSuggestion` plans from the matching track only, and `startTrack` converts
-  an empty track from the estimated max. Read reps through `effectiveTargetReps` /
+  an empty track, or a stale one (last session `TRACK_STALE_DAYS` older than the other track's), from
+  the latest estimated max. Read reps through `effectiveTargetReps` /
   `entryTargetReps`, which know the track. Browser scenarios that test other rules on a main lift
   stub `plannedHeavy = () => false` so they do not depend on the weekday.
 - The clock repaints through `paintClock` (05c), which rebuilds its markup only when words or buttons
@@ -116,7 +117,9 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   shows in Coach's Notes and the calendar day (`fmtLiftTime`).
 - Plate math reads `barWeightFor(name)` (04): `barWeight: 0` in `EXERCISE_DEFAULTS` marks a
   plate-loaded machine (Hip Thrust), and `barNote` ends the load line in parentheses ("no bar,
-  machine", "45 lb trap bar"); the plate line wraps balanced instead of an ellipsis. Due lifts (08) include finishers; a due pill gets an amber ring
+  machine", "45 lb trap bar"). The plate line is one line, never wrapped: "45 + 2×10 + 2.5 a side",
+  "≈" when standard plates fall short, and `fitLoad` (06b) tightens it step by step to fit. Once
+  today is logged the Next tile's headline drops the rest so the next plan shows in full. Due lifts (08) include finishers; a due pill gets an amber ring
   and a days tag (`daysSince`). The card footer shows the newest PR, dated when older than the rows.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.

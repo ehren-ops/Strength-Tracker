@@ -3588,6 +3588,35 @@ async function main(){
   if(!ok108) throw new Error('expected saved plans, a dated PR footer, a due tag and lifting time, got: ' + JSON.stringify(r108));
   console.log('OK: the footer shows the last PR with its date, a logged session keeps its 2x12 plan and counts as a hit, a due pill says 12d, and the calendar day shows about 50 min of lifting');
 
+  console.log('=== 109: plate math stays on one line at 360px, with the bar note and an approximate sign when plates fall short ===');
+  const vp109 = page.viewportSize();
+  await page.setViewportSize({ width: 360, height: 800 });
+  const r109 = await page.evaluate(() => {
+    const saved = { data, view, selected, modes: JSON.stringify(modes) };
+    const out = [];
+    try{
+      MODE_DEFS.forEach(m => { modes[m.key] = false; });
+      for(const [name, day, w] of [['Hip Thrust', 'lower', 265], ['Hip Thrust', 'lower', 217.5], ['Trap Bar Jump', 'lower', 200], ['Squat', 'full', 252.5]]){
+        data = { [name]: Object.assign(newExerciseShell(name), { day }) };
+        view = day; selected = name; render();
+        const el = document.createElement('div');
+        el.className = 'rec-load plate-line';
+        document.querySelector('.rec-load').replaceWith(el);
+        el._load = loadText(name, data[name], { weight: w });
+        fitGuidance();
+        out.push({ text: el.textContent, fits: el.scrollWidth <= el.clientWidth, lines: Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)) });
+      }
+    } finally {
+      data = saved.data; view = saved.view; selected = saved.selected; Object.assign(modes, JSON.parse(saved.modes)); render();
+    }
+    return out;
+  });
+  await page.setViewportSize(vp109);
+  const ok109 = r109.every(r => r.fits && r.lines === 1) && /\(no bar, machine\)$/.test(r109[0].text) && /2×45/.test(r109[0].text) &&
+    /≈/.test(r109[1].text) && /\(45 lb trap bar\)$/.test(r109[2].text) && /^Load 252\.5 lb ≈ /.test(r109[3].text);
+  if(!ok109) throw new Error('expected every plate line on one line with its bar note, got: ' + JSON.stringify(r109));
+  console.log('OK: Hip Thrust, Trap Bar Jump and Squat plate lines fit one line at 360px: ' + r109.map(r => r.text).join(' | '));
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

@@ -10,12 +10,13 @@ function planModifiers(name, ex){
 
 // The Next tile: always four rows at one fixed size on every lift, so the card never shifts.
 // 1: weight, sets x reps, rest. 2-3: the call and a short read of recent notes. 4: the load.
-function renderNextTile(headline, ex, guidance, load){
-  const rest = ex.trackBy !== "duration" ? `<span class="rec-rest">Rest ${restTimeFor(ex)}</span>` : "";
+// Once today is logged (noRest) the headline plans the next session in full and takes the whole row.
+function renderNextTile(headline, ex, guidance, load, noRest){
+  const rest = ex.trackBy !== "duration" && !noRest ? `<span class="rec-rest">Rest ${restTimeFor(ex)}</span>` : "";
   return `<div class="rec-box">
     <div class="rec-headline"><span class="rec-plan">${headline}</span>${rest}</div>
     <div class="rec-desc">${guidance}</div>
-    <div class="rec-load${/ per side/.test(load) ? " plate-line" : ""}">${load}</div>
+    <div class="rec-load${ex.equipment === "barbell" && /^Load /.test(load) ? " plate-line" : ""}">${load}</div>
   </div>`;
 }
 // Rows 2-3: the call first, then whole sentences from a pool, most useful first. The pool rides on
@@ -46,13 +47,33 @@ function firstSessionGuidance(name, ex){
 // Greedy fill: add each sentence in order, drop any that would push past two lines. A tile that
 // changes width later (rotation, a scrollbar, the web font arriving) is refit by the observer.
 const guidanceObserver = typeof ResizeObserver === "function"
-  ? new ResizeObserver(list => list.forEach(r => { if(r.target.clientWidth !== r.target._fitW) fitOne(r.target); }))
+  ? new ResizeObserver(list => list.forEach(r => { if(r.target.clientWidth !== r.target._fitW) (r.target._load ? fitLoad : fitOne)(r.target); }))
   : null;
 function fitGuidance(){
   document.querySelectorAll(".rec-desc").forEach(box => {
     fitOne(box);
     if(guidanceObserver) guidanceObserver.observe(box);
   });
+  document.querySelectorAll(".rec-load.plate-line").forEach(el => {
+    el._load = el._load || el.textContent;
+    fitLoad(el);
+    if(guidanceObserver) guidanceObserver.observe(el);
+  });
+}
+// The plate line stays on one line: each step tightens it only if it still doesn't fit
+// ("45 + 2×10 + 2.5 a side" to "45+2×10+2.5/side", then without the leading "Load", then the bar
+// note's last words only: "(machine)", "(trap bar)").
+const LOAD_TIGHTEN = [s => s.replace(/ \+ /g, "+"), s => s.replace(" a side", "/side"), s => s.replace(/^Load /, ""),
+  s => s.replace(/\((?:[^)]*, )?(?:\d+ lb )?([^)]*)\)$/, "($1)")];
+function fitLoad(el){
+  if(!el.clientWidth) return;
+  el._fitW = el.clientWidth;
+  let text = el._load;
+  el.textContent = text;
+  for(const step of LOAD_TIGHTEN){
+    if(el.scrollWidth <= el.clientWidth) break;
+    el.textContent = text = step(text);
+  }
 }
 function fitOne(box){
   const span = box.querySelector("[data-gpool]");
@@ -178,11 +199,13 @@ function loadText(name, ex, sug){
   if(!sug) return ex.equipment === "barbell" ? "Plates show after your first log" : sidesOf(name).weight === "hand" ? "Load is the weight in each hand" : "Load is the total weight";
   const w = sug.weight;
   if(!(w > 0)) return "Bodyweight";
-  // The total first, then how it's made: "Load 180 lb = 1×45 + 2×10 + 1×2.5 per side".
+  // The total first, then how it's made: "Load 180 lb = 45 + 2×10 + 2.5 a side" ("≈" when standard
+  // plates can't make it exactly). fitLoad keeps it on one line.
   if(ex.equipment === "barbell"){
     // A bar that isn't the standard 45 lb Olympic bar says so: "(no bar, machine)", "(45 lb trap bar)".
     const bar = barWeightFor(name), note = (EXERCISE_DEFAULTS[name] || {}).barNote;
-    return `Load ${w} lb = ${platesLabel(w, ex.equipment, bar).replace("No plates needed", bar ? "the bar alone" : "no plates")}${note ? ` (${note})` : ""}`;
+    const plates = platesLabel(w, ex.equipment, bar).replace("No plates needed", bar ? "the bar alone" : "no plates");
+    return `Load ${w} lb ${calcPlates(w, bar).unreachable ? "≈" : "="} ${plates}${note ? ` (${note})` : ""}`;
   }
   const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;
   if(maxW) return `Load ${w} lb = one bell${w >= maxW ? " (heaviest available)" : ""}`;
