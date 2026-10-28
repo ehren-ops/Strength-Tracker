@@ -37,15 +37,16 @@ const HEAVY_DAY = { "Squat": "a", "Bench Press": "a", "Barbell Row": "a", "RDL":
 function liftName(ex){ return Object.keys(data).find(n => data[n] === ex); }
 function isHeavyEntry(ex, e){
   if(!ex || !ex.targetRepsStrength || !e) return false;
+  // A Preseason session at its tempo target (Squat: 5 reps, 4 sec lowering) is that week's heavy day.
+  if(e.preseason && ex.targetRepsPreseason) return true;
   if(e.heavy != null) return !!e.heavy;
   return !e.preseason && !!e.date && programOn(e.date) === "fullbody";
 }
-// Whether the session on this date (today by default) is the heavy one. Never while a preseason or
-// in-season target sets the reps, or while Shoulder Rehab holds or pauses the lift. A session
-// already logged that day keeps its own call.
+// Whether the session on this date (today by default) is the heavy one. Under Preseason or Ski the
+// heavy day is the tempo day (effectiveTargetReps). Never while Shoulder Rehab holds or pauses the
+// lift. A session already logged that day keeps its own call.
 function plannedHeavy(name, ex, date){
   if(!ex || !ex.targetRepsStrength || ex.trackBy !== "weight") return false;
-  if((modes.preseason && ex.targetRepsPreseason) || (modes.ski && ex.targetRepsSki)) return false;
   if(modes.shoulder && typeof isShoulderHeld === "function" && (isShoulderHeld(name) || isShoulderPaused(name))) return false;
   date = date || todayISO();
   const done = ex.entries.filter(e => e.date === date).pop();
@@ -480,9 +481,12 @@ function entryTargetReps(ex, entry){
 }
 // The reps a session must reach to count as hit: the bottom of an accessory's range, else the target.
 function effectiveTargetReps(ex){
-  if(modes.preseason && ex.targetRepsPreseason) return ex.targetRepsPreseason;
-  if(modes.ski && ex.targetRepsSki) return ex.targetRepsSki;
-  if(ex.targetRepsStrength && (ex.heavyPlanned != null ? ex.heavyPlanned : plannedHeavy(liftName(ex), ex))) return ex.targetRepsStrength;
+  // A main lift keeps its heavy and volume days under Preseason and Ski: the heavy day takes the
+  // season's tempo target (Squat: 5 reps), the volume day stays 3x8 at normal tempo.
+  const heavy = ex.targetRepsStrength ? (ex.heavyPlanned != null ? ex.heavyPlanned : plannedHeavy(liftName(ex), ex)) : null;
+  if(modes.preseason && ex.targetRepsPreseason && heavy !== false) return ex.targetRepsPreseason;
+  if(modes.ski && ex.targetRepsSki && heavy !== false) return ex.targetRepsSki;
+  if(heavy) return ex.targetRepsStrength;
   const range = activeRepRange(ex);
   return range ? range[0] : (ex.targetReps || 8);
 }

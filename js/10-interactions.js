@@ -122,7 +122,8 @@ function logEntry(){
   // Every modifier on for this lift keeps its tag in the note, in front of whatever was typed.
   entry.note = withModifierTags(entry.note, activeModifierTags(selected, ex));
   // Logged at the preseason target (Squat: 5 reps, 4 sec lowering), so charts judge it against that.
-  if(modes.preseason && ex.targetRepsPreseason && ex.trackBy !== "duration") entry.preseason = true;
+  // A main lift's volume day under Preseason is plain 3x8, so only its tempo (heavy) day is tagged.
+  if(modes.preseason && ex.targetRepsPreseason && ex.trackBy !== "duration" && !(ex.targetRepsStrength && !plannedHeavy(selected, ex, entry.date))) entry.preseason = true;
   // When it was logged, so a session's actual exercise order can be compared with the planned one.
   entry.loggedAt = new Date().toISOString();
   // The plan the Next tile showed, so the chart and Coach's Notes judge the session against what

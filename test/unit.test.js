@@ -288,7 +288,12 @@ test("Classic: main lifts heavy (4x5) first in the week, volume (3x8) after, eac
   s = onDay("2026-10-19", () => suggest("Squat"));
   eq([s.weight, s.sets, s.reps, s.deloadWeek], [167.5, 3, 5, true], "deload heavy day: 10% under the last heavy, fewer sets");
   run(`modes.deload = false; modes.preseason = true;`);
-  eq(onDay("2026-10-19", () => suggest("Squat").heavy), false, "never heavy while a preseason target sets the reps");
+  s = onDay("2026-10-19", () => suggest("Squat"));
+  eq([s.heavy, s.reps], [true, 5], "under Preseason the week's first session is the tempo (heavy) day");
+  run(`data["Squat"].entries.push(${JSON.stringify(at("2026-10-19", 195, 5, { sets: 4, preseason: true }))});`);
+  s = onDay("2026-10-21", () => suggest("Squat"));
+  eq([s.heavy, s.reps, s.sets, s.weight], [false, 8, 3, 185], "and the second is volume: 3x8 from the last volume day, not another 3x5");
+  eq(run(`isHeavyEntry(data["Squat"], data["Squat"].entries[data["Squat"].entries.length - 1])`), true, "a Preseason tempo session counts as heavy");
   run(`modes.preseason = false;`);
 });
 test("Full Body 2+1: heavy by day (Squat, Bench, Row on A; RDL on B); v107 entries count as heavy", () => {

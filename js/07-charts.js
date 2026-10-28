@@ -63,7 +63,9 @@ const MODIFIER_TAGS = MODE_DEFS.map(m => ({ key: m.key, ...m.tag, title: m.name,
 // note and kept on log, so history, the graph and the coach all see which sessions were planned.
 function activeModifierTags(name, ex){
   if(!ex || ex.trackBy === "checklist" || isRecovery(name)) return [];
-  return modifiersOn(name, ex).map(m => MODIFIER_TAGS.find(t => t.key === m.key));
+  // A main lift's volume day under Preseason or Ski is plain 3x8, so it doesn't carry that tag.
+  const volumeDay = ex.targetRepsStrength && ex.trackBy === "weight" && !plannedHeavy(name, ex);
+  return modifiersOn(name, ex).filter(m => !(volumeDay && (m.key === "preseason" || m.key === "ski"))).map(m => MODIFIER_TAGS.find(t => t.key === m.key));
 }
 // Adds whichever of these tags the note is missing, in front of what was typed.
 function withModifierTags(note, tags){

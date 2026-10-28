@@ -388,10 +388,12 @@ function renderExerciseCard(name, ex){
   // One line per modifier: its pill, then its notes run together, so nothing is left dangling on a
   // line of its own. The pill names the modifier, so the text never repeats it.
   // Tempo copy comes from the app's defaults first, so a wording change reaches lifts saved earlier.
+  // A main lift's volume day under Preseason or Ski is 3x8 at normal speed; the tempo belongs to its heavy day.
+  const volumeDay = !!(ex.targetRepsStrength && suggestion && suggestion.heavy === false);
   const skiTempo = (EXERCISE_DEFAULTS[name] || {}).skiTempo || ex.skiTempo;
-  const ski = [modes.ski && ex.inSeasonNote, skiActive && skiTempo ? `Tempo: ${skiTempo}, ${ex.targetRepsSki} reps.` : ""].filter(Boolean);
+  const ski = [modes.ski && ex.inSeasonNote, skiActive && skiTempo ? (volumeDay ? `Volume day: normal tempo. The ${skiTempo} is for the heavy day.` : `Tempo: ${skiTempo}, ${ex.targetRepsSki} reps.`) : ""].filter(Boolean);
   if(ski.length) modHtml += `<div class="ski-tempo-line">${pill("ski")}${ski.join(" ")}</div>`;
-  const pre = [preseasonActive && ex.preseasonTempo ? `Tempo: ${ex.preseasonTempo}, ${ex.targetRepsPreseason} reps.` : "",
+  const pre = [preseasonActive && ex.preseasonTempo ? (volumeDay ? `Volume day: normal tempo. The ${ex.preseasonTempo} is for the heavy day.` : `Tempo: ${ex.preseasonTempo}, ${ex.targetRepsPreseason} reps.`) : "",
     preseasonActive && ex.preseasonNote ? `${ex.preseasonNote}${ex.preseasonWeek3 && !(preseasonWeek() >= 3) ? ' <b>Add from week 3.</b>' : ''}` : ""].filter(Boolean);
   if(pre.length) modHtml += `<div class="preseason-line">${pill("preseason")}${pre.join(" ")}</div>`;
 

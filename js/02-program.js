@@ -210,7 +210,7 @@ const EXERCISE_DEFAULTS = {
   "Walking Lunge": { targetRepsSki: 8, skiTempo: "2-3 sec lowering each step" },
   "Bench Press": { equipment: "barbell", targetRepsStrength: 5 },
   "RDL": { equipment: "barbell", targetRepsStrength: 5 },
-  "Hip Thrust": { equipment: "barbell", targetReps: 10, barWeight: 0 }, // plate-loaded machine, no bar
+  "Hip Thrust": { equipment: "barbell", targetReps: 10, barWeight: 0, barNote: "no bar, machine" }, // plate-loaded machine
   "Barbell Row": { equipment: "barbell", targetRepsStrength: 5 },
   "Back Extension": { trackBy: "weight", autoloadLastReps: true, repRange: "10-15" },
   // Accessories progress by reps inside a range before adding weight (double progression): +5 lb is
@@ -232,7 +232,7 @@ const EXERCISE_DEFAULTS = {
   "Copenhagen Plank": { trackBy: "reps", unit: "sec", targetReps: 20, preseason: true, preseasonNote: "3x20 sec per side, adductors." },
   "Dead Hang": { trackBy: "reps", unit: "sec", targetReps: 45 },
   "Seated Calf Raise": { trackBy: "weight", targetReps: 15, repRange: "12-20", preseason: true, preseasonNote: "3x15, soleus for boot control." },
-  "Trap Bar Jump": { trackBy: "weight", targetReps: 3, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "4x3 @ 95-135 lb. Stop if speed drops." },
+  "Trap Bar Jump": { trackBy: "weight", targetReps: 3, equipment: "barbell", barWeight: 45, barNote: "45 lb trap bar", preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "4x3 @ 95-135 lb. Stop if speed drops." },
   "Skater Bound": { trackBy: "reps", targetReps: 4, preseason: true, preseasonWeek3: true, preseasonPower: true, preseasonNote: "3x4 per side, stick each landing 2 sec." },
   "Spanish Squat": { trackBy: "reps", targetReps: 10, preseason: false, preseasonWeek3: false },
   "Push-Ups": { trackBy: "reps", targetReps: 12 },
@@ -340,6 +340,6 @@ function backfillExerciseDefaults(){
 function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v134";
+const APP_VERSION = "v135";
 const APP_UPDATED = "Oct 15, 2026";
 

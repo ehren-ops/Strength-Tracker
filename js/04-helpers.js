@@ -279,20 +279,24 @@ function niceTicks(values, forceStep){
   if(!nums.length) return { lo:0, hi:10, step:2 };
   const min = Math.min(...nums), max = Math.max(...nums);
   const range = max - min || 1;
+  // A clean round step (1, 2, 5, 10, 20...) aiming for about 5 gridlines.
+  const roundStep = () => {
+    const roughStep = range / 5;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const norm = roughStep / magnitude;
+    return (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * magnitude;
+  };
   let step;
   if(forceStep){
-    step = forceStep;
+    // Whole units (minutes, reps, seconds): never finer than forceStep, but never 20 crowded labels
+    // either (a treadmill at 15 to 38 min reads 15, 20, 25 ... not every minute).
+    step = Math.max(forceStep, roundStep());
   } else if(range <= 100){
     // normal per-lift weight tracking: keep to the 2.5/5/10lb grain plates actually move in
     step = range <= 20 ? 2.5 : range <= 60 ? 5 : 10;
   } else {
-    // larger-magnitude series (e.g. total session volume in the thousands):
-    // pick a clean round step aiming for ~5 gridlines instead of a fixed lb grain
-    const roughStep = range / 5;
-    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
-    const norm = roughStep / magnitude;
-    const niceNorm = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
-    step = niceNorm * magnitude;
+    // larger-magnitude series (e.g. total session volume in the thousands)
+    step = roundStep();
   }
   const lo = Math.floor(min/step)*step;
   const hi = Math.ceil(max/step)*step === lo ? lo + step : Math.ceil(max/step)*step;

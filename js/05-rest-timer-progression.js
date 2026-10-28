@@ -53,8 +53,10 @@ function startRestTimer(name){
   renderRestTimerBadge();
 }
 
+// Keeps ticking after the rest is over, so the red badge can count the extra time.
 function tickRestTimer(){
-  checkRestTimerCompletion();
+  if(restTimer && restTimer.phase === "done") renderRestTimerBadge();
+  else checkRestTimerCompletion();
 }
 
 // The only place a running timer turns "done": safe from both the interval and visibilitychange,
@@ -65,7 +67,6 @@ function checkRestTimerCompletion(){
     lastRestTimerChoiceIndex = restTimer.choiceIndex;
     restTimer.revertedFromDone = false;
     restTimer.phase = "done";
-    clearInterval(restTimer.intervalId);
     notifyRestOver();
   }
   renderRestTimerBadge();
@@ -153,8 +154,12 @@ function renderRestTimerBadge(){
   }
   el.hidden = false;
   if(restTimer.phase === "done"){
+    // Five seconds past the end, a second row counts the extended rest: "+0:12".
+    const over = Math.floor((Date.now() - restTimer.endAt) / 1000);
     el.className = "rest-timer-badge done";
-    el.textContent = "Rest over";
+    el.innerHTML = over >= 5
+      ? `Rest over<span class="rest-over">+${Math.floor(over / 60)}:${String(over % 60).padStart(2, "0")}</span>`
+      : "Rest over";
   } else {
     const remainingSec = Math.max(0, Math.ceil((restTimer.endAt - Date.now()) / 1000));
     const m = Math.floor(remainingSec / 60);

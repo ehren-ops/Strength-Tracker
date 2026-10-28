@@ -343,6 +343,8 @@ async function main(){
   console.log('OK: cardio tracking flags and distance/incline values synced to the cloud correctly');
 
   console.log('=== 14: ski season mode shows the badge/tempo line on ski-enabled exercises ===');
+  // The tempo is the heavy day's (a volume day is 3x8 at normal speed), so pin today as heavy.
+  await page.evaluate(() => { window.__ph14 = plannedHeavy; plannedHeavy = () => true; });
   await page.click('.tab:has-text("Full Body")');
   await page.click('.pill:has-text("Squat")');
   let skiBadgeCount = await page.locator('.ski-badge').count();
@@ -359,6 +361,7 @@ async function main(){
   if(repsField !== '5') throw new Error('expected target reps to shift to 5 for ski season, got ' + repsField);
   console.log('OK: ski badge and tempo line show on Squat, target reps shift to 5:', tempoLine.trim());
 
+  await page.evaluate(() => { plannedHeavy = window.__ph14; });
   console.log('=== 15: ski fields backfill onto an exercise that already existed before this fix ===');
   await page.click('.tab:has-text("Overview")');
   await page.click('.seg-btn.off'); // turn back off for a clean re-check
@@ -991,9 +994,13 @@ async function main(){
 
   // Full Body has no power exercises since Kettlebell Swings moved back to
   // Lower Body, so Squat stays first there.
+  // The tempo is the heavy day's; pin today as heavy, then check a volume day says so instead.
+  await page.evaluate(() => { window.__ph41 = plannedHeavy; plannedHeavy = () => true; });
   await page.click('.tab:has-text("Full Body")');
   await page.locator('.pill').filter({ hasText: /^1\.\s*Squat/ }).click();
   if(await page.locator('.preseason-badge').count() !== 1) throw new Error('expected a Preseason badge on Squat');
+  const volumeLine = await page.evaluate(() => { plannedHeavy = () => false; render(); const t = document.querySelector('.preseason-line').textContent; plannedHeavy = () => true; render(); return t; });
+  if(!/Volume day: normal tempo\. The 4 sec lowering is for the heavy day\./.test(volumeLine)) throw new Error('expected the volume-day line on Squat under Preseason, got: ' + volumeLine);
   const squatTempoLine = await page.locator('.preseason-line').first().textContent();
   if(!squatTempoLine.includes('4 sec lowering') || !squatTempoLine.includes('5')) throw new Error('unexpected preseason tempo line on Squat: ' + squatTempoLine);
   if(squatTempoLine.toLowerCase().includes('knee')) throw new Error('did not expect knee-pain commentary in the preseason tempo line, got: ' + squatTempoLine);
@@ -1001,6 +1008,7 @@ async function main(){
   if(squatRepsField !== '5') throw new Error('expected Squat target reps to shift to 5 for preseason prep, got ' + squatRepsField);
   console.log('OK: Squat shows the preseason tempo note (no knee commentary) and its target reps shift to 5:', squatTempoLine.trim());
 
+  await page.evaluate(() => { plannedHeavy = window.__ph41; });
   console.log('=== 42: new preseason exercises appear on the right days without disturbing the default landing lift ===');
   // Day mapping: Lower Body = squat day (Box Jumps/Lateral Lunge/Trap Bar
   // Jump/Skater Bound - all quad-dominant/squat-pattern work
@@ -1277,9 +1285,10 @@ async function main(){
   await sleep(150);
   const badgeAfterReturn = await page.locator('#rest-timer-badge').textContent();
   const badgeClassAfterReturn = await page.locator('#rest-timer-badge').getAttribute('class');
-  if(badgeAfterReturn.trim() !== 'Rest over') throw new Error('expected reopening the app to immediately catch a rest that fully elapsed while backgrounded, got: ' + badgeAfterReturn);
+  // 5 sec past the end, the red badge adds its second row with the extra time.
+  if(!/^Rest over\+0:0[5-9]$/.test(badgeAfterReturn.trim()) || await page.locator('#rest-timer-badge .rest-over').count() !== 1) throw new Error('expected reopening the app to catch a rest that elapsed while backgrounded, with the overtime row, got: ' + badgeAfterReturn);
   if(!badgeClassAfterReturn.includes('done')) throw new Error('expected the done state after returning, got class: ' + badgeClassAfterReturn);
-  console.log('OK: reopening/foregrounding the app immediately catches a rest period that fully elapsed while backgrounded, even with the interval disabled');
+  console.log('OK: reopening/foregrounding the app immediately catches a rest period that fully elapsed while backgrounded, even with the interval disabled, and shows the +0:05 overtime row');
 
   // After visibilitychange catches completion, tap 1 should restart the same
   // duration that had been running (90 sec here), tap 2 should dismiss
@@ -2664,7 +2673,11 @@ async function main(){
     out.squatCare = note('Squat');
     out.rdl = note('RDL');
     modes.knee = false; modes.back = false; modes.preseason = true; modes.ski = true; modes.deload = true;
+    const ph85 = plannedHeavy; plannedHeavy = () => true; // Squat's tempo (heavy) day carries Preseason and Ski
     out.squatAll = note('Squat');
+    plannedHeavy = () => false;
+    out.squatVolume = note('Squat'); // its volume day is plain 3x8, so only Deload
+    plannedHeavy = ph85;
     out.calf = note('Standing Calf Raise');
     modes.preseason = false; modes.ski = false; modes.deload = false; modes.knee = true;
     data['Bulgarian Split Squat'] = Object.assign(newExerciseShell('Bulgarian Split Squat'), { entries: [] });
@@ -2678,7 +2691,7 @@ async function main(){
     return out;
   });
   const ok85 = r85.off === '' && r85.squatCare === 'Knee Care, Back Care' && r85.rdl === 'Back Care' &&
-    r85.squatAll === 'Deload, Preseason, Ski' && r85.calf === 'Deload, Preseason' && r85.logged === 'Knee Care, felt solid';
+    r85.squatAll === 'Deload, Preseason, Ski' && r85.squatVolume === 'Deload' && r85.calf === 'Deload, Preseason' && r85.logged === 'Knee Care, felt solid';
   if(!ok85) throw new Error('expected each modifier on for a lift to pre-fill its tag, got: ' + JSON.stringify(r85));
   console.log('OK: Squat pre-fills "Knee Care, Back Care", RDL "Back Care", Squat "Deload, Preseason, Ski"; a typed note logs as "' + r85.logged + '"');
 

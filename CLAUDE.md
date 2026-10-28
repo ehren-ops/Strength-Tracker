@@ -70,7 +70,10 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - Heavy and volume days (03, 05): lifts with `targetRepsStrength` (Squat, Bench, RDL, Row) run
   heavy (`HEAVY_SETS` x 5) or volume (3x8) on both programs. `plannedHeavy(name, ex, date)`:
   Classic = first session of the lift in the Monday week; 2+1 = `HEAVY_DAY` by day. Never heavy
-  under a preseason/ski target or Shoulder Rehab hold/pause. `logEntry` stores `entry.heavy`
+  under a Shoulder Rehab hold/pause. Under Preseason or Ski the heavy day is the tempo day (Squat:
+  5 reps, `targetRepsPreseason` / `targetRepsSki` via `effectiveTargetReps`) and the volume day stays
+  3x8 at normal tempo: only the tempo day is tagged `preseason` (which `isHeavyEntry` reads as heavy)
+  and carries the modifier's note tag and tempo line. `logEntry` stores `entry.heavy`
   (column `heavy`); `isHeavyEntry` reads it (v107 2+1 entries without it count as heavy via
   `programOn`). `computeSuggestion` plans from the matching track only, and `startTrack` converts
   an empty track from the estimated max. Read reps through `effectiveTargetReps` /
@@ -105,11 +108,15 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   `{ sets, reps, weight }`, saved by `logEntry` in column `plan`), or for older entries the previous
   regular session (its sets up to 3; a range's bottom or the target; a bodyweight or timed lift's
   previous reps). The chart and Coach's Notes both use it; never compare against a fixed 3 sets.
+- The rest badge (05, `renderRestTimerBadge`) keeps ticking once red: 5 sec past the end it adds a
+  second row with the extra time ("+0:12"). Whole-unit charts (minutes, reps) use about 5 round
+  gridlines (`niceTicks` with `forceStep`), never one per unit.
 - Lifting time is `liftMinutes(date)` (08): first to last lift log or rest-clock start that local
   day, leaving out cardio, checklists, recovery and the rehab card; 5 min to 4 h or nothing. It
   shows in Coach's Notes and the calendar day (`fmtLiftTime`).
 - Plate math reads `barWeightFor(name)` (04): `barWeight: 0` in `EXERCISE_DEFAULTS` marks a
-  plate-loaded machine (Hip Thrust). Due lifts (08) include finishers; a due pill gets an amber ring
+  plate-loaded machine (Hip Thrust), and `barNote` ends the load line in parentheses ("no bar,
+  machine", "45 lb trap bar"); the plate line wraps balanced instead of an ellipsis. Due lifts (08) include finishers; a due pill gets an amber ring
   and a days tag (`daysSince`). The card footer shows the newest PR, dated when older than the rows.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
