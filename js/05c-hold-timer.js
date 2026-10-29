@@ -176,7 +176,6 @@ function startSetTimer(name){
 function beginHoldTimer(){
   holdAudio(); // unlocked by this tap, so later beeps can play
   try{ if(navigator.wakeLock) navigator.wakeLock.request("screen").then(w => { if(holdTimer) holdTimer.wake = w; else w.release(); }).catch(() => {}); }catch(e){}
-  holdBuzz(80);
   renderHoldClock();
   markTimerButtons();
 }
@@ -194,9 +193,9 @@ function nextHoldStep(t, from){
   const next = t.steps[t.idx];
   t.endAt = from + next.secs * 1000;
   if(next.kind !== "extra") t.guardUntil = Date.now() + holdTapGuard;
-  if(next.kind === "hold" || next.kind === "set"){ holdBeep(880, 250); holdBuzz(200); }
-  else if(next.kind === "rest"){ holdBeep(520, 400); holdBuzz([200, 100, 200]); if(t.mode !== "routine") recordRestTap(t.name); }
-  else if(next.kind === "extra"){ holdBeep(660, 200); holdBeep(880, 300); holdBuzz([150, 80, 150]); }
+  if(next.kind === "hold" || next.kind === "set"){ holdBeep(880, 250); }
+  else if(next.kind === "rest"){ holdBeep(520, 400); if(t.mode !== "routine") recordRestTap(t.name); }
+  else if(next.kind === "extra"){ holdBeep(660, 200); holdBeep(880, 300); }
   return true;
 }
 
@@ -322,7 +321,7 @@ function finishHoldTimer(early){
   t.finished = true;
   if(t.mode === "routine"){
     const n = t.items.filter(i => t.doneItems.has(i)).length;
-    if(!early){ holdBeep(880, 500); holdBuzz([300, 120, 300]); }
+    if(!early){ holdBeep(880, 500); }
     t.summary = `${n}/${t.items.length}`;
     t.result = early ? `Stopped: ${n} of ${t.items.length} checked off` : "Done: all checked off";
     renderHoldClock();
@@ -337,7 +336,7 @@ function finishHoldTimer(early){
     logFormDirty = true;
     syncHoldButton();
   }
-  if(!early){ holdBeep(880, 500); holdBuzz([300, 120, 300]); }
+  if(!early){ holdBeep(880, 500); }
   t.summary = perSet.length ? `${perSet.length}x${Math.min(...perSet)}` : "--";
   t.result = early ? (perSet.length ? `Stopped: ${perSet.length} set${perSet.length === 1 ? "" : "s"} filled in` : "Stopped") : "Done: filled in below, tap Log";
   renderHoldClock();
@@ -578,8 +577,4 @@ function holdBeep(freq, ms){
     o.start();
     o.stop(ctx.currentTime + ms / 1000 + 0.02);
   }catch(e){}
-}
-function holdBuzz(pattern){
-  if(document.visibilityState !== "visible") return;
-  try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
 }

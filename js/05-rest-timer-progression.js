@@ -60,24 +60,15 @@ function tickRestTimer(){
 }
 
 // The only place a running timer turns "done": safe from both the interval and visibilitychange,
-// since the vibrate fires once and the phase check stops a second caller.
+// since the phase check stops a second caller. Done shows as the badge turning red.
 function checkRestTimerCompletion(){
   if(!restTimer || restTimer.phase !== "running") return;
   if(Date.now() >= restTimer.endAt){
     lastRestTimerChoiceIndex = restTimer.choiceIndex;
     restTimer.revertedFromDone = false;
     restTimer.phase = "done";
-    notifyRestOver();
   }
   renderRestTimerBadge();
-}
-
-// In-app only: a buzz where the browser supports it (Android; iOS Safari has no Vibration
-// API), plus the badge turning red. A system banner was tried, but a home-screen web app
-// can't fire one while closed without a push server, so it only ever showed up on return.
-function notifyRestOver(){
-  if(document.visibilityState !== "visible") return;
-  try{ if(navigator.vibrate) navigator.vibrate([200, 100, 200]); }catch(e){}
 }
 
 // Shared by the floating badge tap and by re-pressing "Start Rest" while

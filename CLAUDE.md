@@ -117,7 +117,9 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   previous reps). The chart and Coach's Notes both use it; never compare against a fixed 3 sets.
 - The rest badge (05, `renderRestTimerBadge`) keeps ticking once red: 5 sec past the end it adds a
   second row with the extra time ("+0:12"). Whole-unit charts (minutes, reps) use about 5 round
-  gridlines (`niceTicks` with `forceStep`), never one per unit.
+  gridlines (`niceTicks` with `forceStep`), never one per unit; barbell charts step at least 5 lb.
+  Point labels stay inside the plot (never over the y-axis numbers), and a run of the same modifier
+  label (Deload, Deload, Deload) shows once. No vibration anywhere: the clocks use beeps and color.
 - Lifting time is `liftMinutes(date)` (08): first to last lift log or rest-clock start that local
   day, leaving out cardio, checklists, recovery and the rehab card; 5 min to 4 h or nothing. It
   shows in Coach's Notes and the calendar day (`fmtLiftTime`).

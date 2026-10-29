@@ -110,7 +110,8 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
   const projY = hasProjection ? suggestionValue(suggestion, ex) : null;
 
   const allY = points.map(p=>p.y).concat(hasProjection ? [projY] : []);
-  const forceStep = ex.trackBy === "weight" ? undefined : 1;
+  // Barbell loads move in 5 lb steps, so their gridlines never split a step (no 92.5 or 97.5 lines).
+  const forceStep = ex.trackBy !== "weight" ? 1 : ex.equipment === "barbell" ? 5 : undefined;
   const { lo, hi, step } = niceTicks(allY, forceStep);
   const tickValues = ticksBetween(lo, hi, step);
 
@@ -152,6 +153,9 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
   // dots + x labels for actual points - deload gets a hollow red marker,
   // fewer sets than planned gets dark red, missed planned reps gets red, extra reps/sets
   // (that actually hit target) gets green - each with a small sets×reps label
+  // A run of sessions under the same modifier (three Deload weeks in a row) labels only its first,
+  // so the labels never run into each other.
+  let lastTagLabel = null;
   points.forEach((p,i) => {
     // A Deload Week session (tagged when logged with the modifier on) is planned, so it gets its own
     // diamond in the Deload badge color instead of the short-set or missed-rep flag its lighter load
@@ -177,15 +181,16 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     function labelWithHalo(text, color){
       // Above the point when there's room, otherwise just below it so it never covers the dot.
       const labelY = yAt(p.y) - 8 >= padT + 7 ? yAt(p.y) - 8 : yAt(p.y) + 14;
-      const w = text.length * 4.6 + 3;
-      svg += `<rect x="${(xAt(i)-w/2).toFixed(1)}" y="${(labelY-6.5).toFixed(1)}" width="${w.toFixed(1)}" height="9" rx="2" fill="var(--chart-label-halo)" opacity="0.85"/>`;
-      svg += `<text x="${xAt(i).toFixed(1)}" y="${labelY.toFixed(1)}" font-size="7.5" fill="${color}" font-weight="700" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${text}</text>`;
+      // Kept inside the plot, so the first session's label never covers the y-axis numbers.
+      const w = text.length * 4.6 + 3, x = Math.min(W - w / 2 - 1, Math.max(padL + w / 2 + 1, xAt(i)));
+      svg += `<rect x="${(x-w/2).toFixed(1)}" y="${(labelY-6.5).toFixed(1)}" width="${w.toFixed(1)}" height="9" rx="2" fill="var(--chart-label-halo)" opacity="0.85"/>`;
+      svg += `<text x="${x.toFixed(1)}" y="${labelY.toFixed(1)}" font-size="7.5" fill="${color}" font-weight="700" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${text}</text>`;
     }
 
     if(isPlanned){
       const cx = xAt(i), cy = yAt(p.y), r = 5.5;
       svg += `<path d="M${cx.toFixed(1)},${(cy-r).toFixed(1)} L${(cx+r).toFixed(1)},${cy.toFixed(1)} L${cx.toFixed(1)},${(cy+r).toFixed(1)} L${(cx-r).toFixed(1)},${cy.toFixed(1)} Z" fill="${tag.color}" stroke="var(--chart-white)" stroke-width="1.2" class="mod-mark${tag.key === "deload" ? " deload-mark" : ""}" data-tag="${tag.key}"><title>${titleText}</title></path>`;
-      labelWithHalo(tag.label, tag.color);
+      if(lastTagLabel !== tag.label) labelWithHalo(tag.label, tag.color);
     } else if(isDeload){
       svg += `<line x1="${xAt(i).toFixed(1)}" y1="${padT}" x2="${xAt(i).toFixed(1)}" y2="${H-padB}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>`;
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="5" fill="var(--chart-white)" stroke="var(--danger)" stroke-width="2"><title>${titleText}</title></circle>`;
@@ -204,6 +209,7 @@ function renderChart(ex, suggestion, isRealExercise, chartKey){
     } else {
       svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="var(--chart-line)"><title>${titleText}</title></circle>`;
     }
+    lastTagLabel = isPlanned ? tag.label : null;
     svg += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" font-size="8" fill="${isDeload?'var(--danger)':tag?tag.color:'var(--chart-axis)'}" text-anchor="middle" style="font-family:var(--font-body);font-variant-numeric:tabular-nums">${isDeload?'D':p.entry.label}</text>`;
   });
 
