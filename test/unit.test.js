@@ -298,6 +298,13 @@ test("Classic: main lifts heavy (4x5) first in the week, volume (3x8) after, eac
   eq(run(`isHeavyEntry(data["Squat"], data["Squat"].entries[data["Squat"].entries.length - 1])`), true, "a Preseason tempo session counts as heavy");
   run(`modes.preseason = false;`);
 });
+test("an odd heavy-day weight rounds by its own track, not a heavier volume day after it", () => {
+  reset(); run(`program = { key: "classic" }; view = "full";`); heavyDays();
+  lift("RDL", []);
+  run(`data["RDL"].entries = ${JSON.stringify([at("2026-10-06", 242.5, 5, { sets: 4, heavy: true }), at("2026-10-08", 245, 8, { heavy: false }), at("2026-10-13", 252.5, 5, { sets: 4, heavy: true }), at("2026-10-15", 265, 8, { heavy: false })])}; data["RDL"].conservative = true;`);
+  const s = onDay("2026-10-19", () => suggest("RDL"));
+  eq([s.heavy, s.weight], [true, 255], "a hold at 252.5 after a clean heavy day goes to 255");
+});
 test("a stale track restarts from the latest estimated max, not a weeks-old weight", () => {
   reset(); run(`program = { key: "classic" }; view = "full"; modes.preseason = true;`); heavyDays();
   lift("Squat", []);
@@ -368,6 +375,9 @@ test("cable stacks: a pin at a time (15 lb) from the last weight logged, only fr
   eq(run(`loadText("Face Pulls", data["Face Pulls"], { weight: 120 })`), `Load 120 lb total: same pin as ${run(`fmtShortDate(shiftISO(todayISO(), -9))`)}`, "back to a pin used before");
   lift("Face Pulls", [[3, 125, 15]]); run(`modes.deload = true;`);
   eq(suggest("Face Pulls").weight, 110, "a planned cut takes the lighter pin, never rounds back up");
+  run(`modes.deload = false;`);
+  lift("Face Pulls", [[3, 120, 15, { note: "next 130" }]]);
+  eq(suggest("Face Pulls").weight, 130, "a weight written in the note is a real pin and stays");
   run(`modes.deload = false;`);
 });
 test("hit or miss: judged against the saved plan, or the previous session when there is none", () => {

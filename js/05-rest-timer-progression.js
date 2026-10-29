@@ -407,10 +407,15 @@ function computeSuggestion(full, name){
   if(!plan || (full.equipment !== "barbell" && !pin) || !(plan.weight > 0)) return plan;
   const logged = [...full.entries].reverse().filter(e => e.weight > 0);
   const last = logged[0] || full.entries[full.entries.length - 1];
-  const up = plan.weight > last.weight || !!plan.readyToProgress || (plan.weight === last.weight && !!plan.hitTarget);
+  // Up or down is judged against the plan's own track: a heavy day holding 252.5 after a clean
+  // session goes to 255, even when the newest session was a heavier 3x8.
+  const ref = plan.heavy != null ? (logged.find(e => isHeavyEntry(full, e) === plan.heavy) || last) : last;
+  // A track starting over from an estimated max rounds down, like any first guess.
+  const up = !plan.trackStart && (plan.weight > ref.weight || !!plan.readyToProgress || (plan.weight === ref.weight && !!plan.hitTarget));
   // A cable stack's labels are unknown, so its pins count from the last regular session's weight;
-  // a weight already logged on it is a real pin and stays (back to the pre-deload weight, say).
-  if(pin && logged.some(e => e.weight === plan.weight)) return plan;
+  // a weight already logged on it is a real pin and stays (back to the pre-deload weight, say), and
+  // so does one written in the note ("next 130"): the athlete read it off the stack.
+  if(pin && (logged.some(e => e.weight === plan.weight) || plan.noteTarget === plan.weight)) return plan;
   const anchor = (logged.find(e => !e.deload) || last).weight;
   // A planned cut (deload, pain, a return ramp) takes the lighter pin, so it is always a real cut.
   const weight = !pin ? loadableWeight(plan.weight, barWeightFor(name), up)

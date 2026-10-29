@@ -127,13 +127,14 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   plate-loaded machine (Hip Thrust), and `barNote` ends the load line in parentheses ("no bar,
   machine", "45 lb trap bar"). The plate line is one line, never wrapped: "45 + 2×10 + 2.5 a side",
   "≈" only for a typed odd weight (plans never land there: `computeSuggestion` snaps barbell
-  plans to `loadableWeight`, 5 lb steps from the bar since 2.5 is the smallest plate), and `fitLoad` (06b) tightens it step by step to fit. Once
+  plans to `loadableWeight`, 5 lb steps from the bar since 2.5 is the smallest plate; halfway
+  rounds up or down by the plan's own track, and a track restart rounds down), and `fitLoad` (06b) tightens it step by step to fit. Once
   today is logged the Next tile's headline drops the rest so the next plan shows in full. Due lifts (08) include finishers; a due pill gets an amber ring
   and a days tag (`daysSince`). The card footer shows the newest PR, dated when older than the rows.
 - Cable lifts (`pinStep: CABLE_PIN`, 15 lb, in `EXERCISE_DEFAULTS`; `pinStepFor` / `incrementFor`, 04):
   the stack labels are unknown, so `computeSuggestion` counts pins from the last regular session's
   weight (`onGrid`), keeps a weight already logged (back to a pre-deload pin), and takes the lighter
-  pin for any planned cut (deload, pain, rehab return). They move a pin only from the top of their
+  pin for any planned cut (deload, pain, rehab return); a weight written in the note stays as is. They move a pin only from the top of their
   rep range (no early jump). The load line names the pin ("1 pin heavier than last", "same pin as
   Oct 1"). Read increments through `incrementFor`, never `ex.increment` directly.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
