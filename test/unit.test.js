@@ -163,7 +163,7 @@ test("joint check: pain 4-5 holds the load, 6+ drops about 10%", () => {
   eq([s.weight, !!s.painHold, s.painHold.drop], [180, true, false], "pain 5");
   run(`data["Squat"].entries[1].pain = 7;`);
   s = suggest("Squat");
-  eq([s.weight, s.painHold.drop], [162.5, true], "pain 7");
+  eq([s.weight, s.painHold.drop], [160, true], "pain 7");
 });
 test("joint check: 3 or less changes nothing", () => {
   reset(); lift("Squat", [[7, 175, 8], [3, 175, 8, { pain: 3 }]]);
@@ -172,7 +172,7 @@ test("joint check: 3 or less changes nothing", () => {
 test("deload week: about 10% lighter and a third fewer sets", () => {
   reset(); lift("Squat", [[3, 180, 8]]); run(`modes.deload = true;`);
   const s = suggest("Squat");
-  eq([s.weight, s.sets, s.deloadWeek], [162.5, 2, true], "deload");
+  eq([s.weight, s.sets, s.deloadWeek], [160, 2, true], "deload");
 });
 test("first session after a deload: pressing repeats its weight", () => {
   reset(); lift("Bench Press", [[9, 170, 8], [2, 152.5, 8, { deload: true }]]);
@@ -182,7 +182,7 @@ test("first session after a deload: pressing repeats its weight", () => {
 test("after 14+ days off, lifts restart near 90%", () => {
   reset(); lift("Hip Thrust", [[27, 170, 8], [20, 180, 8]]);
   const s = suggest("Hip Thrust");
-  eq([s.weight, s.reentry && s.reentry.step], [162.5, 1], "hip thrust");
+  eq([s.weight, s.reentry && s.reentry.step], [160, 1], "hip thrust");
 });
 test("shoulder rehab holds Barbell Row at 85% of its pre-rehab weight", () => {
   reset(); lift("Barbell Row", [[14, 135, 8], [9, 135, 8]]);
@@ -286,7 +286,7 @@ test("Classic: main lifts heavy (4x5) first in the week, volume (3x8) after, eac
   eq(run(`data["Squat"].entries.map(e => entryTargetReps(data["Squat"], e))`), [8, 8, 5], "history judged by its own reps");
   run(`modes.deload = true;`);
   s = onDay("2026-10-19", () => suggest("Squat"));
-  eq([s.weight, s.sets, s.reps, s.deloadWeek], [167.5, 3, 5, true], "deload heavy day: 10% under the last heavy, fewer sets");
+  eq([s.weight, s.sets, s.reps, s.deloadWeek], [165, 3, 5, true], "deload heavy day: 10% under the last heavy, fewer sets");
   run(`modes.deload = false; modes.preseason = true;`);
   s = onDay("2026-10-19", () => suggest("Squat"));
   eq([s.heavy, s.reps], [true, 5], "under Preseason the week's first session is the tempo (heavy) day");
@@ -301,7 +301,7 @@ test("a stale track restarts from the latest estimated max, not a weeks-old weig
   lift("Squat", []);
   run(`data["Squat"].entries = ${JSON.stringify([at("2026-09-21", 175, 8), at("2026-09-28", 205, 5, { sets: 4, preseason: true }), at("2026-10-05", 210, 5, { sets: 4, preseason: true }), at("2026-10-12", 215, 5, { sets: 4, preseason: true }), at("2026-10-19", 220, 5, { sets: 4, preseason: true })])};`);
   let s = onDay("2026-10-21", () => suggest("Squat"));
-  eq([s.heavy, s.reps, s.sets, s.weight, !!s.trackStart], [false, 8, 3, 202.5, true], "3x8 after four weeks of tempo 5s: worked out from 220x5");
+  eq([s.heavy, s.reps, s.sets, s.weight, !!s.trackStart], [false, 8, 3, 200, true], "3x8 after four weeks of tempo 5s: worked out from 220x5");
   run(`data["Squat"].entries.splice(1, 1, ${JSON.stringify(at("2026-09-30", 180, 8))});`);
   s = onDay("2026-10-21", () => suggest("Squat"));
   eq([s.weight, !!s.trackStart], [185, false], "19 days back: still its own track, +5 from 180x8");
@@ -340,6 +340,13 @@ test("muscle map: main muscles get full sets, helpers half, and recent work sets
 test("plates: Hip Thrust is a plate-loaded machine with no bar; barbell lifts keep the 45 lb bar", () => {
   eq(run(`platesLabel(180, "barbell", barWeightFor("Hip Thrust"))`), "2×45 a side", "hip thrust");
   eq(run(`platesLabel(180, "barbell", barWeightFor("Squat"))`), "45 + 2×10 + 2.5 a side", "squat");
+});
+test("plates: barbell plans land on a weight 2.5 lb plates can make (5 lb steps from the bar)", () => {
+  eq(run(`[loadableWeight(197.5, 45, false), loadableWeight(197.5, 45, true), loadableWeight(198, 45, false), loadableWeight(162.5, 0, false), loadableWeight(110, 45, false)]`), [195, 200, 200, 160, 110], "snap");
+  reset(); lift("RDL", [[7, 245, 8], [3, 252.5, 8]]);
+  eq(suggest("RDL").weight, 260, "an odd log that hit its reps: up to the next loadable weight");
+  run(`data["RDL"].entries[1].reps = 6;`);
+  eq(suggest("RDL").weight, 250, "missed: down to the loadable weight under it");
 });
 test("hit or miss: judged against the saved plan, or the previous session when there is none", () => {
   reset(); lift("Face Pulls", [[6, 110, 10, { sets: 2 }], [3, 130, 12, { sets: 2, plan: { sets: 2, reps: 12, weight: 110 } }]]);

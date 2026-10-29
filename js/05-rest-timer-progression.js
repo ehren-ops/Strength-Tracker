@@ -411,6 +411,24 @@ function applyPain(s, ex, full){
 // skipped here, so progression resumes from the pre-deload weights. A main lift plans from the
 // sessions on today's track (heavy or volume) only.
 function computeSuggestion(full, name){
+  const plan = planSuggestion(full, name);
+  if(!plan || full.equipment !== "barbell" || !(plan.weight > 0)) return plan;
+  const last = full.entries[full.entries.length - 1];
+  const up = plan.weight > last.weight || !!plan.readyToProgress || (plan.weight === last.weight && !!plan.hitTarget);
+  const weight = loadableWeight(plan.weight, barWeightFor(name), up);
+  return weight === plan.weight ? plan : { ...plan, weight };
+}
+// A barbell moves in steps of two of the smallest plate (2.5 lb a side, so 5 lb), from the bar up.
+// A plan that lands between loadable totals (a percentage, an estimated max, an old odd log) snaps
+// to the nearest one; halfway goes up when the lift is moving up or just hit its reps, else down.
+function loadableWeight(w, bar, up){
+  const step = 2 * PLATE_SET[PLATE_SET.length - 1];
+  if(!(w > bar)) return w;
+  const k = (w - bar) / step, lo = Math.floor(k + 1e-9), frac = k - lo;
+  if(frac < 1e-9) return w;
+  return bar + step * (frac > 0.5 + 1e-9 ? lo + 1 : frac < 0.5 - 1e-9 ? lo : up ? lo + 1 : lo);
+}
+function planSuggestion(full, name){
   if(!full.entries.length || isRecovery(name)) return null;
   let ex = full, fresh = false;
   if(full.targetRepsStrength && full.trackBy === "weight"){

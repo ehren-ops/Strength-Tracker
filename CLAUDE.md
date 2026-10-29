@@ -118,7 +118,8 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - Plate math reads `barWeightFor(name)` (04): `barWeight: 0` in `EXERCISE_DEFAULTS` marks a
   plate-loaded machine (Hip Thrust), and `barNote` ends the load line in parentheses ("no bar,
   machine", "45 lb trap bar"). The plate line is one line, never wrapped: "45 + 2×10 + 2.5 a side",
-  "≈" when standard plates fall short, and `fitLoad` (06b) tightens it step by step to fit. Once
+  "≈" only for a typed odd weight (plans never land there: `computeSuggestion` snaps barbell
+  plans to `loadableWeight`, 5 lb steps from the bar since 2.5 is the smallest plate), and `fitLoad` (06b) tightens it step by step to fit. Once
   today is logged the Next tile's headline drops the rest so the next plan shows in full. Due lifts (08) include finishers; a due pill gets an amber ring
   and a days tag (`daysSince`). The card footer shows the newest PR, dated when older than the rows.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session

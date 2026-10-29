@@ -1891,8 +1891,8 @@ async function main(){
     data = savedData; Object.assign(modes, savedModes);
     return out;
   });
-  if(JSON.stringify(comeback) !== JSON.stringify({ fly: [60, true], calf: 100, hard: [235, 'last full session was RPE 8', 135, null], ramp: [162.5, 1, 170, 180], skipped: false })) throw new Error('expected press hold after deload and a 90/95/100% ramp after time off, got: ' + JSON.stringify(comeback));
-  console.log('OK: after a deload pressing lifts hold (fly 60) while others add (calf 100); after 20 days off squat ramps 162.5, 170, 180; a skipped lift is not a break');
+  if(JSON.stringify(comeback) !== JSON.stringify({ fly: [60, true], calf: 100, hard: [235, 'last full session was RPE 8', 135, null], ramp: [160, 1, 170, 180], skipped: false })) throw new Error('expected press hold after deload and a 90/95/100% ramp after time off, got: ' + JSON.stringify(comeback));
+  console.log('OK: after a deload pressing lifts hold (fly 60) while others add (calf 100); after 20 days off squat ramps 160, 170, 180; a skipped lift is not a break');
   // Accessory rep ranges: two more reps inside the range at RPE 7, add weight once every set reaches the top.
   const ranged = await page.evaluate(() => {
     const savedData = data, savedModes = { ...modes };
@@ -2479,11 +2479,11 @@ async function main(){
     r79.off.first.startsWith('1. Bench Press') && !r79.off.rehabPill && r79.off.bench === 190 &&
     r79.firstPills.every((p, i) => p[0] === 'Shoulder Rehab' && (i === 3 ? !/^\d/.test(p[1]) : /^1\. /.test(p[1]))) &&
     /Incline DB Press|Bicep Curl/.test(r79.flyPill || '') &&
-    r79.bench.weight === 157.5 && r79.bench.hold && r79.bench.badge && /85%/.test(r79.bench.tip || '') &&
+    r79.bench.weight === 155 && r79.bench.hold && r79.bench.badge && /85%/.test(r79.bench.tip || '') &&
     r79.benchAfter150 === 150 && r79.benchDeload === 150 && r79.off.pushupsOnUpper && r79.off.pushupsOnExtra &&
     r79.pushups[0] === 4 && r79.pushups[1] > 0 && r79.pushups[2] === -1 &&
     /incline/i.test(r79.pushupCard.tip || '') && r79.pushupCard.note === 'Rehab' && r79.pushupCard.exists &&
-    r79.benchP3.first === 157.5 && r79.benchP3.build && r79.benchP3.next === 155 &&
+    r79.benchP3.first === 160 && r79.benchP3.build && r79.benchP3.next === 155 &&
     r79.fly && r79.curlWeek1 && /paused/i.test(r79.flyCard.next) && !r79.flyCard.skip && /Paused/.test(r79.flyCard.paused) && /Right arm/.test(r79.flyCard.tip) &&
     r79.benchNote === 'Rehab' && r79.benchLogged === 'Rehab, felt fine' && /85% of pre-rehab weight; two clean sessions add 5 lb\. Palms-in grip/.test(r79.row.tip || '') && r79.row.badge && r79.row.note === 'Rehab' &&
     /right arm/.test(r79.week2Hammer || '') &&
@@ -2882,10 +2882,10 @@ async function main(){
   });
   const ok90 = r90.benchClosed && r90.squatOpen && r90.logged[0] === 5 && r90.logged[1] === 'knee' &&
     r90.hold[0] === 180 && r90.hold[1] && !r90.hold[2] && /Pain 5\/10 \(knee\) last time: hold 180 lb/.test(r90.msg) && r90.hist === 'Pain 5 knee' &&
-    r90.drop[0] === 162.5 && r90.drop[1] && JSON.stringify(r90.sync) === JSON.stringify([7, 'knee', 7, 'knee']) &&
+    r90.drop[0] === 160 && r90.drop[1] && JSON.stringify(r90.sync) === JSON.stringify([7, 'knee', 7, 'knee']) &&
     /Knee pain was above 3 on 2 of your last 2 joint checks: consider turning on Knee Care/.test(r90.notes) && /pain 4\/10 knee/.test(r90.payload);
   if(!ok90) throw new Error('expected the joint check to log, hold, drop, sync and nudge, got: ' + JSON.stringify(r90));
-  console.log('OK: joint check opens under Knee Care (closed on bench, set to shoulder), pain 5 holds 180, pain 7 drops to 162.5, it syncs, shows "Pain 5 knee", reaches the coach, and two high knee checks suggest Knee Care');
+  console.log('OK: joint check opens under Knee Care (closed on bench, set to shoulder), pain 5 holds 180, pain 7 drops to 160, it syncs, shows "Pain 5 knee", reaches the coach, and two high knee checks suggest Knee Care');
 
   console.log('=== 91: sync takes the newest edit, keeps edits still waiting to sync, carries deletions over, pages past 1000 rows, reads settings from JSON ===');
   const r91 = await page.evaluate(async () => {
