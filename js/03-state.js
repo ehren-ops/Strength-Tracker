@@ -192,19 +192,25 @@ MODE_DEFS.forEach(m => {
 });
 // Display preference only, not training data, so this stays local to the
 // device rather than syncing through upsert_settings like the modes above.
-const DARK_MODE_KEY = "strength-tracker-dark-mode";
-let darkMode = (function(){
-  try{ return window.localStorage.getItem(DARK_MODE_KEY) === "1"; }catch(e){ return false; }
+// themeMode: "light", "dark" (the regular colors on dark) or "neon". The old dark-mode key meant neon.
+const THEME_KEY = "strength-tracker-theme", DARK_MODE_KEY = "strength-tracker-dark-mode";
+const THEMES = ["light", "dark", "neon"];
+let themeMode = (function(){
+  try{
+    const t = window.localStorage.getItem(THEME_KEY);
+    return THEMES.includes(t) ? t : window.localStorage.getItem(DARK_MODE_KEY) === "1" ? "neon" : "light";
+  }catch(e){ return "light"; }
 })();
 function applyTheme(){
-  document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+  document.documentElement.setAttribute("data-theme", themeMode);
   const meta = document.querySelector('meta[name="color-scheme"]');
-  if(meta) meta.setAttribute("content", darkMode ? "dark" : "light");
+  if(meta) meta.setAttribute("content", themeMode === "light" ? "light" : "dark");
 }
 applyTheme();
-function toggleDarkMode(){
-  darkMode = !darkMode;
-  try{ window.localStorage.setItem(DARK_MODE_KEY, darkMode ? "1" : "0"); }catch(e){}
+// The Appearance toggles: each turns its theme on, or back to light when it is already on.
+function toggleTheme(t){
+  themeMode = themeMode === t ? "light" : t;
+  try{ window.localStorage.setItem(THEME_KEY, themeMode); }catch(e){}
   applyTheme();
   render();
 }

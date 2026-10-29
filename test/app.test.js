@@ -801,30 +801,51 @@ async function main(){
   if(themeAttrBefore !== 'light') throw new Error('expected to start in light mode, got: ' + themeAttrBefore);
 
   await page.click('.tab:has-text("Overview")');
-  if(await page.locator('.theme-toggle[aria-label="Toggle dark mode"]').count() !== 1) throw new Error('expected a Neon Dark Mode toggle in the Backup & Restore card');
-  await page.click('.theme-toggle[aria-label="Toggle dark mode"]');
+  if(await page.locator('.theme-toggle[aria-label="Toggle neon dark mode"]').count() !== 1 || await page.locator('.theme-toggle[aria-label="Toggle dark mode"]').count() !== 1) throw new Error('expected Dark Mode and Neon Dark Mode toggles in the Backup & Restore card');
+  const toggleOrder = await page.evaluate(() => [...document.querySelectorAll('.theme-toggle')].map(b => b.getAttribute('aria-label')).filter(l => /dark mode/.test(l)));
+  if(JSON.stringify(toggleOrder) !== JSON.stringify(['Toggle dark mode', 'Toggle neon dark mode'])) throw new Error('expected Dark Mode just above Neon Dark Mode, got: ' + JSON.stringify(toggleOrder));
+  await page.click('.theme-toggle[aria-label="Toggle neon dark mode"]');
   await sleep(150);
   const themeAttrAfter = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-  if(themeAttrAfter !== 'dark') throw new Error('expected data-theme to flip to dark after toggling, got: ' + themeAttrAfter);
+  if(themeAttrAfter !== 'neon') throw new Error('expected data-theme to flip to neon after toggling, got: ' + themeAttrAfter);
   const bodyBgDark = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  if(bodyBgDark === bodyBgLight) throw new Error('expected the page background to actually change in dark mode');
+  if(bodyBgDark === bodyBgLight) throw new Error('expected the page background to actually change in neon mode');
 
   await page.click('.tab:has-text("Full Body")');
   const headingFontDark = await page.evaluate(() => getComputedStyle(document.querySelector('.ex-name')).fontFamily);
-  if(!headingFontDark.toLowerCase().includes('sora')) throw new Error('expected headings to switch to Sora in dark mode, got: ' + headingFontDark);
-  if(headingFontDark === headingFontLight) throw new Error('expected the heading font to actually differ between light and dark');
-  const darkModeStored = await page.evaluate(() => localStorage.getItem('strength-tracker-dark-mode'));
-  if(darkModeStored !== '1') throw new Error('expected dark mode preference to persist to localStorage');
-  console.log('OK: toggling dark mode swaps the background, switches headings to Sora, and persists');
+  if(!headingFontDark.toLowerCase().includes('sora')) throw new Error('expected headings to switch to Sora in neon mode, got: ' + headingFontDark);
+  if(headingFontDark === headingFontLight) throw new Error('expected the heading font to actually differ between light and neon');
+  const themeStored = await page.evaluate(() => localStorage.getItem('strength-tracker-theme'));
+  if(themeStored !== 'neon') throw new Error('expected the theme to persist to localStorage, got: ' + themeStored);
+  console.log('OK: toggling neon swaps the background, switches headings to Sora, and persists');
 
   await page.reload();
-  await waitForText(page, '#sync-status', t => t.includes('Synced') || t.includes('Not signed in'), 10000, 'reload after enabling dark mode');
+  await waitForText(page, '#sync-status', t => t.includes('Synced') || t.includes('Not signed in'), 10000, 'reload after enabling neon mode');
   const themeAttrAfterReload = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-  if(themeAttrAfterReload !== 'dark') throw new Error('expected dark mode to survive a reload, got: ' + themeAttrAfterReload);
-  console.log('OK: dark mode survives a full page reload');
+  if(themeAttrAfterReload !== 'neon') throw new Error('expected neon mode to survive a reload, got: ' + themeAttrAfterReload);
+  console.log('OK: neon mode survives a full page reload');
 
+  // Plain dark: one toggle swaps neon for it (never both on), keeps the regular fonts, and goes back to light.
   await page.click('.tab:has-text("Overview")');
   await page.click('.theme-toggle[aria-label="Toggle dark mode"]');
+  await sleep(150);
+  await page.click('.tab:has-text("Full Body")');
+  const plainDark = await page.evaluate(() => ({ theme: document.documentElement.getAttribute('data-theme'), bg: getComputedStyle(document.body).backgroundColor, font: getComputedStyle(document.querySelector('.ex-name')).fontFamily, scheme: document.querySelector('meta[name="color-scheme"]').content }));
+  if(plainDark.theme !== "dark" || plainDark.bg === bodyBgLight || plainDark.bg === bodyBgDark || plainDark.font !== headingFontLight || plainDark.scheme !== "dark") throw new Error("expected plain dark mode with the regular fonts and its own background, got: " + JSON.stringify(plainDark));
+  await page.click('.tab:has-text("Overview")');
+  const ons = await page.locator('.theme-toggle.on[aria-label$="dark mode"]').count();
+  if(ons !== 1) throw new Error('expected only one theme toggle on, got ' + ons);
+  console.log('OK: Dark Mode replaces neon, keeps the regular fonts on its own dark background');
+  // An old phone that stored the neon flag before the theme key existed still opens in neon.
+  const legacy = await page.evaluate(() => { localStorage.removeItem('strength-tracker-theme'); localStorage.setItem('strength-tracker-dark-mode', '1'); return true; });
+  await page.reload();
+  await waitForText(page, '#sync-status', t => t.includes('Synced') || t.includes('Not signed in'), 10000, 'reload with the old dark-mode key');
+  const legacyTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  if(!legacy || legacyTheme !== 'neon') throw new Error('expected the old dark-mode key to open in neon, got: ' + legacyTheme);
+  await page.evaluate(() => localStorage.removeItem('strength-tracker-dark-mode'));
+
+  await page.click('.tab:has-text("Overview")');
+  await page.click('.theme-toggle[aria-label="Toggle neon dark mode"]');
   await sleep(150);
   const themeAttrBackToLight = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   if(themeAttrBackToLight !== 'light') throw new Error('expected toggling again to return to light mode, got: ' + themeAttrBackToLight);
@@ -2783,15 +2804,15 @@ async function main(){
   console.log('=== 88: every modifier in the registry is complete, with a color in both themes ===');
   const reg = await page.evaluate(() => {
     const bad = [];
-    const savedTheme = darkMode;
+    const savedTheme = themeMode;
     MODE_DEFS.forEach(m => {
       ['key', 'storageKey', 'name', 'short', 'emoji', 'desc'].forEach(f => { if(!m[f]) bad.push(m.key + ' missing ' + f); });
       if(!m.badge) bad.push(m.key + ' missing badge');
       if(!m.tag || !['light', 'block'].includes(m.tag.kind) || !(m.tag.re instanceof RegExp) || !m.tag.re.test(m.tag.label)) bad.push(m.key + ' tag');
       if(typeof m.applies !== 'function' || typeof m.changesNumbers !== 'function') bad.push(m.key + ' rules');
-      [false, true].forEach(dark => { darkMode = dark; applyTheme(); if(!getComputedStyle(document.documentElement).getPropertyValue('--' + m.key).trim()) bad.push(m.key + ' color ' + (dark ? 'dark' : 'light')); });
+      THEMES.forEach(t => { themeMode = t; applyTheme(); if(!getComputedStyle(document.documentElement).getPropertyValue('--' + m.key).trim()) bad.push(m.key + ' color ' + t); });
     });
-    darkMode = savedTheme; applyTheme();
+    themeMode = savedTheme; applyTheme();
     return { bad, rows: document.querySelectorAll('.mod-row').length, keys: MODE_DEFS.map(m => m.key) };
   });
   if(reg.bad.length) throw new Error('expected every modifier row to be complete, got: ' + JSON.stringify(reg));

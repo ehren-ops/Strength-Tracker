@@ -27,7 +27,35 @@
     --seg-on-text:#FFFFFF;
     --font-display:'Fjalla One',sans-serif; --name-size:1.475rem; --font-body:'IBM Plex Sans',sans-serif;
   }
+  /* Plain dark: the light theme's colors and fonts on a dark background, for evenings. */
   :root[data-theme="dark"]{
+    color-scheme: dark;
+    --pine:#151D18; --pine-2:#0E1310; --stone:#0F1411; --card:#19211C;
+    --amber:#D9883A; --amber-light:#E8B074; --slate:#9AA69B; --ink:#E9E7DF; --line:#2F3A32;
+    --emerald:#2F9A6B;
+    --accent-2:#7AA386; --header-text:#F1EFE7; --header-muted:#A9B5A6;
+    --tab-bg:rgba(255,255,255,0.06); --tab-border:rgba(255,255,255,0.14);
+    --log-btn-bg:#2F9A6B; --log-btn-text:#FFFFFF; --surface:#1F2822; --input-bg:#131915;
+    --sync-muted:#7D8B7E; --danger:#E5675C;
+    --rec-bg:rgba(217,136,58,0.10); --rec-text:#E6D6C0; --rec-headline:#EFBE86;
+    --panel-soft:#1F2822; --panel-soft-active:#26312A; --hairline:#232C26; --track-bg:#26312A;
+    --chart-grid:#2A342D; --chart-axis:#8C978D; --chart-line:#E0954A; --chart-label-halo:#19211C;
+    --chart-white:#19211C; --chart-under:#E5675C; --chart-missed:#F0A196; --chart-extra:#5FCB96;
+    --ski:#6AA9EE; --ski-bg:rgba(106,169,238,0.12); --ski-border:rgba(106,169,238,0.45); --ski-text:#AECFF5;
+    --knee:#E3A050; --knee-bg:rgba(227,160,80,0.12); --knee-border:rgba(227,160,80,0.45); --knee-text:#F0C894;
+    --back:#E07A86; --back-bg:rgba(224,122,134,0.12); --back-border:rgba(224,122,134,0.45); --back-text:#F2B5BC;
+    --shoulder:#4DBDAF; --shoulder-bg:rgba(77,189,175,0.12); --shoulder-border:rgba(77,189,175,0.45); --shoulder-text:#A6E0D8;
+    --preseason:#A98BDA; --preseason-bg:rgba(169,139,218,0.13); --preseason-border:rgba(169,139,218,0.45); --preseason-text:#D4C4F0;
+    --cat-strength:#93A3B8; --cat-strength-bg:rgba(147,163,184,0.12); --cat-strength-border:rgba(147,163,184,0.4); --cat-strength-text:#C9D3DF;
+    --cat-cardio:#E07BA9; --cat-cardio-bg:rgba(224,123,169,0.12); --cat-cardio-border:rgba(224,123,169,0.4); --cat-cardio-text:#F2BCD5;
+    --cat-core:#4DBDAA; --cat-core-bg:rgba(77,189,170,0.12); --cat-core-border:rgba(77,189,170,0.4); --cat-core-text:#A6E0D6;
+    --cat-stretch:#9CBD7E; --cat-stretch-bg:rgba(156,189,126,0.12); --cat-stretch-border:rgba(156,189,126,0.4); --cat-stretch-text:#CFE2BD;
+    --cat-recovery:#C99A6B; --cat-recovery-bg:rgba(201,154,107,0.12); --cat-recovery-border:rgba(201,154,107,0.4); --cat-recovery-text:#E6CCB2;
+    --ai-bg:rgba(47,154,107,0.10); --ai-border:rgba(47,154,107,0.40); --ai-text:#CFE6D9; --ai-accent:#5FCB96;
+    --deload:#6FA8BD; --deload-on-text:#0F1411; --deload-border:rgba(111,168,189,0.5); --deload-text:#B9D6E1;
+    --seg-on-text:#0F1411;
+  }
+  :root[data-theme="neon"]{
     color-scheme: dark;
     --pine:#150c26; --pine-2:#05030a; --stone:#050308; --card:#0e0a1a;
     --amber:#ff2d95; --amber-light:#ff8fc7; --slate:#8f80c2; --ink:#f2eefc; --line:#3a2560;
@@ -158,10 +186,10 @@
   .routine-chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0.25rem;margin:0.2rem 0 0.6rem;}
   .routine-chip{font:inherit;font-size:0.68rem;font-weight:600;padding:0.35rem 0.1rem;white-space:nowrap;border-radius:7px;border:1px solid var(--cat-stretch-border);background:var(--cat-stretch-bg);color:var(--cat-stretch-text);cursor:pointer;}
   .routine-chip.active{background:var(--cat-stretch);border-color:var(--cat-stretch);color:#fff;}
-  :root[data-theme="dark"] .routine-chip.active{color:#050308;}
+  :root[data-theme="neon"] .routine-chip.active{color:#050308;}
   .pill.knee-pill{background:var(--knee-bg);border-color:var(--knee-border);color:var(--knee-text);}
   .pill.knee-pill.active{background:var(--knee);border-color:var(--knee);color:#fff;}
-  :root[data-theme="dark"] .pill.knee-pill.active{color:#050308;}
+  :root[data-theme="neon"] .pill.knee-pill.active{color:#050308;}
   .pill.cat-recovery{background:var(--cat-recovery-bg);border-color:var(--cat-recovery-border);color:var(--cat-recovery-text);}
   .pill.cat-recovery.active{background:var(--cat-recovery);border-color:var(--cat-recovery);color:#fff;}
   .pill.logged-today:not(.active){opacity:0.55;}
@@ -253,7 +281,7 @@
   .date-log-row .field{flex:1 1 140px;min-width:0;}
   .date-log-row button.log{flex:1 1 auto;width:auto;min-width:0;margin-top:0;height:var(--input-h);padding:0 0.5rem;}
   input[type="date"]{display:block !important;width:100% !important;max-width:100% !important;min-width:0 !important;box-sizing:border-box !important;-webkit-appearance:none !important;appearance:none !important;}
-  :root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.85);}
+  :root[data-theme="neon"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.85);}
   input, select, textarea{font-size:16px !important;}
   /* Form controls don't inherit the page font by default (browsers use their own, and a date field
      can fall back to monospace), so numbers typed or shown in them would not match the rest. */
@@ -412,6 +440,7 @@
   .stretch-variation{color:var(--slate);}
   .edit-actions{display:flex;gap:0.4rem;margin-top:0.5rem;}
   .save-btn{background:var(--accent-2);color:#fff;border:none;border-radius:6px;padding:0.4rem 0.8rem;font-size:0.78rem;font-weight:600;cursor:pointer;}
+  :root[data-theme="dark"] .save-btn, :root[data-theme="dark"] .add-ex-row button{color:#0F1411;}
   .cancel-btn{background:var(--surface);border:1px solid var(--line);color:var(--slate);border-radius:6px;padding:0.4rem 0.8rem;font-size:0.78rem;cursor:pointer;}
   .danger-btn{background:var(--danger);color:#fff;border:none;border-radius:6px;padding:0.3rem 0.6rem;font-size:0.76rem;font-weight:600;cursor:pointer;}
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
@@ -455,7 +484,7 @@
   .preseason-badge{background:var(--preseason);}
   .deload-badge{background:var(--deload);color:var(--deload-on-text);}
   .shoulder-badge{display:inline-block;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:6px;vertical-align:middle;letter-spacing:0.02em;background:var(--shoulder);}
-  :root[data-theme="dark"] .shoulder-badge{color:#050308;}
+  :root[data-theme="neon"] .shoulder-badge{color:#050308;}
   .shoulder-status{font-size:0.76rem;line-height:1.45;color:var(--ink);margin:0.35rem 0 0;}
   .deload-status{font-size:0.76rem;line-height:1.45;color:var(--ink);margin:0.35rem 0 0;}
   .deload-status div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -469,7 +498,7 @@
   /* Shoulder Rehab card and its pill */
   .pill.rehab-pill{background:var(--shoulder-bg);border-color:var(--shoulder-border);color:var(--shoulder-text);}
   .pill.rehab-pill.active{background:var(--shoulder);border-color:var(--shoulder);color:#fff;}
-  :root[data-theme="dark"] .pill.rehab-pill.active{color:#050308;}
+  :root[data-theme="neon"] .pill.rehab-pill.active{color:#050308;}
   .rehab-week{font-size:0.72rem;font-weight:600;color:var(--shoulder-text);white-space:nowrap;}
   .rehab-phase{font-size:0.78rem;color:var(--slate);margin:0.2rem 0 0.5rem;line-height:1.4;}
   .rehab-rules{display:flex;flex-direction:column;gap:0.1rem;font-size:0.72rem;line-height:1.35;color:var(--shoulder-text);background:var(--shoulder-bg);border:1px solid var(--shoulder-border);border-radius:8px;padding:0.4rem 0.55rem;margin-bottom:0.3rem;}
@@ -483,7 +512,7 @@
   .pain-btn.on.pain-ok{background:var(--emerald);border-color:var(--emerald);color:#fff;}
   .pain-btn.on.pain-warn{background:var(--amber);border-color:var(--amber);color:#fff;}
   .pain-btn.on.pain-bad{background:var(--back);border-color:var(--back);color:#fff;}
-  :root[data-theme="dark"] .pain-btn.on{color:#050308;}
+  :root[data-theme="neon"] .pain-btn.on{color:#050308;}
   .rehab-warn{font-size:0.72rem;color:var(--back-text);margin:0.4rem 0 0;line-height:1.35;}
   .rehab-trend{font-size:0.72rem;color:var(--slate);margin:0.5rem 0 0;}
   .rehab-right{font-size:0.72rem;line-height:1.4;color:var(--shoulder-text);background:var(--shoulder-bg);border:1px solid var(--shoulder-border);border-radius:8px;padding:0.45rem 0.55rem;margin-top:0.6rem;}
@@ -496,6 +525,7 @@
   .theme-toggle{position:relative;width:52px;height:28px;border-radius:999px;background:var(--line);flex-shrink:0;border:none;cursor:pointer;padding:0;transition:background 0.25s ease;}
   .theme-toggle .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.25s ease;box-shadow:0 1px 3px rgba(0,0,0,0.3);}
   .theme-toggle.on{background:linear-gradient(90deg,#ff2d95,#b967ff,#00f0ff);}
+  .theme-toggle.theme-dark.on{background:var(--emerald);}
   .theme-toggle.on .knob{left:27px;}
   .theme-toggle.mod-switch.on{background:var(--mod-color);}
   .mod-row{padding-bottom:0.75rem;margin-bottom:0.75rem;border-bottom:1px dashed var(--line);}
@@ -525,15 +555,15 @@
   .mod-desc{font-size:0.76rem;line-height:1.45;color:var(--slate);margin:0.3rem 0 0;}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
   /* Neon: the page title set like the exercise card titles (Sora bold, no extra tracking). */
-  :root[data-theme="dark"] header h1{font-weight:700;letter-spacing:0;}
-  :root[data-theme="dark"] .pill.active{color:#050308;}
-  :root[data-theme="dark"] .pill.preseason-pill.active{color:#050308;}
-  :root[data-theme="dark"] .pill.cat-strength.active,
-  :root[data-theme="dark"] .pill.cat-cardio.active,
-  :root[data-theme="dark"] .pill.cat-core.active,
-  :root[data-theme="dark"] .pill.finisher-pill.active,
-  :root[data-theme="dark"] .pill.cat-stretch.active,
-  :root[data-theme="dark"] .pill.cat-recovery.active{color:#050308;}
+  :root[data-theme="neon"] header h1{font-weight:700;letter-spacing:0;}
+  :root[data-theme="neon"] .pill.active{color:#050308;}
+  :root[data-theme="neon"] .pill.preseason-pill.active{color:#050308;}
+  :root[data-theme="neon"] .pill.cat-strength.active,
+  :root[data-theme="neon"] .pill.cat-cardio.active,
+  :root[data-theme="neon"] .pill.cat-core.active,
+  :root[data-theme="neon"] .pill.finisher-pill.active,
+  :root[data-theme="neon"] .pill.cat-stretch.active,
+  :root[data-theme="neon"] .pill.cat-recovery.active{color:#050308;}
 /* Unclamped while fitGuidance() measures how many sentences fill two lines. */
 .rec-desc.fitting{display:block;height:auto;max-height:none;-webkit-line-clamp:unset;overflow:visible;}
 
@@ -574,9 +604,10 @@ body.library-open{overflow:hidden;}
 @keyframes vt-in{from{opacity:0;transform:translateX(calc(var(--vt-dir,1) * var(--vt-shift,28px)));}}
 
 /* Muscle Map (09c): sets shade one amber ramp light to dark (10-20 is the target band, over 20 the
-   darkest); recovery runs Ready (pale) to Worked hard (dark). Neon in dark mode. */
+   darkest); recovery runs Ready (pale) to Worked hard (dark). Neon in neon mode; dark mode turns the ramp around (brighter is more). */
 :root{--mm-body:#F0EDE4;--mm-0:#E2DDCF;--mm-1:#F2D3A6;--mm-2:#DE9B52;--mm-3:#B8661F;--mm-4:#6E3509;--mm-ready:#A9D3BC;--mm-recovering:#DE9B52;--mm-hard:#9A3F12;--mm-band:rgba(201,122,43,0.16);--mm-glow:none;}
-:root[data-theme="dark"]{--mm-body:#150c26;--mm-0:#2a1f45;--mm-1:#0f4a5c;--mm-2:#0a8fa3;--mm-3:#00f0ff;--mm-4:#ff2d95;--mm-ready:#1e6b5c;--mm-recovering:#8a4fd1;--mm-hard:#ff5fae;--mm-band:rgba(0,240,255,0.18);--mm-glow:drop-shadow(0 0 6px rgba(0,240,255,0.28));}
+:root[data-theme="dark"]{--mm-body:#1F2822;--mm-0:#2C362F;--mm-1:#5A4026;--mm-2:#9A6232;--mm-3:#D9883A;--mm-4:#F2B26E;--mm-ready:#2F6B50;--mm-recovering:#9A6232;--mm-hard:#E07A55;--mm-band:rgba(217,136,58,0.16);--mm-glow:none;}
+:root[data-theme="neon"]{--mm-body:#150c26;--mm-0:#2a1f45;--mm-1:#0f4a5c;--mm-2:#0a8fa3;--mm-3:#00f0ff;--mm-4:#ff2d95;--mm-ready:#1e6b5c;--mm-recovering:#8a4fd1;--mm-hard:#ff5fae;--mm-band:rgba(0,240,255,0.18);--mm-glow:drop-shadow(0 0 6px rgba(0,240,255,0.28));}
 .mm-sub{font-size:0.78rem;color:var(--slate);margin:0 0 0.6rem;}
 .mm-seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;border:1px solid var(--line);border-radius:9px;background:var(--panel-soft);margin-bottom:0.6rem;}
 .mm-seg button{min-height:2.4rem;border:0;border-radius:7px;background:transparent;color:var(--slate);font:inherit;font-size:0.85rem;font-weight:600;cursor:pointer;}

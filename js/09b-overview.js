@@ -457,13 +457,14 @@ function renderBackupSyncCard(){
 
   html += `<div style="border-top:1px dashed var(--line);padding-top:0.7rem;margin-top:0.7rem;">
     <h3 class="section">Appearance</h3>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.7rem;">
+    ${[["dark", "Dark Mode", "The usual colors on a dark background."], ["neon", "Neon Dark Mode", "80s high-contrast colors and fonts."]].map(([key, title, desc], i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.7rem;${i ? "margin-top:0.7rem;" : ""}">
       <div>
-        <div style="font-size:0.85rem;font-weight:600;">Neon Dark Mode</div>
-        <div style="font-size:0.68rem;color:var(--slate);margin-top:0.1rem;">80s high-contrast theme, everywhere in the app.</div>
+        <div style="font-size:0.85rem;font-weight:600;">${title}</div>
+        <div style="font-size:0.68rem;color:var(--slate);margin-top:0.1rem;">${desc}</div>
       </div>
-      <button class="theme-toggle${darkMode ? ' on' : ''}" onclick="toggleDarkMode()" aria-label="Toggle dark mode" aria-pressed="${darkMode}"><span class="knob"></span></button>
-    </div>
+      <button class="theme-toggle theme-${key}${themeMode === key ? " on" : ""}" onclick="toggleTheme('${key}')" aria-label="Toggle ${title.toLowerCase()}" aria-pressed="${themeMode === key}"><span class="knob"></span></button>
+    </div>`).join("")}
   </div>`;
 
   html += `</div>`;

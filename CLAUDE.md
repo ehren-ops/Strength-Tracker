@@ -8,7 +8,7 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - Never use em dashes anywhere: UI copy, comments, commits, replies. Use commas, colons, periods.
 - Answer questions without changing code; build only when asked. Ask before outward-facing changes.
 - Every release bumps the version (see Releasing), passes the full suite, and gets a 360px
-  screenshot check (light and dark) before pushing to `main`.
+  screenshot check (light, dark and neon) before pushing to `main`.
 - Weights are "lb" everywhere (never "lbs"). Short, plain coaching language.
 - No emoji in the UI, with one exception: the training modifiers keep their emoji (`emoji` in
   `MODE_DEFS`, on their pills and Overview rows). Everything else uses outline icons via `icon(key)`
@@ -150,6 +150,10 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - The coach system prompt is cached (5 minutes). Keep anything that changes per call out of
   `PRINCIPLES` and the mode prompts, or every call pays the cache write for nothing.
 - Render is a full `innerHTML` rebuild on every change; keep helpers pure and cheap.
+- Themes (03): `themeMode` is `light`, `dark` (the light theme's colors and fonts on a dark
+  background) or `neon` (Sora/Rajdhani, the 80s palette), set on `html[data-theme]` and stored in
+  `strength-tracker-theme` (the old `strength-tracker-dark-mode` = 1 still opens neon). New tokens
+  go in all three `:root` blocks, plus the `--mm-*` line; screenshot new UI in all three.
 - View transitions (`navTransition(kind, dir, update)`, 06): tab switches (`switchView`), lift picks
   (`selectExercise`) and Extra group chips change state first, then repaint inside
   `document.startViewTransition`, so the DOM updates a frame later. Animate new navigation through it
