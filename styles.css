@@ -268,6 +268,7 @@
   /* Hold timer: the top half of the screen while timed holds run. Colors by phase. */
   /* The timer button: a small clock above Last (or beside the name, before any history). */
   .timer-btn{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:1.85rem;height:1.85rem;margin:-0.25rem 0;padding:0;background:none;border:1.5px solid var(--emerald);color:var(--emerald);border-radius:50%;cursor:pointer;}
+  .timer-btn.running{background:var(--emerald);color:var(--card);}
   .timer-btn .btn-icon{width:1.05rem;height:1.05rem;margin:0;stroke-width:2;}
   /* What the clock will run, in two small lines left of it (the record label's type, not capitals). */
   .timer-group{display:inline-flex;align-items:center;gap:0.45rem;flex:0 0 auto;}
@@ -324,7 +325,8 @@
   .hold-clock.compact{height:auto;min-height:0;flex-direction:row;gap:0.7rem;padding:calc(env(safe-area-inset-top, 0px) + 0.45rem) 3rem 0.55rem 1rem;justify-content:flex-start;}
   .hold-clock.compact .hc-time{font-size:1.9rem;}
   .hold-clock.compact .hc-phase{font-size:0.8rem;}
-  .hold-clock.compact .hc-set{font-size:0.8rem;}
+  .hold-clock.compact .hc-set{font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .hold-clock.compact .hc-more{display:none;}
   .hold-clock.compact .hc-dots, .hold-clock.compact .hc-stop{display:none;}
   .hold-clock.compact .hc-stop.armed{display:block;margin:0;}
   .hold-clock.compact .hc-handle{left:auto;right:0.2rem;bottom:auto;top:calc(env(safe-area-inset-top, 0px) + 0.35rem);transform:none;}

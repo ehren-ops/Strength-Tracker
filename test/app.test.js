@@ -3617,6 +3617,51 @@ async function main(){
   if(!ok109) throw new Error('expected every plate line on one line with its bar note, got: ' + JSON.stringify(r109));
   console.log('OK: Hip Thrust, Trap Bar Jump and Squat plate lines fit one line at 360px: ' + r109.map(r => r.text).join(' | '));
 
+  console.log('=== 110: the clock ignores a double tap across a step, a swipe never eats the next tap, and the card button brings a running clock back ===');
+  const r110 = await page.evaluate(() => {
+    const saved = { data, view, selected, guard: holdTapGuard, compact: holdCompact, prefs: JSON.stringify(restPrefs) };
+    const out = {};
+    try{
+      holdTapGuard = 600; holdCompact = false;
+      data = { 'Squat': Object.assign(newExerciseShell('Squat'), { entries: [{ clientId: 'c110', label: 'S1', date: shiftISO(todayISO(), -3), weight: 185, sets: 3, reps: 8, difficulty: 7 }] }) };
+      view = 'full'; selected = 'Squat'; render();
+      const clock = () => document.getElementById('hold-clock');
+      const at = () => holdTimer.idx + ':' + holdTimer.steps[holdTimer.idx].kind;
+      startHoldTimer('Squat');
+      clock().querySelector('[data-hc="skip"]').click(); // Set done
+      clock().querySelector('[data-hc="skip"]').click(); // the double tap's second half lands on Next set
+      out.doubleTap = at();
+      holdTimer.guardUntil = 0;
+      clock().querySelector('[data-hc="skip"]').click(); // a real Next set later still works
+      out.later = at();
+      // A swipe sets the flag; the next touch clears it, so its tap goes through.
+      const el = clock(), touch = (type, y) => { const t = new Touch({ identifier: 1, target: el, clientX: 100, clientY: y }); el.dispatchEvent(new TouchEvent(type, { touches: type === 'touchend' ? [] : [t], changedTouches: [t], bubbles: true })); };
+      touch('touchstart', 200); touch('touchend', 80);
+      out.compact = holdCompact;
+      touch('touchstart', 50); touch('touchend', 50);
+      holdTimer.guardUntil = 0;
+      clock().querySelector('[data-hc="skip"]').click();
+      out.afterSwipe = at();
+      out.slimLine = getComputedStyle(clock().querySelector('.hc-more') || clock()).display;
+      // The card button while its clock runs: the big clock comes back, nothing restarts.
+      render();
+      const btn = document.querySelector('.timer-btn[data-lift="Squat"]');
+      out.running = btn.classList.contains('running');
+      btn.click();
+      out.resumed = [at(), holdCompact];
+      clearHoldTimer();
+      out.cleared = document.querySelector('.timer-btn[data-lift="Squat"]').classList.contains('running');
+    } finally {
+      clearHoldTimer(); holdTapGuard = saved.guard; holdCompact = saved.compact; restPrefs = JSON.parse(saved.prefs);
+      data = saved.data; view = saved.view; selected = saved.selected; render();
+    }
+    return out;
+  });
+  const ok110 = r110.doubleTap === '1:rest' && r110.later === '3:set' && r110.compact === true && r110.afterSwipe === '4:rest' &&
+    r110.slimLine === 'none' && r110.running && JSON.stringify(r110.resumed) === JSON.stringify(['4:rest', false]) && r110.cleared === false;
+  if(!ok110) throw new Error('expected the clock to guard double taps, keep taps after a swipe and resume from the card, got: ' + JSON.stringify(r110));
+  console.log('OK: a double tap on Set done stays on the rest, a tap after a swipe registers, the slim bar drops "ready at", and the card button shows and resumes the running clock');
+
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({
     version: APP_VERSION,

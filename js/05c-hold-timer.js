@@ -15,6 +15,10 @@ const HOLD_STOP_WINDOW = 2000;
 let holdCompact = false; // the slim bar instead of the big clock; kept between runs this visit
 let holdTimer = null; // { name, sets, secs, rest, steps, idx, endAt, paused: { left }, held: [[sec per side]], intervalId, lastTap, beeped, wake }
 const HOLD_REST_STEP = 15;
+// After the clock moves to a new step its buttons ignore taps this long, so the second tap of a
+// double tap (on Set done, say) can't land on the new screen's Next set and skip the rest. Off in
+// test browsers (they click faster than a finger); scenario 110 turns it on.
+let holdTapGuard = typeof navigator !== "undefined" && navigator.webdriver ? 0 : 600;
 
 // A lift's rest as last set on the clock, else the short end of its usual range.
 const REST_PREFS_KEY = "strength-tracker-rest-prefs";
@@ -49,7 +53,8 @@ function timerButtonFor(name, ex){
   const p = mode === "holds" ? holdPlanFor(name, ex) : setPlanFor(name, ex);
   const amount = mode === "holds" ? p.secs : p.reps;
   const what = mode === "holds" ? `${p.sets} holds of ${p.secs} seconds` : `${p.sets} sets of ${p.reps}`;
-  return `<button type="button" class="timer-btn" onclick="startHoldTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start the timer, ${what}">${HOLD_ICON}<span class="hold-btn-label sr-only">${p.sets}x${amount}</span></button>`;
+  const running = holdTimer && !holdTimer.finished && holdTimer.name === name ? " running" : "";
+  return `<button type="button" class="timer-btn${running}" data-lift="${escapeHtml(name)}" onclick="startHoldTimer('${name.replace(/'/g,"\\'")}')" aria-label="Start the timer, ${what}">${HOLD_ICON}<span class="hold-btn-label sr-only">${p.sets}x${amount}</span></button>`;
 }
 
 // The plan on the button: the next progression, else three holds at the target. Starting the clock
@@ -78,7 +83,7 @@ function timerGroupFor(name, ex){
   return btn ? `<span class="timer-group">${timerPlanHtml(timerPlanLines(name, ex))}${btn}</span>` : "";
 }
 function syncHoldButton(){
-  const btn = document.querySelector(".timer-btn");
+  const btn = document.querySelector(".timer-btn[data-lift]");
   const ex = selected && data[selected];
   if(!btn || !ex) return;
   const hold = isHoldLift(ex);
@@ -129,8 +134,23 @@ function restRangeFor(mode, name, ex){
 }
 function restStepSecs(t){ return t.mode === "sets" ? t.rest : Math.max(5, t.rest - HOLD_COUNT_IN); }
 
+// The card's clock button on a lift whose clock is already running brings the big clock back
+// instead of starting over at set 1.
+function resumeRunningClock(name){
+  if(!holdTimer || holdTimer.finished || holdTimer.name !== name) return false;
+  holdCompact = false;
+  holdAudio();
+  renderHoldClock();
+  return true;
+}
+// The card button shows when its lift's clock is running (render covers the rest of the time).
+function markTimerButtons(){
+  const name = holdTimer && !holdTimer.finished ? holdTimer.name : null;
+  document.querySelectorAll(".timer-btn[data-lift]").forEach(b => b.classList.toggle("running", b.dataset.lift === name));
+}
 function startHoldTimer(name){
   const ex = data[name];
+  if(resumeRunningClock(name)) return;
   if(!isHoldLift(ex)){ if(isSetLift(name, ex)) startSetTimer(name); return; }
   stopHoldTimer(true);
   clearRestTimer();
@@ -144,6 +164,7 @@ function startHoldTimer(name){
 }
 function startSetTimer(name){
   const ex = data[name];
+  if(resumeRunningClock(name)) return;
   stopHoldTimer(true);
   clearRestTimer();
   const { sets, reps, weight } = setPlanFor(name, ex, true);
@@ -157,6 +178,7 @@ function beginHoldTimer(){
   try{ if(navigator.wakeLock) navigator.wakeLock.request("screen").then(w => { if(holdTimer) holdTimer.wake = w; else w.release(); }).catch(() => {}); }catch(e){}
   holdBuzz(80);
   renderHoldClock();
+  markTimerButtons();
 }
 
 // Time left in the current step, frozen while paused.
@@ -171,6 +193,7 @@ function nextHoldStep(t, from){
   if(t.idx >= t.steps.length){ finishHoldTimer(false); return false; }
   const next = t.steps[t.idx];
   t.endAt = from + next.secs * 1000;
+  if(next.kind !== "extra") t.guardUntil = Date.now() + holdTapGuard;
   if(next.kind === "hold" || next.kind === "set"){ holdBeep(880, 250); holdBuzz(200); }
   else if(next.kind === "rest"){ holdBeep(520, 400); holdBuzz([200, 100, 200]); if(t.mode !== "routine") recordRestTap(t.name); }
   else if(next.kind === "extra"){ holdBeep(660, 200); holdBeep(880, 300); holdBuzz([150, 80, 150]); }
@@ -318,6 +341,7 @@ function finishHoldTimer(early){
   t.summary = perSet.length ? `${perSet.length}x${Math.min(...perSet)}` : "--";
   t.result = early ? (perSet.length ? `Stopped: ${perSet.length} set${perSet.length === 1 ? "" : "s"} filled in` : "Stopped") : "Done: filled in below, tap Log";
   renderHoldClock();
+  markTimerButtons();
   setTimeout(() => { if(holdTimer === t) clearHoldTimer(); }, early ? 3400 : 2400);
 }
 
@@ -328,6 +352,7 @@ function clearHoldTimer(){
   }
   holdTimer = null;
   renderHoldClock();
+  markTimerButtons();
 }
 
 function fmtClock(sec){ return sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : String(sec); }
@@ -342,10 +367,12 @@ function renderHoldClock(){
     el.setAttribute("role", "timer");
     el.onclick = e => {
       if(el._swiped){ el._swiped = false; return; }
+      holdAudio(); // a tap can wake sound the phone suspended while the app was in the background
       const act = e.target.closest("[data-hc]");
       if(act){
         e.stopPropagation();
         const a = act.dataset.hc;
+        if(a !== "close" && a !== "size" && holdTimer && Date.now() < (holdTimer.guardUntil || 0)) return;
         if(a === "close") clearHoldTimer();
         else if(a === "pause") toggleHoldPause();
         else if(a === "skip") skipHoldStep();
@@ -359,7 +386,7 @@ function renderHoldClock(){
       tapHoldClock();
     };
     // Swipe up for the slim bar, down for the big clock.
-    el.addEventListener("touchstart", e => { el._y = e.touches[0].clientY; }, { passive: true });
+    el.addEventListener("touchstart", e => { el._y = e.touches[0].clientY; el._swiped = false; }, { passive: true });
     el.addEventListener("touchend", e => {
       const dy = e.changedTouches[0].clientY - (el._y ?? e.changedTouches[0].clientY);
       if(Math.abs(dy) < 30 || !holdTimer) return;
@@ -392,13 +419,13 @@ function renderHoldClock(){
     // Past the lift's rest: Ready, counting up toward the longest rest; Start set whenever.
     const over = Math.max(0, Math.round(step.secs - holdLeftMs(t) / 1000));
     const total = t.rest + over, pctX = Math.min(100, Math.max(0, 100 * (1 - holdLeftMs(t) / (step.secs * 1000))));
-    const line = `Next: set ${step.set + 1} of ${t.sets} · go when ready, up to ${fmtClock(t.max)}`;
+    const line = `Next: set ${step.set + 1} of ${t.sets}<span class="hc-more"> · go when ready, up to ${fmtClock(t.max)}</span>`;
     paintClock(el, `hold-clock extra${t.paused ? " paused" : ""}${size}`, `Ready, rested ${total} seconds, ${line}`, `<div class="hc-phase">${t.paused ? "Paused" : "Ready"}</div><div class="hc-time">${fmtClock(total)}</div><div class="hc-set">${line}</div><div class="hc-dots">${dots}</div>${restControlsHtml(t, step, "Start set")}${stopHint}<div class="hc-bar" style="width:${pctX}%"></div>${handle}`);
     return;
   }
   const left = Math.max(0, Math.ceil(holdLeftMs(t) / 1000));
   const phase = t.paused ? "Paused" : step.kind === "ready" ? (step.switching ? "Switch sides" : "Get ready") : step.kind === "hold" ? "Hold" : "Rest";
-  const setLine = step.kind === "rest" ? `Next: set ${step.set + 1} of ${t.sets}${t.mode === "sets" ? ` · ready at ${fmtClock(t.rest)}` : ""}` : `Set ${step.set} of ${t.sets}${step.side ? ` · ${step.side}` : ""}`;
+  const setLine = step.kind === "rest" ? `Next: set ${step.set + 1} of ${t.sets}${t.mode === "sets" ? `<span class="hc-more"> · ready at ${fmtClock(t.rest)}</span>` : ""}` : `Set ${step.set} of ${t.sets}${step.side ? ` · ${step.side}` : ""}`;
   const pct = Math.min(100, Math.max(0, 100 * (1 - holdLeftMs(t) / (step.secs * 1000))));
   const skipLabel = step.kind === "rest" ? "Next set" : step.kind === "hold" ? (t.idx >= t.steps.length - 1 ? "Finish" : "Rest") : "Start";
   paintClock(el, `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`, `${phase}, ${left} seconds, ${setLine}`, `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${setLine}</div><div class="hc-dots">${dots}</div>${restControlsHtml(t, step, skipLabel)}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`);
@@ -407,7 +434,7 @@ function renderHoldClock(){
 // bar, so a button is never swapped out from under a finger mid-tap.
 function paintClock(el, cls, aria, html){
   el.className = cls;
-  el.setAttribute("aria-label", aria);
+  el.setAttribute("aria-label", aria.replace(/<[^>]+>/g, ""));
   const timeRe = /<div class="hc-time">([^<]*)<\/div>/, barRe = /width:([\d.]+)%/;
   const key = html.replace(timeRe, "").replace(barRe, "");
   if(key === el._key){
@@ -519,6 +546,14 @@ function renderRoutineClock(el, t, step, dots, handle, stopHint, size){
   const pct = Math.min(100, Math.max(0, 100 * (1 - holdLeftMs(t) / (step.secs * 1000))));
   const skipLabel = step.kind === "rest" ? "Next set" : step.kind === "hold" ? "Next" : "Start";
   paintClock(el, `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`, `${phase}, ${left} seconds, ${line}`, `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${line}</div><div class="hc-dots">${dots}</div>${restControlsHtml(t, step, skipLabel)}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`);
+}
+
+// Back in the app: the screen lock was dropped while away, and the clock should catch up now
+// rather than on its next tick.
+function resumeHoldClock(){
+  if(!holdTimer || holdTimer.finished) return;
+  try{ if(navigator.wakeLock && (!holdTimer.wake || holdTimer.wake.released)) navigator.wakeLock.request("screen").then(w => { if(holdTimer) holdTimer.wake = w; else w.release(); }).catch(() => {}); }catch(e){}
+  tickHoldTimer();
 }
 
 // Sound needs a tap to start on phones; the Start tap creates the context, later beeps reuse it.

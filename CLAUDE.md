@@ -83,6 +83,12 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - The clock repaints through `paintClock` (05c), which rebuilds its markup only when words or buttons
   change; ticks update just the time and bar. Never set its innerHTML on every tick, or taps on
   Pause, Skip and Done get lost mid-press.
+- Clock taps (05c): after a step change the controls ignore taps for `holdTapGuard` (600 ms; 0 under
+  webdriver, scenario 110 turns it on), so a double tap on Set done can't skip the rest; Rest to
+  Ready keeps the same button and sets no guard. A swipe's flag clears on the next touchstart. The
+  card button (`data-lift`, `.running`) on a lift whose clock runs brings the big clock back
+  (`resumeRunningClock`) instead of restarting at set 1. `resumeHoldClock` on return to the app
+  catches up and re-takes the screen wake lock. Text the slim bar drops goes in `.hc-more`.
 - The clock (05c): one `holdTimer` with `mode` holds / sets / routine and a list of steps (`ready`,
   `hold`, `set` waits for Done, `rest`), all on absolute end times. `timerButtonFor` puts the round
   clock button at the top of the card head's side column (in the title row before any history);
