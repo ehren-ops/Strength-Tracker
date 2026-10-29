@@ -468,7 +468,7 @@ function renderExerciseCard(name, ex){
         } else if(suggestion.painHold){
           msg = painMessage(suggestion, `${suggestion.weight} lb`);
         } else if(suggestion.shoulderHold){
-          const h = suggestion.shoulderHold, inc = h.inc || ex.increment || 5;
+          const h = suggestion.shoulderHold, inc = h.inc || incrementFor(ex, name);
           const share = h.first && h.fullWeight ? ` (${Math.round(h.pct * 100)}% of ${h.fullWeight})` : "";
           const cue = name === "Bicep Curl" ? "hammer curls, lower over 3 sec" : name === "Barbell Row" ? "palms-in grip, no shrug" : "medium grip, short of the chest";
           const next = h.atFull ? `Held at your pre-rehab weight until rehab is off.`
@@ -529,7 +529,7 @@ function renderExerciseCard(name, ex){
         } else if(suggestion.range && !suggestion.deloadWeek){
           const [lo, hi] = suggestion.range;
           msg = suggestion.readyToProgress ? (suggestion.rangeEarly ? `${trackWork.reps} reps with reps to spare: ${chg} today, back to ${lo} reps a set.` : `Every set reached ${hi} reps: ${chg} today, back to ${lo} reps a set.`)
-            : suggestion.hitTarget ? `${trackWork.reps} reps a set last time. Today: ${suggestion.reps} reps, same weight. Add weight at ${suggestion.mid} with reps left, or ${hi}.`
+            : suggestion.hitTarget ? `${trackWork.reps} reps a set last time. Today: ${suggestion.reps} reps, same weight. ${pinStepFor(name) ? `Next pin once every set reaches ${hi}.` : `Add weight at ${suggestion.mid} with reps left, or ${hi}.`}`
             : `Under ${lo} reps last time: same weight, build back to ${lo} reps a set.`;
         } else if(suggestion.readyToProgress){
           if(ex.conservative){

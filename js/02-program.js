@@ -194,11 +194,14 @@ const VALID_TRACK_BY_VALUES = ["weight", "duration", "reps", "checklist"];
 
 // Built-in exercises that shouldn't default to weight/sets/reps when first
 // created - cardio work is logged by time, distance, and incline instead.
+// The gym's cable stacks move about 15 lb a pin (the kg labels are that, converted); the slide-on
+// add-on doesn't fit every machine, so plans never count on it.
+const CABLE_PIN = 15;
 const EXERCISE_DEFAULTS = {
   "Zone 2 Ride": { trackBy: "duration", trackDistance: true, trackSpeed: true },
   "Incline Treadmill Walk": { trackBy: "duration", trackDistance: true, trackIncline: true, trackSpeed: true },
   "C2 Row": { trackBy: "duration", trackDistance: true, trackSpeed: true, rowing: true, trackSpm: true },
-  "Pallof Press": { trackBy: "weight", targetReps: 10, repRange: "10-15" },
+  "Pallof Press": { trackBy: "weight", targetReps: 10, repRange: "10-15", pinStep: CABLE_PIN },
   "Side Plank": { trackBy: "reps", unit: "sec", targetReps: 30 },
   "Dead Bug": { trackBy: "reps", targetReps: 8 },
   "Wall Sit": { trackBy: "reps", unit: "sec", targetReps: 45 },
@@ -216,11 +219,11 @@ const EXERCISE_DEFAULTS = {
   // Accessories progress by reps inside a range before adding weight (double progression): +5 lb is
   // 3% on a squat but a third of a light dumbbell, so these earn it at the top of the range.
   "Incline DB Press": { repRange: "8-12" },
-  "Cable Chest Fly": { repRange: "10-15" },
-  "Face Pulls": { repRange: "12-15" },
-  "Cable Lat Pulldown": { repRange: "8-12" },
+  "Cable Chest Fly": { repRange: "10-15", pinStep: CABLE_PIN },
+  "Face Pulls": { repRange: "12-15", pinStep: CABLE_PIN },
+  "Cable Lat Pulldown": { repRange: "8-12", pinStep: CABLE_PIN },
   "Bicep Curl": { repRange: "8-12" },
-  "Tricep Pushdown": { repRange: "10-15" },
+  "Tricep Pushdown": { repRange: "10-15", pinStep: CABLE_PIN },
   "Lateral Raise": { repRange: "12-15" },
   // A year-round grip and trunk finisher, not Preseason work (preseason: false clears the old flag).
   "Farmer's Carry": { unit: "sec", targetReps: 40, preseason: false },
@@ -340,6 +343,6 @@ function backfillExerciseDefaults(){
 function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v139";
+const APP_VERSION = "v140";
 const APP_UPDATED = "Oct 29, 2026";
 

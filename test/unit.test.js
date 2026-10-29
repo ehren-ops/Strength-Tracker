@@ -63,6 +63,8 @@ const heavyDays = () => run(`plannedHeavy = __plannedHeavy;`);
 function lift(name, rows){
   run(`data[${JSON.stringify(name)}] = Object.assign(newExerciseShell(${JSON.stringify(name)}), { entries: ${JSON.stringify(rows)}.map((r, i) => Object.assign({ clientId: "u" + i, date: shiftISO(todayISO(), -r[0]), weight: r[1], sets: 3, reps: r[2], difficulty: 7 }, r[3] || {})) });`);
 }
+// A dumbbell rep-range lift for the generic range rules (the cable lifts move by whole pins).
+run(`EXERCISE_DEFAULTS["DB Fly"] = { repRange: "10-15" };`);
 const suggest = name => run(`computeSuggestion(data[${JSON.stringify(name)}], ${JSON.stringify(name)})`);
 
 test("barbell lift adds weight after hitting its reps", () => {
@@ -79,31 +81,31 @@ test("three straight misses drop about 15%", () => {
   eq([s.weight, s.deload], [150, true], "squat");
 });
 test("rep range: inside the range, two more reps at RPE 7, one at RPE 8, none at 9", () => {
-  reset(); lift("Cable Chest Fly", [[3, 50, 12]]);
-  const s = suggest("Cable Chest Fly");
+  reset(); lift("DB Fly", [[3, 50, 12]]);
+  const s = suggest("DB Fly");
   eq([s.weight, s.reps, s.readyToProgress], [50, 14, false], "fly at RPE 7");
-  lift("Cable Chest Fly", [[3, 50, 12, { difficulty: 8 }]]);
-  eq(suggest("Cable Chest Fly").reps, 13, "RPE 8");
-  lift("Cable Chest Fly", [[3, 50, 12, { difficulty: 9 }]]);
-  eq(suggest("Cable Chest Fly").reps, 12, "RPE 9");
+  lift("DB Fly", [[3, 50, 12, { difficulty: 8 }]]);
+  eq(suggest("DB Fly").reps, 13, "RPE 8");
+  lift("DB Fly", [[3, 50, 12, { difficulty: 9 }]]);
+  eq(suggest("DB Fly").reps, 12, "RPE 9");
 });
 test("rep range: the middle of the range at RPE 7 or easier adds weight (twice in a row when conservative)", () => {
-  reset(); lift("Cable Chest Fly", [[3, 50, 13]]);
-  const s = suggest("Cable Chest Fly");
+  reset(); lift("DB Fly", [[3, 50, 13]]);
+  const s = suggest("DB Fly");
   eq([s.weight, s.reps, s.readyToProgress, s.rangeEarly], [55, 10, true, true], "fly");
-  lift("Cable Chest Fly", [[3, 50, 13, { difficulty: 8 }]]);
-  eq(suggest("Cable Chest Fly").weight, 50, "not at RPE 8");
-  lift("Cable Chest Fly", [[3, 50, 13]]); run(`data["Cable Chest Fly"].conservative = true;`);
-  eq(suggest("Cable Chest Fly").weight, 50, "conservative wants two");
-  lift("Cable Chest Fly", [[6, 50, 13], [3, 50, 14]]); run(`data["Cable Chest Fly"].conservative = true;`);
-  eq(suggest("Cable Chest Fly").weight, 55, "conservative after two");
+  lift("DB Fly", [[3, 50, 13, { difficulty: 8 }]]);
+  eq(suggest("DB Fly").weight, 50, "not at RPE 8");
+  lift("DB Fly", [[3, 50, 13]]); run(`data["DB Fly"].conservative = true;`);
+  eq(suggest("DB Fly").weight, 50, "conservative wants two");
+  lift("DB Fly", [[6, 50, 13], [3, 50, 14]]); run(`data["DB Fly"].conservative = true;`);
+  eq(suggest("DB Fly").weight, 55, "conservative after two");
 });
 test("rep range: well under the bottom refits the weight instead of doubling the reps", () => {
-  reset(); lift("Cable Chest Fly", [[3, 60, 5]]);
-  const s = suggest("Cable Chest Fly");
+  reset(); lift("DB Fly", [[3, 60, 5]]);
+  const s = suggest("DB Fly");
   eq([s.weight, s.reps, !!s.refit], [52.5, 10, true], "fly");
-  lift("Cable Chest Fly", [[3, 60, 5, { repsBySet: [5, 8, 8] }]]);
-  eq([suggest("Cable Chest Fly").weight, !!suggest("Cable Chest Fly").refit], [60, false], "one short set in 5/8/8 is not a 5-rep session");
+  lift("DB Fly", [[3, 60, 5, { repsBySet: [5, 8, 8] }]]);
+  eq([suggest("DB Fly").weight, !!suggest("DB Fly").refit], [60, false], "one short set in 5/8/8 is not a 5-rep session");
 });
 test("notes: grip and heavy never hold a lift that hit its reps; pain words do unless negated", () => {
   reset(); lift("Squat", [[3, 180, 8, { note: "Staggered grip, heavy but good" }]]);
@@ -145,13 +147,13 @@ test("Shoulder Rehab: the first session starts at 85%, then the load follows the
   eq(suggest("Bench Press").weight, 155, "an RPE 9 session is not clean");
 });
 test("rep range: top of the range adds weight and resets reps", () => {
-  reset(); lift("Cable Chest Fly", [[3, 50, 15]]);
-  const s = suggest("Cable Chest Fly");
+  reset(); lift("DB Fly", [[3, 50, 15]]);
+  const s = suggest("DB Fly");
   eq([s.weight, s.reps, s.readyToProgress], [55, 10, true], "fly");
 });
 test("rep range: below the bottom holds and rebuilds", () => {
-  reset(); lift("Cable Chest Fly", [[3, 50, 9]]);
-  eq([suggest("Cable Chest Fly").weight, suggest("Cable Chest Fly").reps], [50, 10], "fly");
+  reset(); lift("DB Fly", [[3, 50, 9]]);
+  eq([suggest("DB Fly").weight, suggest("DB Fly").reps], [50, 10], "fly");
 });
 test("preseason rep target overrides a rep range", () => {
   reset(); run(`modes.preseason = true;`);
@@ -347,6 +349,26 @@ test("plates: barbell plans land on a weight 2.5 lb plates can make (5 lb steps 
   eq(suggest("RDL").weight, 260, "an odd log that hit its reps: up to the next loadable weight");
   run(`data["RDL"].entries[1].reps = 6;`);
   eq(suggest("RDL").weight, 250, "missed: down to the loadable weight under it");
+});
+test("cable stacks: a pin at a time (15 lb) from the last weight logged, only from the top of the range", () => {
+  reset(); lift("Face Pulls", [[7, 120, 13], [3, 120, 15]]);
+  let s = suggest("Face Pulls");
+  eq([s.weight, s.reps], [135, 12], "every set at 15: one pin heavier, back to 12");
+  lift("Face Pulls", [[7, 120, 12], [3, 120, 13]]);
+  s = suggest("Face Pulls");
+  eq([s.weight, s.reps], [120, 15], "13 at RPE 7: no early jump on a stack, reps climb");
+  lift("Tricep Pushdown", [[7, 125, 13], [3, 125, 15]]);
+  eq(suggest("Tricep Pushdown").weight, 140, "an off-label last weight: pins count from it");
+  lift("Face Pulls", [[3, 120, 15]]); run(`modes.deload = true;`);
+  eq(suggest("Face Pulls").weight, 105, "deload: about 10% lighter lands a pin lighter");
+  run(`modes.deload = false;`);
+  eq(run(`[onGrid(108, 120, 15, false), onGrid(112.5, 120, 15, false), onGrid(112.5, 120, 15, true), onGrid(-20, 40, 15, false)]`), [105, 105, 120, 10], "grid");
+  eq(run(`loadText("Face Pulls", data["Face Pulls"], { weight: 135 })`), "Load 135 lb total: 1 pin heavier than last", "load line");
+  lift("Face Pulls", [[9, 120, 15], [2, 95, 15, { deload: true }]]);
+  eq(run(`loadText("Face Pulls", data["Face Pulls"], { weight: 120 })`), `Load 120 lb total: same pin as ${run(`fmtShortDate(shiftISO(todayISO(), -9))`)}`, "back to a pin used before");
+  lift("Face Pulls", [[3, 125, 15]]); run(`modes.deload = true;`);
+  eq(suggest("Face Pulls").weight, 110, "a planned cut takes the lighter pin, never rounds back up");
+  run(`modes.deload = false;`);
 });
 test("hit or miss: judged against the saved plan, or the previous session when there is none", () => {
   reset(); lift("Face Pulls", [[6, 110, 10, { sets: 2 }], [3, 130, 12, { sets: 2, plan: { sets: 2, reps: 12, weight: 110 } }]]);

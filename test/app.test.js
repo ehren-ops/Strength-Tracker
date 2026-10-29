@@ -1382,7 +1382,7 @@ async function main(){
   await sleep(150);
   const chestFlySuggestion = await page.evaluate(() => computeSuggestion(data['Cable Chest Fly'], 'Cable Chest Fly'));
   if(!chestFlySuggestion.readyToProgress) throw new Error('expected Cable Chest Fly to be ready to progress once the 4 most recent sessions all hit target, got: ' + JSON.stringify(chestFlySuggestion));
-  if(chestFlySuggestion.weight !== 55) throw new Error('expected Cable Chest Fly to suggest 55 lbs, got: ' + chestFlySuggestion.weight);
+  if(chestFlySuggestion.weight !== 65) throw new Error('expected Cable Chest Fly to suggest one pin up, 65 lb, got: ' + chestFlySuggestion.weight);
   console.log('OK: an old miss no longer permanently blocks progression once recent sessions consistently hit target');
 
   console.log('=== 52: Back Extension is weight-tracked and pre-fills the next rep in its 10-15 range ===');
@@ -1926,9 +1926,9 @@ async function main(){
     data = savedData; Object.assign(modes, savedModes);
     return out;
   });
-  if(JSON.stringify(ranged) !== JSON.stringify({ range: [10, 15], mid: [50, 14, false], top: [55, 10, true], under: [50, 10, false], preseasonRange: null }))
+  if(JSON.stringify(ranged) !== JSON.stringify({ range: [10, 15], mid: [50, 14, false], top: [65, 10, true], under: [50, 10, false], preseasonRange: null }))
     throw new Error('expected double progression inside 10-15 for the fly, got: ' + JSON.stringify(ranged));
-  console.log('OK: fly in a 10-15 range holds 50 and aims for 14 after 12 reps at RPE 7, adds to 55 and drops to 10 reps at 15, holds at 10 after a miss; a preseason rep target overrides the range');
+  console.log('OK: fly in a 10-15 range holds 50 and aims for 14 after 12 reps at RPE 7, adds a pin (65) and drops to 10 reps at 15, holds at 10 after a miss; a preseason rep target overrides the range');
   await page.click('.tab:has-text("Overview")');
   await page.click('button:has-text("Deload Week: ON")');
   await sleep(150);
@@ -2512,7 +2512,7 @@ async function main(){
     r79.p2.items === 9 && r79.p2.week === 'Week 3 · Phase 2' && r79.p2.curl.weight === 20 && r79.p2.curl.hold &&
     r79.p3.items === 11 && r79.p3.week === 'Week 3 · Phase 3' && r79.p3.synced &&
     r79.coach && r79.coach.on && r79.coach.phase === 3 && r79.coach.pausedLifts.includes('Cable Chest Fly') && r79.coach.heldLifts.includes('Bench Press') &&
-    r79.ret.w1 === 25 && r79.ret.s1 === 1 && r79.ret.w2 === 27.5 && r79.ret.s2 === 2 && r79.ret.bench === 190 && r79.ret.endedOn &&
+    r79.ret.w1 === 15 && r79.ret.s1 === 1 && r79.ret.w2 === 30 && r79.ret.s2 === 2 && r79.ret.bench === 190 && r79.ret.endedOn &&
     !r79.afterOff.rehabPill && r79.afterOff.first.startsWith('1. Bench Press');
   if(!ok79) throw new Error('expected Shoulder Rehab to work as designed, got: ' + JSON.stringify(r79));
   console.log('OK: off changes nothing; on, the rehab card leads every day (lifts keep their numbers), flies paused, bench at 85% (157.5 from 185, never above the last log, kept through a deload) and rebuilt in phase 3, Push-Ups joins Upper and Full, curls paused then hammer at 20; phases 1/2/3 show 3/9/11 items; pain saves; off ramps the fly 25 then 27.5');

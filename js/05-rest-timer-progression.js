@@ -412,21 +412,33 @@ function applyPain(s, ex, full){
 // sessions on today's track (heavy or volume) only.
 function computeSuggestion(full, name){
   const plan = planSuggestion(full, name);
-  if(!plan || full.equipment !== "barbell" || !(plan.weight > 0)) return plan;
-  const last = full.entries[full.entries.length - 1];
+  const pin = pinStepFor(name);
+  if(!plan || (full.equipment !== "barbell" && !pin) || !(plan.weight > 0)) return plan;
+  const logged = [...full.entries].reverse().filter(e => e.weight > 0);
+  const last = logged[0] || full.entries[full.entries.length - 1];
   const up = plan.weight > last.weight || !!plan.readyToProgress || (plan.weight === last.weight && !!plan.hitTarget);
-  const weight = loadableWeight(plan.weight, barWeightFor(name), up);
+  // A cable stack's labels are unknown, so its pins count from the last regular session's weight;
+  // a weight already logged on it is a real pin and stays (back to the pre-deload weight, say).
+  if(pin && logged.some(e => e.weight === plan.weight)) return plan;
+  const anchor = (logged.find(e => !e.deload) || last).weight;
+  // A planned cut (deload, pain, a return ramp) takes the lighter pin, so it is always a real cut.
+  const weight = !pin ? loadableWeight(plan.weight, barWeightFor(name), up)
+    : plan.weight < anchor ? Math.max(anchor - pin * Math.ceil((anchor - plan.weight) / pin - 1e-9), anchor - pin * Math.floor((anchor - 1e-9) / pin))
+    : onGrid(plan.weight, anchor, pin, up);
   return weight === plan.weight ? plan : { ...plan, weight };
 }
 // A barbell moves in steps of two of the smallest plate (2.5 lb a side, so 5 lb), from the bar up.
 // A plan that lands between loadable totals (a percentage, an estimated max, an old odd log) snaps
 // to the nearest one; halfway goes up when the lift is moving up or just hit its reps, else down.
 function loadableWeight(w, bar, up){
-  const step = 2 * PLATE_SET[PLATE_SET.length - 1];
-  if(!(w > bar)) return w;
-  const k = (w - bar) / step, lo = Math.floor(k + 1e-9), frac = k - lo;
-  if(frac < 1e-9) return w;
-  return bar + step * (frac > 0.5 + 1e-9 ? lo + 1 : frac < 0.5 - 1e-9 ? lo : up ? lo + 1 : lo);
+  return w > bar ? onGrid(w, bar, 2 * PLATE_SET[PLATE_SET.length - 1], up) : w;
+}
+// The nearest of base + k * step; halfway goes up only when `up`. Never below one step.
+function onGrid(w, base, step, up){
+  const k = (w - base) / step, lo = Math.floor(k + 1e-9), frac = k - lo;
+  const n = frac < 1e-9 ? lo : frac > 0.5 + 1e-9 ? lo + 1 : frac < 0.5 - 1e-9 ? lo : up ? lo + 1 : lo;
+  const snapped = base + step * n;
+  return snapped > 0 ? snapped : base - step * Math.floor((base - 1e-9) / step);
 }
 function planSuggestion(full, name){
   if(!full.entries.length || isRecovery(name)) return null;
@@ -469,7 +481,7 @@ function computeSuggestionCore(ex, name){
   if(!ex.entries.length) return null;
   const last = ex.entries[ex.entries.length-1];
   const targetReps = effectiveTargetReps(ex);
-  const increment = ex.increment || 5;
+  const increment = incrementFor(ex, name);
 
   if(ex.trackBy === "weight"){
     // Consecutive-hit streak at the current weight, most recent first -
@@ -539,12 +551,15 @@ function computeSuggestionCore(ex, name){
     const hitTarget = last.reps >= targetReps;
     let readyToProgress = streak >= requiredStreak;
     // Rep range: weight goes up once every set reaches the top, or once a session reaches the middle
-    // of the range at RPE 7 or easier (reps to spare). Conservative lifts want two of those in a row.
+    // of the range at RPE 7 or easier (reps to spare; not on a cable stack). Conservative lifts want
+    // two of those in a row.
     const range = activeRepRange(ex);
     const mid = range ? Math.ceil((range[0] + range[1]) / 2) : null;
     let rangeEarly = false, refit = null;
     if(range){
-      const earned = e => e.reps >= range[1] || (e.reps >= mid && e.difficulty > 0 && e.difficulty <= 7);
+      // A whole cable pin is a big jump, so a stack lift moves only from the top of its range.
+      const early = !pinStepFor(name);
+      const earned = e => e.reps >= range[1] || (early && e.reps >= mid && e.difficulty > 0 && e.difficulty <= 7);
       let earnedStreak = 0;
       for(let i = ex.entries.length - 1; i >= 0; i--){
         const e = ex.entries[i];

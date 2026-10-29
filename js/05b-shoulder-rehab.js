@@ -286,7 +286,7 @@ function applyShoulder(core, ex, name, baseline){
     const clean = e => e.weight === last.weight && e.reps >= reps && !(e.difficulty >= 9) && !(e.pain > PAIN_HOLD_ABOVE);
     let streak = 0;
     for(let i = since.length - 1; i >= 0 && clean(since[i]); i--) streak++;
-    const inc = ex.increment || 5;
+    const inc = incrementFor(ex, name);
     const step = streak >= 2 && (full == null || last.weight + inc <= full);
     let weight = step ? last.weight + inc : last.weight;
     if(core.deload || (core.noteTarget != null && core.noteTarget < weight)) weight = Math.min(weight, core.weight);

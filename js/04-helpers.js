@@ -117,6 +117,9 @@ function daysBetween(dateStrA, dateStrB){
 }
 
 // Plate-loaded machines with no bar (Hip Thrust) set barWeight: 0 in EXERCISE_DEFAULTS.
+// Cable lifts move a whole pin at a time (pinStep); everything else by its own increment.
+function pinStepFor(name){ return (EXERCISE_DEFAULTS[name] || {}).pinStep || 0; }
+function incrementFor(ex, name){ return pinStepFor(name) || ex.increment || 5; }
 function barWeightFor(name){
   const b = (EXERCISE_DEFAULTS[name] || {}).barWeight;
   return b != null ? b : BAR_WEIGHT;

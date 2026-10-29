@@ -128,6 +128,12 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   plans to `loadableWeight`, 5 lb steps from the bar since 2.5 is the smallest plate), and `fitLoad` (06b) tightens it step by step to fit. Once
   today is logged the Next tile's headline drops the rest so the next plan shows in full. Due lifts (08) include finishers; a due pill gets an amber ring
   and a days tag (`daysSince`). The card footer shows the newest PR, dated when older than the rows.
+- Cable lifts (`pinStep: CABLE_PIN`, 15 lb, in `EXERCISE_DEFAULTS`; `pinStepFor` / `incrementFor`, 04):
+  the stack labels are unknown, so `computeSuggestion` counts pins from the last regular session's
+  weight (`onGrid`), keeps a weight already logged (back to a pre-deload pin), and takes the lighter
+  pin for any planned cut (deload, pain, rehab return). They move a pin only from the top of their
+  rep range (no early jump). The load line names the pin ("1 pin heavier than last", "same pin as
+  Oct 1"). Read increments through `incrementFor`, never `ex.increment` directly.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double
