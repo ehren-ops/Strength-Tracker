@@ -355,6 +355,7 @@ const ICON_PATHS = {
   play: '<path d="M5 3.2 12.6 8 5 12.8z"/>',
   next: '<path d="M3.2 3.4 9.4 8l-6.2 4.6zM12.6 3.4v9.2"/>',
   check: '<path d="M3 8.6l3.2 3.1L13 4.6"/>',
+  stop: '<rect x="4" y="4" width="8" height="8" rx="1.3"/>',
 };
 function icon(key){ return ICON_PATHS[key] ? `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${ICON_PATHS[key]}</svg>` : ""; }
 

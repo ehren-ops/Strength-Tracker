@@ -24,7 +24,7 @@ const DAY_ORDER = {
   // Grouped by type - strength, then cardio, then core, then stretches -
   // rather than the order they were added in, so the row reads as sections
   // instead of a grab-bag. See EXTRA_CATEGORY below for the color coding.
-  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Cable Chest Fly","Incline Treadmill Walk","Zone 2 Ride","C2 Row","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
+  extra: ["Farmer's Carry","Dead Hang","Spanish Squat","Push-Ups","Cable Chest Fly","Travel Workout","Incline Treadmill Walk","Zone 2 Ride","C2 Row","5-Minute Core Routine","Copenhagen Plank","Thoracic Spine Stretch","Hip Stretch","Leg Stretch","Full Body Stretch","Sauna","Cold Plunge","Hot Tub"],
 };
 const PRESEASON_ONLY = new Set(["Box Jumps","Lateral Lunge","Trap Bar Jump","Skater Bound","Seated Calf Raise","Med Ball Slam","Copenhagen Plank"]);
 // Preseason lifts that stay on in season, once a week, to keep power without leg fatigue.
@@ -82,6 +82,7 @@ const EXTRA_CATEGORY = {
   "Spanish Squat": "strength",
   "Push-Ups": "strength",
   "Cable Chest Fly": "strength",
+  "Travel Workout": "strength",
   "Zone 2 Ride": "cardio",
   "Incline Treadmill Walk": "cardio",
   "C2 Row": "cardio",
@@ -249,12 +250,32 @@ const EXERCISE_DEFAULTS = {
   "Leg Stretch": { trackBy: "checklist" },
   "Full Body Stretch": { trackBy: "checklist" },
   "5-Minute Core Routine": { trackBy: "checklist" },
+  "Travel Workout": { trackBy: "checklist" },
   "Shoulder Rehab": { trackBy: "checklist" }, // items and phases live in js/05b-shoulder-rehab.js
 };
 
 // Content for the checklist-type "exercises" above: not logged sets, just a
 // daily checklist of stretches/moves with a collapsible how-to per item.
 const CHECKLIST_ROUTINES = {
+  // No equipment, for days on the road: keeps the base the program builds. Power first, single-leg
+  // and side-to-side legs with a slow lowering (Preseason), more pulling than pressing and incline
+  // push-ups only (Shoulder Rehab), calves and a wall sit for ski boots, then a side plank. The
+  // clock plays it move by move with `rest` between sets.
+  "Travel Workout": {
+    intro: "No equipment, about 30 min. Daily for 3 to 5 days away; end each set 2 reps short of failure.",
+    rest: 40,
+    items: [
+      { name: "Skater Bound", dose: "3 × 5 each side", description: "Power first, while you're fresh. Bound sideways off one leg, land soft on the other and stick it for 2 sec.", variation: "Short on room: quick side-to-side hops in place, still sticking each landing." },
+      { name: "Split Squat", dose: "3 × 10 each leg, 3s down", description: "Bulgarian style: back foot on the bed or a chair, front shin close to vertical. Lower for 3 sec, drive up through the front heel.", variation: "Hold your bag for load once 10 feels easy. Too much: back foot on the floor." },
+      { name: "Single-Leg RDL", dose: "3 × 10 each leg", description: "Soft standing knee, hinge forward with a flat back and square hips until the hamstring stretches, then stand tall.", variation: "Hold your bag for load, or touch a wall with one finger for balance." },
+      { name: "Door Frame Row", dose: "3 × 12", description: "Stand in a doorway and hold both sides of the frame at chest height, palms in. Lean back with a straight body, pull your chest to the frame and squeeze the shoulder blades.", variation: "Feet closer to the frame makes it harder. One arm at a time for more load per side." },
+      { name: "Incline Push-Up", dose: "3 × 12", description: "Hands on a desk or the bed edge, shoulder width, elbows about 45°. Stop a few inches short of the bottom, as in your Shoulder Rehab.", variation: "Hands on a chair as it gets easy. Floor push-ups once rehab reaches phase 3." },
+      { name: "Reverse Snow Angel", dose: "2 × 10", description: "Face down, arms by your hips, thumbs up. Lift the arms just off the floor, sweep them overhead and back, shoulder blades down.", variation: "Pause 2 sec overhead for more upper-back work." },
+      { name: "Single-Leg Calf Raise", dose: "2 × 15 each leg", description: "Ball of the foot on a stair edge. Full stretch at the bottom, pause, rise as high as you can. Hold the rail.", variation: "Knee bent works the soleus, the calf muscle that matters in ski boots." },
+      { name: "Wall Sit", dose: "2 × 45 sec", description: "Back flat on the wall, thighs parallel to the floor, knees over ankles.", variation: "Shift onto one leg for 10 sec at a time inside the hold." },
+      { name: "Side Plank", dose: "2 × 30 sec each side", description: "Forearm under the shoulder, hips high, body in one straight line.", variation: "Lift the top leg for the adductors and side hip." },
+    ],
+  },
   "Thoracic Spine Stretch": {
     intro: "Mobility for the mid-back - tightness here shows up a lot from cycling, skiing tuck, and running posture.",
     items: [
@@ -345,6 +366,6 @@ function backfillExerciseDefaults(){
 function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v144";
+const APP_VERSION = "v145";
 const APP_UPDATED = "Nov 3, 2026";
 

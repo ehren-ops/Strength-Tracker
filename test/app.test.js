@@ -3117,13 +3117,16 @@ async function main(){
     out.form = [document.getElementById('f-sets').value, document.getElementById('f-reps').value].join(',');
     clearHoldTimer();
     out.hidden = getComputedStyle(clock()).display === 'none';
-    // Stop early: one tap arms, the second stops; the partial hold counts.
+    // Stop early: a tap on the clock face does nothing; the Stop pill's first tap arms, the second
+    // stops; the partial hold counts.
     startHoldTimer('Dead Hang');
     step();
     holdTimer.endAt = Date.now() + 20000; // 22 of 42 sec held
     clock().click();
+    out.faceTap = !!holdTimer && !holdTimer.finished && !clock().querySelector('.hc-stopbtn.armed');
+    clock().querySelector('[data-hc="stop"]').click();
     out.armed = text();
-    clock().click();
+    clock().querySelector('[data-hc="stop"]').click();
     out.stopped = text();
     out.formStopped = [document.getElementById('f-sets').value, document.getElementById('f-reps').value].join(',');
     clock().click(); // a tap on the stopped clock clears it
@@ -3144,9 +3147,9 @@ async function main(){
     view = saved.view; selected = saved.selected; render();
     return out;
   });
-  if(r96.btn !== '3x42' || r96.prefill !== '3x42' || JSON.stringify(r96.follow) !== '["3x50","4x50"]' || !r96.restBtn || !/Each hold 42 sec today: 2 sec longer than last time/.test(r96.desc) || !/^Get ready 5 Set 1 of 3/.test(r96.start)
-    || JSON.stringify(r96.kinds) !== JSON.stringify(['hold', 'rest', 'ready', 'hold']) || !/^Rest 40 Next: set 2 of 3/.test(r96.rest)
-    || !/^Done 3x42/.test(r96.done) || r96.form !== '3,42' || !r96.hidden || !/Tap again to stop/.test(r96.armed) || !/^Stopped 1x22/.test(r96.stopped) || r96.formStopped !== '1,22' || !r96.closed || !/compact/.test(r96.compact.cls) || !r96.compact.running || r96.compact.h >= r96.compact.h0 / 2 || !r96.expanded)
+  if(r96.btn !== '3x42' || r96.prefill !== '3x42' || JSON.stringify(r96.follow) !== '["3x50","4x50"]' || !r96.restBtn || !/Each hold 42 sec today: 2 sec longer than last time/.test(r96.desc) || !/^Get ready Dead Hang ?Set 1 of 3 ?5/.test(r96.start)
+    || JSON.stringify(r96.kinds) !== JSON.stringify(['hold', 'rest', 'ready', 'hold']) || !/^Rest Dead Hang ?Next: set 2 of 3 ?40/.test(r96.rest)
+    || !/^Done 3x42/.test(r96.done) || r96.form !== '3,42' || !r96.hidden || !r96.faceTap || !/Tap to stop/.test(r96.armed) || !/^Stopped 1x22/.test(r96.stopped) || r96.formStopped !== '1,22' || !r96.closed || !/compact/.test(r96.compact.cls) || !r96.compact.running || r96.compact.h >= r96.compact.h0 / 2 || !r96.expanded)
     throw new Error('expected the Dead Hang hold timer to run 3x42 with a count-in and 45 sec rest, fill the form, and stop on two taps, got: ' + JSON.stringify(r96));
   console.log('OK: Dead Hang shows a 3x42 clock button at the top right (matching the form, and following edits to 3x50, 4x50), the rest button stays in the form ("2 sec longer than last time"); Get ready 5, Hold, Rest 40 + 5 count-in; Done fills 3 x 42; two taps stop and keep the 22 sec held; a tap clears the stopped clock; the handle shrinks it to a bar that keeps running');
 
@@ -3164,7 +3167,8 @@ async function main(){
     out.firstRest = holdTimer.rest;
     holdTimer.endAt = Date.now() - 1; tickHoldTimer(); // into the first hold
     out.holdBtns = btns();
-    out.underline = getComputedStyle(clock().querySelector('.hc-stop')).textDecorationLine;
+    out.stopPill = !!clock().querySelector('.hc-controls [data-hc="stop"]') && !clock().querySelector('.hc-stop');
+    out.name = (clock().querySelector('.hc-name') || {}).textContent;
     // Ticks only update the time: the buttons stay the same elements, so a tap never loses its target.
     const pauseBtn = clock().querySelector('[data-hc="pause"]');
     holdTimer.endAt -= 3000; tickHoldTimer(); holdTimer.endAt -= 3000; tickHoldTimer();
@@ -3199,10 +3203,10 @@ async function main(){
     view = saved.view; selected = saved.selected; render();
     return out;
   });
-  if(r97.firstRest !== 45 || !r97.stable || r97.holdBtns !== 'Pause|Rest' || !/underline/.test(r97.underline) || JSON.stringify(r97.paused) !== '["hold",true,"Paused",true]' || !r97.resumed
-    || JSON.stringify(r97.skipped) !== '["rest","[[22]]"]' || r97.restBtns !== '−15|Pause|Next set|+15|Min 0:45|Max 3:00' || JSON.stringify(r97.max) !== '[180,180,"175,175",true]' || JSON.stringify(r97.min) !== '[45,45]' || JSON.stringify(r97.more) !== '[15,60,60,"55,55"]' || r97.afterRest !== 'ready' || r97.kept !== 60)
+  if(r97.firstRest !== 45 || !r97.stable || r97.holdBtns !== 'Pause|Rest|Stop' || !r97.stopPill || r97.name !== 'Dead Hang' || JSON.stringify(r97.paused) !== '["hold",true,"Paused",true]' || !r97.resumed
+    || JSON.stringify(r97.skipped) !== '["rest","[[22]]"]' || r97.restBtns !== '−15|Pause|Next set|+15|Min 0:45|Stop|Max 3:00' || JSON.stringify(r97.max) !== '[180,180,"175,175",true]' || JSON.stringify(r97.min) !== '[45,45]' || JSON.stringify(r97.more) !== '[15,60,60,"55,55"]' || r97.afterRest !== 'ready' || r97.kept !== 60)
     throw new Error('expected pause, skip and -15/+15 on the hold clock, with the new rest kept, got: ' + JSON.stringify(r97));
-  console.log('OK: Pause freezes the clock (Resume picks up), Skip ends the hold at 22 sec and goes to the rest, +15 makes the rest 60 sec for this run and the next, Skip on a rest goes to the count-in, "Tap twice to stop" is underlined');
+  console.log('OK: Pause freezes the clock (Resume picks up), Skip ends the hold at 22 sec and goes to the rest, +15 makes the rest 60 sec for this run and the next, Skip on a rest goes to the count-in, Stop is a pill in the button set and the lift name leads the clock');
 
   console.log('=== 98: lifts done for reps run set by set from the clock button: Done after each set, the rest, then the next set ===');
   const r98 = await page.evaluate(() => {
@@ -3237,7 +3241,7 @@ async function main(){
     render();
     document.querySelector('.card-head .timer-btn').click();
     clock().querySelector('.hc-done').click();
-    clock().click(); clock().click();
+    clock().querySelector('[data-hc="stop"]').click(); clock().querySelector('[data-hc="stop"]').click();
     out.stopped = [text(), document.getElementById('f-sets').value].join(' | ');
     clearHoldTimer();
     plannedHeavy = saved.ph; restPrefs = JSON.parse(saved.prefs);
@@ -3245,7 +3249,7 @@ async function main(){
     view = saved.view; selected = saved.selected; render();
     return out;
   });
-  if(r98.btn !== '3x8' || r98.plan !== '3 × 8 repsRest 1:30–3:00' || r98.planAfter !== '3 × 8 repsRest 1:45–3:00' || r98.extra[0] !== 'extra' || !/^Ready 1:45 Next: set 2 of 3 · go when ready, up to 3:00/.test(r98.extra[1]) || r98.extra[2] !== 'Pause|Start set' || !/^Set 1 of 3 8 reps Squat · 185 lb total/.test(r98.set1) || !/Set done/.test(r98.done1) || r98.rest[0] !== 'rest' || r98.rest[1] !== 90 || !/^Rest 1:30 Next: set 2 of 3/.test(r98.rest[2])
+  if(r98.btn !== '3x8' || r98.plan !== '3 × 8 repsRest 1:30–3:00' || r98.planAfter !== '3 × 8 repsRest 1:45–3:00' || r98.extra[0] !== 'extra' || !/^Ready Squat ?Next: set 2 of 3 · go when ready, up to 3:00 ?1:45/.test(r98.extra[1]) || r98.extra[2] !== 'Pause|Start set|Stop' || !/^Set 1 of 3 Squat ?185 lb total ?8 reps/.test(r98.set1) || !/Set done/.test(r98.done1) || r98.rest[0] !== 'rest' || r98.rest[1] !== 90 || !/^Rest Squat ?Next: set 2 of 3 · ready at 1:30 ?1:30/.test(r98.rest[2])
     || r98.nextRests !== '105,105' || !/^Set 2 of 3/.test(r98.set2) || !/^Done 3x8/.test(r98.end) || r98.form !== '185,3,8' || !/^Stopped 1x8/.test(r98.stopped) || !/\| 1$/.test(r98.stopped))
     throw new Error('expected Squat to run 3 sets of 8 at 185 with Done and a 90 sec rest, fill the form, and keep only finished sets when stopped, got: ' + JSON.stringify(r98));
   console.log('OK: the clock button runs Squat 3x8 at 185: Set done, Rest 1:30 (+15 makes the rests 1:45), then Ready counting up to 3:00 with Start set, set 2 on its own at 3:00, Done 3x8 fills the form; stopped after one set it fills 1 set');
@@ -3295,9 +3299,9 @@ async function main(){
     return out;
   });
   const want99 = { parse: ['{"sets":1,"secs":45,"sides":2}', '{"sets":1,"reps":"10","sides":1,"each":""}', '{"sets":5,"secs":30,"sides":1}', '{"sets":3,"reps":"12-15","sides":1,"each":""}', '{"sets":1,"reps":"8","sides":2,"each":"side"}'] };
-  if(JSON.stringify(r99.parse) !== JSON.stringify(want99.parse) || !/^Move 1 of 5 5 Next: 90\/90 Hip Stretch/.test(r99.ready) || !/^Hold 45 90\/90 Hip Stretch · Left side/.test(r99.hold) || !/^Switch sides 5 90\/90 Hip Stretch · Right side/.test(r99.switching)
-    || r99.after1[0] !== '[0]' || !/Next: Couch Stretch/.test(r99.after1[1]) || !/^Move 5 of 5 5 reps each side World's Greatest Stretch/.test(r99.reps) || !/^Done 5\/5/.test(r99.end) || r99.checked !== '[0,1,2,3,4]'
-    || !/Next: Pigeon Pose/.test(r99.resume) || r99.rehabBtns !== 2 || !/^Move 1 of 6 12-15 reps Side-lying external rotation · 3-5 lb · set 1 of 3/.test(r99.rehab) || !/^Rest 30 Next: set 2 of 3/.test(r99.rehabRest))
+  if(JSON.stringify(r99.parse) !== JSON.stringify(want99.parse) || !/^Move 1 of 5 90\/90 Hip Stretch ?Up next ?5/.test(r99.ready) || !/^Hold 90\/90 Hip Stretch ?Left side ?45/.test(r99.hold) || !/^Switch sides 90\/90 Hip Stretch ?Right side ?5/.test(r99.switching)
+    || r99.after1[0] !== '[0]' || !/^Move 2 of 5 Couch Stretch ?Up next/.test(r99.after1[1]) || !/^Move 5 of 5 World's Greatest Stretch ?5 reps each side/.test(r99.reps) || !/^Done 5\/5/.test(r99.end) || r99.checked !== '[0,1,2,3,4]'
+    || !/^Move 3 of 5 Pigeon Pose ?Up next/.test(r99.resume) || r99.rehabBtns !== 2 || !/^Move 1 of 6 Side-lying external rotation ?3-5 lb · set 1 of 3 ?12-15 reps/.test(r99.rehab) || !/^Rest Side-lying external rotation ?Next: set 2 of 3 ?30/.test(r99.rehabRest))
     throw new Error('expected Mobility and Shoulder Rehab to play their moves and check them off, got: ' + JSON.stringify(r99));
   console.log('OK: Hip Stretch plays 45 sec a side with a switch, rep moves wait for Done, each move is checked off as it ends (5/5), a second play starts at the first unchecked move; Shoulder Rehab has a play button per group (12-15 reps, 3-5 lb, set 1 of 3, then a 30 sec rest)');
 
@@ -3682,6 +3686,45 @@ async function main(){
     r110.slimLine === 'none' && r110.running && JSON.stringify(r110.resumed) === JSON.stringify(['4:rest', false]) && r110.cleared === false;
   if(!ok110) throw new Error('expected the clock to guard double taps, keep taps after a swipe and resume from the card, got: ' + JSON.stringify(r110));
   console.log('OK: a double tap on Set done stays on the rest, a tap after a swipe registers, the slim bar drops "ready at", and the card button shows and resumes the running clock');
+
+  console.log('=== 111: the Travel Workout sits on Extra under Strength and its clock plays every move, name first, with a 40 sec rest ===');
+  const r111 = await page.evaluate(() => {
+    const saved = { view, selected, group: extraGroup, prefs: JSON.stringify(restPrefs), travel: JSON.stringify(data['Travel Workout'] || null) };
+    const out = {};
+    try{
+      delete restPrefs['Travel Workout'];
+      view = 'extra'; extraGroup = 'strength'; render();
+      out.inRow = extraList('strength').includes('Travel Workout');
+      selected = 'Travel Workout'; render();
+      out.card = { title: (document.querySelector('#app .ex-name') || {}).textContent, items: document.querySelectorAll('#app .stretch-item').length, plan: (document.querySelector('#app .timer-plan') || {}).textContent };
+      playChecklist('Travel Workout');
+      const clock = document.getElementById('hold-clock');
+      const go = () => { holdTimer.endAt = Date.now() - 1; tickHoldTimer(); };
+      go(); // count-in done: Skater Bound, first set
+      out.first = [clock.querySelector('.hc-phase').textContent, clock.querySelector('.hc-name').textContent, (clock.querySelector('.hc-detail') || {}).textContent];
+      clock.querySelector('[data-hc="skip"]').click(); // Done
+      out.rest = [holdTimer.steps[holdTimer.idx].kind, Math.round(holdLeftMs(holdTimer) / 1000)];
+      let guard = 0;
+      while(holdTimer && !holdTimer.finished && guard++ < 500){
+        const k = holdTimer.steps[holdTimer.idx];
+        if(k.kind === 'set'){ if(k.name === 'Split Squat' && !out.bss) out.bss = (clock.querySelector('.hc-detail') || {}).textContent; clock.querySelector('[data-hc="skip"]').click(); }
+        else go();
+      }
+      const e = data['Travel Workout'].entries.find(x => x.date === todayISO());
+      out.checked = e ? (e.completedIndices || []).length : 0;
+      out.total = routineItemsFor('Travel Workout').length;
+    } finally {
+      clearHoldTimer(); restPrefs = JSON.parse(saved.prefs);
+      const t = JSON.parse(saved.travel); if(t) data['Travel Workout'] = t; else delete data['Travel Workout'];
+      view = saved.view; selected = saved.selected; extraGroup = saved.group; render();
+    }
+    return out;
+  });
+  const ok111 = r111.inRow && r111.card.title === 'Travel Workout' && r111.card.items === 9 && /9 moves/.test(r111.card.plan) && /Rest 40 sec/.test(r111.card.plan)
+    && JSON.stringify(r111.first) === JSON.stringify(['Move 1 of 9', 'Skater Bound', 'set 1 of 3']) && r111.rest[0] === 'rest' && r111.rest[1] === 40
+    && r111.bss === '3s down · set 1 of 3' && r111.checked === 9 && r111.total === 9;
+  if(!ok111) throw new Error('expected the Travel Workout card and its clock to play all 9 moves, got: ' + JSON.stringify(r111));
+  console.log('OK: Travel Workout is on Extra under Strength with 9 moves and a 40 sec rest; the clock leads with each move name and checks all 9 off');
 
   console.log('=== 75: the page, stylesheet and every script load with matching versions and no page errors ===');
   const assets = await page.evaluate(() => ({

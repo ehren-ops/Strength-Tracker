@@ -3,7 +3,7 @@
 // screen turns into a big clock; swipe it up (or tap the handle) for a slim bar that keeps running.
 // When it ends or is stopped, a tap or the close button clears it. A 5 second count-in, the hold counting down, then the lift's
 // shortest suggested rest, for every set on its own. Lifts done per side hold each side in turn
-// before the rest. Two taps on the clock within 2 seconds stop it, so a bump never does. At the end
+// before the rest. The Stop pill takes two taps within 2 seconds, so a bump never stops it. At the end
 // the form holds the sets and seconds; Log is still one tap. Like the rest timer it runs on
 // absolute end times, so a phone that sleeps mid-hold catches up when it wakes. The big clock has
 // Pause, Skip (to the rest, or through the rest to the next set) and, during a rest, -15 / +15 sec.
@@ -274,31 +274,53 @@ function adjustHoldRest(delta, total){
   saveRestPref(t.name, t.rest);
   renderHoldClock();
 }
-// The rest row: -15 / Pause / skip / +15, and under the ends the Min and Max rests.
+// Stop is a pill with the other buttons: the first tap arms it (red, "Tap to stop"), a second within
+// 2 seconds stops. It sits in the button row, or between Min and Max on a rest.
+function stopPillHtml(t){
+  const armed = Date.now() - t.lastTap < HOLD_STOP_WINDOW;
+  return `<button type="button" class="hc-btn hc-stopbtn${armed ? " armed" : ""}" data-hc="stop" aria-label="${armed ? "Tap again to stop" : "Stop"}">${icon("stop")}${armed ? "Tap to stop" : "Stop"}</button>`;
+}
+// The rest row: -15 / Pause / skip / +15, and under it Min, Stop and Max. Other steps: Pause, skip, Stop.
 function restControlsHtml(t, step, skipLabel){
-  const rest = step.kind === "rest";
+  const ranged = step.kind === "rest" && !!t.range, rest = step.kind === "rest";
   const row = `<div class="hc-controls">`
     + (rest ? `<button type="button" class="hc-btn" data-hc="less" aria-label="15 seconds less rest">−15</button>` : "")
     + `<button type="button" class="hc-btn" data-hc="pause">${t.paused ? icon("play") + "Resume" : icon("pause") + "Pause"}</button>`
     + `<button type="button" class="hc-btn" data-hc="skip">${skipLabel}${icon("next")}</button>`
     + (rest ? `<button type="button" class="hc-btn" data-hc="more" aria-label="15 seconds more rest">+15</button>` : "")
+    + (ranged ? "" : stopPillHtml(t))
     + `</div>`;
-  if(!rest || !t.range) return row;
+  if(!ranged) return row;
   const [lo, hi] = t.range, mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   return `<div class="hc-ctl">${row}<div class="hc-range">`
     + `<button type="button" class="hc-btn hc-mini${t.rest === lo ? " on" : ""}" data-hc="min" aria-label="Shortest rest, ${mmss(lo)}">Min ${mmss(lo)}</button>`
+    + stopPillHtml(t)
     + `<button type="button" class="hc-btn hc-mini${t.rest === hi ? " on" : ""}" data-hc="max" aria-label="Longest rest, ${mmss(hi)}">Max ${mmss(hi)}</button>`
     + `</div></div>`;
 }
+// The Done button on a set, with Stop beside it.
+function doneControlsHtml(t, label){
+  return `<div class="hc-controls"><button type="button" class="hc-btn hc-done" data-hc="skip">${icon("check")}${label}</button>${stopPillHtml(t)}</div>`;
+}
+// What is being done, large, with its set, side or load in a smaller line under it.
+function hcSetHtml(name, detail){
+  return `<div class="hc-set"><span class="hc-name">${name}</span>${detail ? `<span class="hc-detail">${detail}</span>` : ""}</div>`;
+}
 
-// Tap the clock once to arm, again within 2 seconds to stop.
-function tapHoldClock(){
-  if(!holdTimer) return;
-  if(holdTimer.finished){ clearHoldTimer(); return; }
+// The Stop pill: the first tap arms it, a second within 2 seconds stops.
+function tapStopPill(){
+  if(!holdTimer || holdTimer.finished) return;
   const now = Date.now();
   if(now - holdTimer.lastTap < HOLD_STOP_WINDOW){ stopHoldTimer(false); return; }
   holdTimer.lastTap = now;
   renderHoldClock();
+}
+// A tap on the clock face, away from the buttons: closes a finished clock, opens the slim bar into
+// the big clock, and otherwise does nothing, so a bump never changes a set.
+function tapHoldClock(){
+  if(!holdTimer) return;
+  if(holdTimer.finished){ clearHoldTimer(); return; }
+  if(holdCompact) toggleHoldCompact();
 }
 
 function stopHoldTimer(silent){
@@ -371,8 +393,9 @@ function renderHoldClock(){
       if(act){
         e.stopPropagation();
         const a = act.dataset.hc;
-        if(a !== "close" && a !== "size" && holdTimer && Date.now() < (holdTimer.guardUntil || 0)) return;
+        if(a !== "close" && a !== "size" && a !== "stop" && holdTimer && Date.now() < (holdTimer.guardUntil || 0)) return;
         if(a === "close") clearHoldTimer();
+        else if(a === "stop") tapStopPill();
         else if(a === "pause") toggleHoldPause();
         else if(a === "skip") skipHoldStep();
         else if(a === "less") adjustHoldRest(-HOLD_REST_STEP);
@@ -405,13 +428,11 @@ function renderHoldClock(){
     paintClock(el, "hold-clock done" + size, t.result, `<div class="hc-phase">${t.result.startsWith("Done") ? "Done" : "Stopped"}</div><div class="hc-time">${t.summary}</div><div class="hc-set">${t.result.replace(/^(Done|Stopped): ?/, "")}</div><div class="hc-dots">${dots}</div><div class="hc-stop">Tap to close</div><button type="button" class="hc-close" data-hc="close" aria-label="Close">✕</button>`);
     return;
   }
-  const armed = Date.now() - t.lastTap < HOLD_STOP_WINDOW;
-  const stopHint = `<div class="hc-stop${armed ? " armed" : ""}">${armed ? "Tap again to stop" : "Tap twice to stop"}</div>`;
-  if(t.mode === "routine"){ renderRoutineClock(el, t, step, dots, handle, stopHint, size); return; }
+  if(t.mode === "routine"){ renderRoutineClock(el, t, step, dots, handle, size); return; }
   if(step.kind === "set"){
-    // A set has no clock: the reps to do, the load, and Done.
-    const load = t.weight > 0 ? ` · ${t.weight} lb${weightSuffix(t.name)}` : "";
-    paintClock(el, `hold-clock set${size}`, `Set ${step.set} of ${t.sets}, ${t.reps} reps`, `<div class="hc-phase">Set ${step.set} of ${t.sets}</div><div class="hc-time hc-reps">${t.reps}<small> reps${repsSuffix(t.name)}</small></div><div class="hc-set">${t.name}${load}</div><div class="hc-dots">${dots}</div><div class="hc-controls"><button type="button" class="hc-btn hc-done" data-hc="skip">${icon("check")}Set done</button></div>${stopHint}${handle}`);
+    // A set has no clock: the lift, the reps to do, the load, and Done.
+    const load = t.weight > 0 ? `${t.weight} lb${weightSuffix(t.name)}` : "";
+    paintClock(el, `hold-clock set${size}`, `Set ${step.set} of ${t.sets}, ${t.name}, ${t.reps} reps`, `<div class="hc-phase">Set ${step.set} of ${t.sets}</div>${hcSetHtml(t.name, load)}<div class="hc-time hc-reps">${t.reps}<small> reps${repsSuffix(t.name)}</small></div><div class="hc-dots">${dots}</div>${doneControlsHtml(t, "Set done")}${handle}`);
     return;
   }
   if(step.kind === "extra"){
@@ -419,7 +440,7 @@ function renderHoldClock(){
     const over = Math.max(0, Math.round(step.secs - holdLeftMs(t) / 1000));
     const total = t.rest + over, pctX = Math.min(100, Math.max(0, 100 * (1 - holdLeftMs(t) / (step.secs * 1000))));
     const line = `Next: set ${step.set + 1} of ${t.sets}<span class="hc-more"> · go when ready, up to ${fmtClock(t.max)}</span>`;
-    paintClock(el, `hold-clock extra${t.paused ? " paused" : ""}${size}`, `Ready, rested ${total} seconds, ${line}`, `<div class="hc-phase">${t.paused ? "Paused" : "Ready"}</div><div class="hc-time">${fmtClock(total)}</div><div class="hc-set">${line}</div><div class="hc-dots">${dots}</div>${restControlsHtml(t, step, "Start set")}${stopHint}<div class="hc-bar" style="width:${pctX}%"></div>${handle}`);
+    paintClock(el, `hold-clock extra${t.paused ? " paused" : ""}${size}`, `Ready, rested ${total} seconds, ${t.name}, ${line}`, `<div class="hc-phase">${t.paused ? "Paused" : "Ready"}</div>${hcSetHtml(t.name, line)}<div class="hc-time">${fmtClock(total)}</div><div class="hc-dots">${dots}</div>${restControlsHtml(t, step, "Start set")}<div class="hc-bar" style="width:${pctX}%"></div>${handle}`);
     return;
   }
   const left = Math.max(0, Math.ceil(holdLeftMs(t) / 1000));
@@ -427,7 +448,7 @@ function renderHoldClock(){
   const setLine = step.kind === "rest" ? `Next: set ${step.set + 1} of ${t.sets}${t.mode === "sets" ? `<span class="hc-more"> · ready at ${fmtClock(t.rest)}</span>` : ""}` : `Set ${step.set} of ${t.sets}${step.side ? ` · ${step.side}` : ""}`;
   const pct = Math.min(100, Math.max(0, 100 * (1 - holdLeftMs(t) / (step.secs * 1000))));
   const skipLabel = step.kind === "rest" ? "Next set" : step.kind === "hold" ? (t.idx >= t.steps.length - 1 ? "Finish" : "Rest") : "Start";
-  paintClock(el, `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`, `${phase}, ${left} seconds, ${setLine}`, `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${setLine}</div><div class="hc-dots">${dots}</div>${restControlsHtml(t, step, skipLabel)}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`);
+  paintClock(el, `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`, `${phase}, ${left} seconds, ${t.name}, ${setLine}`, `<div class="hc-phase">${phase}</div>${hcSetHtml(t.name, setLine)}<div class="hc-time">${fmtClock(left)}</div><div class="hc-dots">${dots}</div>${restControlsHtml(t, step, skipLabel)}<div class="hc-bar" style="width:${pct}%"></div>${handle}`);
 }
 // Rebuilds the clock only when its words or buttons change; a tick just updates the time and the
 // bar, so a button is never swapped out from under a finger mid-tap.
@@ -453,6 +474,9 @@ function toggleHoldCompact(){ holdCompact = !holdCompact; renderHoldClock(); }
 // "3 × 12") wait for Done. A short count-in names the next move, rests sit between sets, and each
 // move is checked off on the card as it ends. Ranges run at their low end.
 const ROUTINE_REST = 30;
+// The rest between a move's sets: the one set last on the clock, else the routine's own (the
+// travel workout rests longer than a stretch), else 30 sec.
+function routineRestFor(name){ return restPrefs[name] || (CHECKLIST_ROUTINES[name] || {}).rest || ROUTINE_REST; }
 function parseDose(dose){
   const d = String(dose || "").toLowerCase().replace(/×/g, "x");
   const sides = /each (side|leg)/.test(d) ? 2 : 1;
@@ -475,7 +499,7 @@ function routineSteps(name, idxs, rest){
     for(let s = 1; s <= p.sets; s++){
       // What follows the dose's comma (a load, "light", a pause) rides with the name on the clock.
       const extra = (String(it.dose).split(",")[1] || "").trim();
-      const base = { item: idx, label: extra ? `${label} · ${extra}` : label, set: s, sets: p.sets };
+      const base = { item: idx, label: extra ? `${label} · ${extra}` : label, name: label, extra, set: s, sets: p.sets };
       if(p.secs){
         const sides = p.sides === 2 ? ["Left side", "Right side"] : [null];
         sides.forEach((side, i) => {
@@ -501,7 +525,7 @@ function startRoutineTimer(name, idxs){
   const done = new Set(entry ? entry.completedIndices || [] : []);
   const todo = idxs.filter(i => !done.has(i));
   const run = todo.length ? todo : idxs;
-  const rest = restPrefs[name] || ROUTINE_REST;
+  const rest = routineRestFor(name);
   const steps = routineSteps(name, run, rest);
   holdTimer = { mode: "routine", range: restRangeFor("routine", name), name, items: idxs, doneItems: new Set([...done].filter(i => idxs.includes(i) && !run.includes(i))), rest, sides: 1, sets: 0,
     steps, idx: 0, endAt: Date.now() + steps[0].secs * 1000, paused: null, held: [], lastTap: 0, beeped: {}, intervalId: setInterval(tickHoldTimer, 200), wake: null };
@@ -528,23 +552,25 @@ function routineButton(onclick, what, name, idxs){
   const done = new Set(entry ? entry.completedIndices || [] : []);
   const left = idxs.filter(i => !done.has(i)).length || idxs.length;
   const multi = idxs.some(i => parseDose(all[i].dose).sets > 1);
-  const lines = [left < idxs.length ? `${left} of ${idxs.length} moves` : `${idxs.length} moves`, multi ? `Rest ${fmtRest(restPrefs[name] || ROUTINE_REST)}` : ""];
+  const lines = [left < idxs.length ? `${left} of ${idxs.length} moves` : `${idxs.length} moves`, multi ? `Rest ${fmtRest(routineRestFor(name))}` : ""];
   return `<span class="timer-group">${timerPlanHtml(lines)}<button type="button" class="timer-btn" onclick="${onclick}" aria-label="Play ${what}">${HOLD_ICON}</button></span>`;
 }
-function renderRoutineClock(el, t, step, dots, handle, stopHint, size){
+function renderRoutineClock(el, t, step, dots, handle, size){
   const pos = `${t.items.indexOf(step.item) + 1} of ${t.items.length}`;
-  const setPart = step.sets > 1 ? ` · set ${step.set} of ${step.sets}` : "";
-  const sidePart = step.side ? ` · ${step.side}` : "";
+  const name = step.name || step.label;
+  // The line under the name: the dose note ("3 sec lowering"), the set and the side.
+  const detail = (...parts) => parts.filter(Boolean).join(" · ");
+  const setPart = step.sets > 1 ? `set ${step.set} of ${step.sets}` : "";
   if(step.kind === "set"){
-    paintClock(el, `hold-clock set${size}`, `${step.label}, ${step.reps} reps`, `<div class="hc-phase">Move ${pos}</div><div class="hc-time hc-reps">${step.reps}<small> reps${step.each ? " each " + step.each : ""}</small></div><div class="hc-set">${step.label}${setPart}</div><div class="hc-dots">${dots}</div><div class="hc-controls"><button type="button" class="hc-btn hc-done" data-hc="skip">${icon("check")}Done</button></div>${stopHint}${handle}`);
+    paintClock(el, `hold-clock set${size}`, `${step.label}, ${step.reps} reps`, `<div class="hc-phase">Move ${pos}</div>${hcSetHtml(name, detail(step.extra, setPart))}<div class="hc-time hc-reps">${step.reps}<small> reps${step.each ? " each " + step.each : ""}</small></div><div class="hc-dots">${dots}</div>${doneControlsHtml(t, "Done")}${handle}`);
     return;
   }
   const left = Math.max(0, Math.ceil(holdLeftMs(t) / 1000));
   const phase = t.paused ? "Paused" : step.kind === "ready" ? (step.switching ? "Switch sides" : step.next ? `Move ${pos}` : "Get ready") : step.kind === "hold" ? "Hold" : "Rest";
-  const line = step.kind === "rest" ? `Next: set ${step.set + 1} of ${step.sets} · ${step.label}` : step.kind === "ready" && step.next ? `Next: ${step.label}` : `${step.label}${setPart}${sidePart}`;
+  const line = step.kind === "rest" ? `Next: set ${step.set + 1} of ${step.sets}` : step.kind === "ready" && step.next ? detail("Up next", step.extra) : detail(step.extra, setPart, step.side);
   const pct = Math.min(100, Math.max(0, 100 * (1 - holdLeftMs(t) / (step.secs * 1000))));
   const skipLabel = step.kind === "rest" ? "Next set" : step.kind === "hold" ? "Next" : "Start";
-  paintClock(el, `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`, `${phase}, ${left} seconds, ${line}`, `<div class="hc-phase">${phase}</div><div class="hc-time">${fmtClock(left)}</div><div class="hc-set">${line}</div><div class="hc-dots">${dots}</div>${restControlsHtml(t, step, skipLabel)}${stopHint}<div class="hc-bar" style="width:${pct}%"></div>${handle}`);
+  paintClock(el, `hold-clock ${step.kind}${t.paused ? " paused" : ""}${size}`, `${phase}, ${left} seconds, ${name}, ${line}`, `<div class="hc-phase">${phase}</div>${hcSetHtml(name, line)}<div class="hc-time">${fmtClock(left)}</div><div class="hc-dots">${dots}</div>${restControlsHtml(t, step, skipLabel)}<div class="hc-bar" style="width:${pct}%"></div>${handle}`);
 }
 
 // Back in the app: the screen lock was dropped while away, and the clock should catch up now

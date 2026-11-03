@@ -312,7 +312,10 @@
   .hold-clock.hold .hc-phase{color:color-mix(in srgb, var(--emerald) 40%, #fff);}
   .hc-phase{font-size:1rem;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--phase);}
   .hc-time{font-size:clamp(4rem, 20vw, 7rem);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;}
-  .hc-set{font-size:1rem;opacity:0.85;}
+  /* What is being done: the name large, its set, side or load in a quieter line under it. */
+  .hc-set{display:flex;flex-direction:column;align-items:center;gap:0.05rem;max-width:94%;text-align:center;font-size:0.92rem;line-height:1.25;}
+  .hc-name{font-size:1.35rem;font-weight:700;line-height:1.15;letter-spacing:0.01em;}
+  .hc-detail{opacity:0.82;}
   .hc-dots{display:flex;gap:0.5rem;margin-top:0.2rem;}
   .hc-dots i{width:0.7rem;height:0.7rem;border-radius:50%;border:2px solid rgba(241,239,231,0.6);}
   .hc-dots i.done{background:var(--phase);border-color:var(--phase);}
@@ -344,7 +347,9 @@
   .hold-clock.compact .hc-reps small, .hold-clock.compact.set .hc-set{display:none;}
   .hold-clock.compact .hc-phase{white-space:nowrap;}
   .hold-clock:not(.compact){padding-bottom:1.6rem;} /* keeps the hint clear of the shrink handle */
-  .hc-stop.armed{opacity:1;color:var(--phase);font-weight:700;}
+  /* Stop: a quieter pill in the button set until its first tap arms it red. */
+  .hc-btn.hc-stopbtn{border-color:rgba(241,239,231,0.35);}
+  .hc-btn.hc-stopbtn.armed{background:var(--danger);border-color:var(--danger);color:#fff;}
   .hold-clock[hidden]{display:none;}
   .hc-handle, .hc-close{position:absolute;background:none;border:none;color:inherit;opacity:0.75;font-size:1.1rem;line-height:1;padding:0.5rem 0.9rem;cursor:pointer;}
   .hc-handle{left:50%;bottom:0.35rem;transform:translateX(-50%);}
@@ -353,10 +358,11 @@
   .hold-clock.compact{height:auto;min-height:0;flex-direction:row;gap:0.7rem;padding:calc(env(safe-area-inset-top, 0px) + 0.45rem) 3rem 0.55rem 1rem;justify-content:flex-start;}
   .hold-clock.compact .hc-time{font-size:1.9rem;}
   .hold-clock.compact .hc-phase{font-size:0.8rem;}
-  .hold-clock.compact .hc-set{font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .hold-clock.compact .hc-set{display:block;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;text-align:left;}
+  .hold-clock.compact .hc-name{font-size:0.9rem;}
+  .hold-clock.compact .hc-detail, .hold-clock.compact .hc-stopbtn{display:none;}
   .hold-clock.compact .hc-more{display:none;}
   .hold-clock.compact .hc-dots, .hold-clock.compact .hc-stop{display:none;}
-  .hold-clock.compact .hc-stop.armed{display:block;margin:0;}
   .hold-clock.compact .hc-handle{left:auto;right:0.2rem;bottom:auto;top:calc(env(safe-area-inset-top, 0px) + 0.35rem);transform:none;}
   .hold-clock.compact .hc-close{top:calc(env(safe-area-inset-top, 0px) + 0.35rem);}
   .hc-bar{position:absolute;left:0;bottom:0;height:5px;background:var(--phase);transition:width 0.2s linear;}

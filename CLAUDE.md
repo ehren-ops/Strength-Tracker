@@ -83,6 +83,13 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
 - The clock repaints through `paintClock` (05c), which rebuilds its markup only when words or buttons
   change; ticks update just the time and bar. Never set its innerHTML on every tick, or taps on
   Pause, Skip and Done get lost mid-press.
+- Clock face (05c): every screen leads with what is being done, `hcSetHtml(name, detail)`: the name
+  large (`.hc-name`) above the big number, its set, side, load or dose note in a quieter line
+  (`.hc-detail`). Stop is a pill in the button set (`stopPillHtml`, `tapStopPill`): the first tap arms
+  it red ("Tap to stop"), a second within 2 sec stops; on a rest it sits between Min and Max. A tap
+  on the clock face never stops anything: it closes a finished clock and opens the slim bar.
+- Travel Workout (02, `CHECKLIST_ROUTINES`): a no-equipment checklist on Extra under Strength for days
+  on the road, played by the routine clock. A routine can set its own `rest` (`routineRestFor`).
 - Clock taps (05c): after a step change the controls ignore taps for `holdTapGuard` (600 ms; 0 under
   webdriver, scenario 110 turns it on), so a double tap on Set done can't skip the rest; Rest to
   Ready keeps the same button and sets no guard. A swipe's flag clears on the next touchstart. The
