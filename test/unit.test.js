@@ -389,6 +389,11 @@ test("cable stacks: each machine's own ladder (10 lb to 70, then 15 or 20; the f
   lift("Face Pulls", [[3, 110, 15, { note: "next 125" }]]);
   eq(suggest("Face Pulls").weight, 125, "a weight written in the note is a real pin and stays");
 });
+test("plates: Seated Calf Raise is a plate-loaded machine, counted per side with no bar", () => {
+  reset(); lift("Seated Calf Raise", [[7, 110, 15], [3, 120, 17]]);
+  eq(run(`loadText("Seated Calf Raise", data["Seated Calf Raise"], { weight: 120 })`), "Load 120 lb = 45 + 10 + 5 a side (no bar, machine)", "calf raise");
+  eq(suggest("Seated Calf Raise").weight % 5, 0, "plans in 5 lb steps");
+});
 test("hit or miss: judged against the saved plan, or the previous session when there is none", () => {
   reset(); lift("Face Pulls", [[6, 110, 10, { sets: 2 }], [3, 130, 12, { sets: 2, plan: { sets: 2, reps: 12, weight: 110 } }]]);
   let v = run(`sessionVerdict(data["Face Pulls"], 1, 12)`);

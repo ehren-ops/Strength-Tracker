@@ -124,7 +124,7 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   day, leaving out cardio, checklists, recovery and the rehab card; 5 min to 4 h or nothing. It
   shows in Coach's Notes and the calendar day (`fmtLiftTime`).
 - Plate math reads `barWeightFor(name)` (04): `barWeight: 0` in `EXERCISE_DEFAULTS` marks a
-  plate-loaded machine (Hip Thrust), and `barNote` ends the load line in parentheses ("no bar,
+  plate-loaded machine (Hip Thrust, Seated Calf Raise), and `barNote` ends the load line in parentheses ("no bar,
   machine", "45 lb trap bar"). The plate line is one line, never wrapped: "45 + 2×10 + 2.5 a side",
   "≈" only for a typed odd weight (plans never land there: `computeSuggestion` snaps barbell
   plans to `loadableWeight`, 5 lb steps from the bar since 2.5 is the smallest plate; halfway
