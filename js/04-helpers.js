@@ -280,6 +280,18 @@ function cardioPace(e, ex){
   return { value: solveCardio(Number(e.minutes), Number(e.distance), null, !!ex.rowing).speed, calc: true };
 }
 
+// Feet climbed on an incline treadmill session: the belt distance (logged, else speed x time) times
+// the grade, along the slope (d * g / sqrt(1 + g^2)). Null unless time, incline and distance or
+// speed are all logged.
+function vertFeet(e, ex){
+  const num = v => v != null && v !== "" && Number(v) > 0 ? Number(v) : null;
+  if(!ex || !ex.trackIncline || ex.rowing) return null;
+  const minutes = num(e.minutes), incline = num(e.incline), miles = num(e.distance) || (num(e.speed) && minutes ? num(e.speed) * minutes / 60 : null);
+  if(!minutes || !incline || !miles) return null;
+  const g = incline / 100;
+  return Math.round(miles * 5280 * g / Math.sqrt(1 + g * g));
+}
+function fmtVert(ft){ return `${ft.toLocaleString("en-US")} ft. vert`; }
 function formatEntryValue(e, ex){
   if(ex.trackBy === "weight") return `${e.weight} lb ${setsText(e, ex)}`;
   if(ex.trackBy === "duration"){
@@ -289,6 +301,8 @@ function formatEntryValue(e, ex){
     if(pace) s += ex.rowing ? ` @ ${pace.calc ? "~" : ""}${fmtSplit(pace.value)} /500m, ${rowWatts(pace.value)} W` : ` @ ${pace.calc ? "~" : ""}${pace.value} mph`;
     if(e.spm != null && e.spm !== "") s += `, ${e.spm} spm`;
     if(e.incline != null && e.incline !== "") s += ` @ ${e.incline}% incline`;
+    const vert = vertFeet(e, ex);
+    if(vert) s += `, ${fmtVert(vert)}`;
     if(e.tempF != null && e.tempF !== "") s += ` at ${e.tempF}°F`;
     return s;
   }

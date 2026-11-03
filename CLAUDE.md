@@ -127,6 +127,9 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   gridlines (`niceTicks` with `forceStep`), never one per unit; barbell charts step at least 5 lb.
   Point labels stay inside the plot (never over the y-axis numbers), and a run of the same modifier
   label (Deload, Deload, Deload) shows once. No vibration anywhere: the clocks use beeps and color.
+- Incline treadmill climb: `vertFeet(e, ex)` (04) is the belt distance (logged, else speed x time)
+  times the grade along the slope, shown as "1,097 ft. vert" (`fmtVert`) in `formatEntryValue` and as
+  a third line in the history cell (`cardioCell`), only when time, incline and distance or speed exist.
 - Lifting time is `liftMinutes(date)` (08): first to last lift log or rest-clock start that local
   day, leaving out cardio, checklists, recovery and the rehab card; 5 min to 4 h or nothing. It
   shows in Coach's Notes and the calendar day (`fmtLiftTime`).

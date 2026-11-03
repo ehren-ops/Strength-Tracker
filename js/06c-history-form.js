@@ -19,15 +19,16 @@ function renderSkipControl(name){
   return `<div class="skip-ctl"><button type="button" class="skip-btn" onclick="startSkip('${q}')">Skip today</button></div>`;
 }
 
-// Cardio in two short lines for the history column: "35 min · 1.8 mi" over "3.1 mph · 12%", so the
-// note keeps the same room it has on a lift.
+// Cardio in short lines for the history column: "35 min · 1.8 mi" over "3.1 mph · 12%", so the
+// note keeps the same room it has on a lift; an incline session adds its climb ("1,097 ft. vert").
 function cardioCell(e, ex){
   const has = v => v != null && v !== "";
   const pace = cardioPace(e, ex);
   const speed = !pace ? null : ex.rowing ? `${pace.calc ? "~" : ""}${fmtSplit(Math.round(pace.value))}/500` : `${pace.calc ? "~" : ""}${pace.value} mph`;
   const top = [`${e.minutes} min`, has(e.distance) && `${e.distance} ${ex.rowing ? "m" : "mi"}`].filter(Boolean).join(" · ");
   const bottom = [speed, has(e.spm) && `${e.spm} spm`, has(e.incline) && `${e.incline}%`].filter(Boolean).join(" · ");
-  return bottom ? `${top}<br>${bottom}` : top;
+  const vert = vertFeet(e, ex);
+  return [top, bottom, vert && fmtVert(vert)].filter(Boolean).join("<br>");
 }
 
 function renderHistRow(e, idx, isLatest, ex, name, pr){

@@ -394,6 +394,13 @@ test("plates: Seated Calf Raise is a plate-loaded machine, counted per side with
   eq(run(`loadText("Seated Calf Raise", data["Seated Calf Raise"], { weight: 120 })`), "Load 120 lb = 45 + 10 + 5 a side (no bar, machine)", "calf raise");
   eq(suggest("Seated Calf Raise").weight % 5, 0, "plans in 5 lb steps");
 });
+test("incline treadmill: feet climbed from distance, or speed x time, along the slope", () => {
+  const tm = run(`newExerciseShell("Incline Treadmill Walk")`);
+  app.__tm = tm;
+  eq(run(`[vertFeet({ minutes: 30, speed: 2.8, incline: 15 }, __tm), vertFeet({ minutes: 30, distance: 1.4, speed: 2.8, incline: 15 }, __tm), vertFeet({ minutes: 15, distance: 0.75, incline: 13 }, __tm), vertFeet({ minutes: 30, speed: 2.8 }, __tm), vertFeet({ minutes: 30, incline: 12 }, __tm)]`), [1097, 1097, 511, null, null], "feet");
+  eq(run(`formatEntryValue({ minutes: 30, distance: 1.4, speed: 2.8, incline: 15 }, __tm)`), "30 min, 1.4 mi @ 2.8 mph @ 15% incline, 1,097 ft. vert", "description");
+  eq(run(`vertFeet({ minutes: 30, speed: 2.8, incline: 15 }, newExerciseShell("Zone 2 Ride"))`), null, "only on a treadmill with an incline");
+});
 test("hit or miss: judged against the saved plan, or the previous session when there is none", () => {
   reset(); lift("Face Pulls", [[6, 110, 10, { sets: 2 }], [3, 130, 12, { sets: 2, plan: { sets: 2, reps: 12, weight: 110 } }]]);
   let v = run(`sessionVerdict(data["Face Pulls"], 1, 12)`);

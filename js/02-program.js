@@ -366,6 +366,6 @@ function backfillExerciseDefaults(){
 function tabOrder(){ return [...programDays(), "extra", "overview"]; }
 
 // Bumped by hand every release, with every ?v= in index.html (scenario 75 checks they match).
-const APP_VERSION = "v145";
+const APP_VERSION = "v146";
 const APP_UPDATED = "Nov 3, 2026";
 
