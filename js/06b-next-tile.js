@@ -140,8 +140,8 @@ function progressionRule(name, ex){
   if(ex.preseasonPower) return "Light and fast; add weight only while every rep stays explosive.";
   const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;
   if(maxW) return `At ${maxW} lb, progress with reps, then single-arm.`;
-  const inc = incrementFor(ex, name), range = activeRepRange(ex);
-  if(range && pinStepFor(name)) return `Add reps each session; one pin heavier (+${inc} lb) once every set reaches ${range[1]}.`;
+  const lastW = ([...ex.entries].reverse().find(e => e.weight > 0) || {}).weight, inc = incrementFor(ex, name, lastW), range = activeRepRange(ex);
+  if(range && stackFor(name)) return `Add reps each session; one pin heavier (+${inc} lb) once every set reaches ${range[1]}.`;
   if(range) return `Add reps each session; add ${inc} lb at ${Math.ceil((range[0] + range[1]) / 2)} reps with some left, or ${range[1]}.`;
   return ex.unit === "sec" ? `Add ${inc} lb once every hold reaches ${target} sec.` : `Add ${inc} lb once every set reaches ${target} ${repsWord(name)}.`;
 }
@@ -207,12 +207,15 @@ function loadText(name, ex, sug){
     const plates = platesLabel(w, ex.equipment, bar).replace("No plates needed", bar ? "the bar alone" : "no plates");
     return `Load ${w} lb ${calcPlates(w, bar).unreachable ? "≈" : "="} ${plates}${note ? ` (${note})` : ""}`;
   }
-  // A cable stack: the pin, counted from the last weight logged (its labels are often missing).
-  // Back to a weight used before (after a deload, say): the date it was last used, not a pin count.
-  const pin = pinStepFor(name), logged = pin ? [...ex.entries].reverse().filter(e => e.weight > 0) : [];
+  // A cable stack: the pin, counted on the stack's ladder from the last weight logged. Back to a weight
+  // used before (after a deload, say): the date it was last used. A last weight that isn't a pin
+  // on this stack (an old log, an add-on) says which pin is nearest.
+  const stack = stackFor(name), logged = stack ? [...ex.entries].reverse().filter(e => e.weight > 0) : [];
   if(logged.length){
-    const n = Math.round((w - logged[0].weight) / pin), pins = `${Math.abs(n)} pin${Math.abs(n) === 1 ? "" : "s"}`;
-    const used = w !== logged[0].weight && logged.find(e => e.weight === w);
+    const lw = logged[0].weight;
+    if(!onStack(stack, lw) && w !== lw) return `Load ${w} lb${weightSuffix(name)}: nearest pin to your ${lw}`;
+    const n = Math.round(stackIndex(stack, w) - stackIndex(stack, lw)), pins = `${Math.abs(n)} pin${Math.abs(n) === 1 ? "" : "s"}`;
+    const used = w !== lw && logged.find(e => e.weight === w);
     return `Load ${w} lb${weightSuffix(name)}: ${n === 0 && !used ? "same pin as last time" : used ? `same pin as ${fmtShortDate(used.date)}` : `${pins} ${n > 0 ? "heavier" : "lighter"} than last`}`;
   }
   const maxW = (EXERCISE_DEFAULTS[name] || {}).maxWeight;

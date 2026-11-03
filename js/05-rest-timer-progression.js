@@ -403,24 +403,22 @@ function applyPain(s, ex, full){
 // sessions on today's track (heavy or volume) only.
 function computeSuggestion(full, name){
   const plan = planSuggestion(full, name);
-  const pin = pinStepFor(name);
-  if(!plan || (full.equipment !== "barbell" && !pin) || !(plan.weight > 0)) return plan;
+  const stack = stackFor(name);
+  if(!plan || (full.equipment !== "barbell" && !stack) || !(plan.weight > 0)) return plan;
   const logged = [...full.entries].reverse().filter(e => e.weight > 0);
   const last = logged[0] || full.entries[full.entries.length - 1];
   // Up or down is judged against the plan's own track: a heavy day holding 252.5 after a clean
   // session goes to 255, even when the newest session was a heavier 3x8.
   const ref = plan.heavy != null ? (logged.find(e => isHeavyEntry(full, e) === plan.heavy) || last) : last;
   // A track starting over from an estimated max rounds down, like any first guess.
-  const up = !plan.trackStart && (plan.weight > ref.weight || !!plan.readyToProgress || (plan.weight === ref.weight && !!plan.hitTarget));
-  // A cable stack's labels are unknown, so its pins count from the last regular session's weight;
-  // a weight already logged on it is a real pin and stays (back to the pre-deload weight, say), and
-  // so does one written in the note ("next 130"): the athlete read it off the stack.
-  if(pin && (logged.some(e => e.weight === plan.weight) || plan.noteTarget === plan.weight)) return plan;
+  const up = !plan.trackStart && (plan.weight > ref.weight || !!plan.readyToProgress || (!stack && plan.weight === ref.weight && !!plan.hitTarget));
+  // A cable weight written in the note ("next 130") stays: the athlete read it off the stack.
+  if(stack && plan.noteTarget === plan.weight) return plan;
   const anchor = (logged.find(e => !e.deload) || last).weight;
-  // A planned cut (deload, pain, a return ramp) takes the lighter pin, so it is always a real cut.
-  const weight = !pin ? loadableWeight(plan.weight, barWeightFor(name), up)
-    : plan.weight < anchor ? Math.max(anchor - pin * Math.ceil((anchor - plan.weight) / pin - 1e-9), anchor - pin * Math.floor((anchor - 1e-9) / pin))
-    : onGrid(plan.weight, anchor, pin, up);
+  // On a stack a hold never climbs a pin on its own, and a planned cut (deload, pain, a return
+  // ramp) takes the lighter pin, so it is always a real cut.
+  let weight = stack ? snapToStack(stack, plan.weight, up) : loadableWeight(plan.weight, barWeightFor(name), up);
+  if(stack && plan.weight < anchor && weight >= anchor) weight = pinDown(stack, anchor);
   return weight === plan.weight ? plan : { ...plan, weight };
 }
 // A barbell moves in steps of two of the smallest plate (2.5 lb a side, so 5 lb), from the bar up.
@@ -477,7 +475,7 @@ function computeSuggestionCore(ex, name){
   if(!ex.entries.length) return null;
   const last = ex.entries[ex.entries.length-1];
   const targetReps = effectiveTargetReps(ex);
-  const increment = incrementFor(ex, name);
+  const increment = incrementFor(ex, name, last.weight);
 
   if(ex.trackBy === "weight"){
     // Consecutive-hit streak at the current weight, most recent first -
@@ -554,7 +552,7 @@ function computeSuggestionCore(ex, name){
     let rangeEarly = false, refit = null;
     if(range){
       // A whole cable pin is a big jump, so a stack lift moves only from the top of its range.
-      const early = !pinStepFor(name);
+      const early = !stackFor(name);
       const earned = e => e.reps >= range[1] || (early && e.reps >= mid && e.difficulty > 0 && e.difficulty <= 7);
       let earnedStreak = 0;
       for(let i = ex.entries.length - 1; i >= 0; i--){

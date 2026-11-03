@@ -131,12 +131,16 @@ function. The Outlive app (`szsgxlbvleviuzobhuty`) hosts `strava-hr` (wearable h
   rounds up or down by the plan's own track, and a track restart rounds down), and `fitLoad` (06b) tightens it step by step to fit. Once
   today is logged the Next tile's headline drops the rest so the next plan shows in full. Due lifts (08) include finishers; a due pill gets an amber ring
   and a days tag (`daysSince`). The card footer shows the newest PR, dated when older than the rows.
-- Cable lifts (`pinStep: CABLE_PIN`, 15 lb, in `EXERCISE_DEFAULTS`; `pinStepFor` / `incrementFor`, 04):
-  the stack labels are unknown, so `computeSuggestion` counts pins from the last regular session's
-  weight (`onGrid`), keeps a weight already logged (back to a pre-deload pin), and takes the lighter
-  pin for any planned cut (deload, pain, rehab return); a weight written in the note stays as is. They move a pin only from the top of their
-  rep range (no early jump). The load line names the pin ("1 pin heavier than last", "same pin as
-  Oct 1"). Read increments through `incrementFor`, never `ex.increment` directly.
+- Cable lifts (`stack: STACK_20` etc. in `EXERCISE_DEFAULTS`; `stackFor`, `snapToStack`, `pinUp`,
+  `pinDown`, `onStack`, `incrementFor`, 04): each machine has its own ladder, pins every 10 lb up to
+  70, then 15 (Lat Pulldown), 20 (Face Pulls, Tricep Pushdown, Pallof Press) or 10 all the way
+  (Cable Chest Fly, per arm). `computeSuggestion` snaps every plan to a pin; a hold never climbs a
+  pin on its own, a planned cut (deload, pain, rehab return) takes the lighter pin, and a weight
+  written in the note stays as is. A last weight that isn't a pin (old logs) plans the nearest pin
+  and the load line says so. They move a pin only from the top of their rep range (no early jump).
+  The load line names the pin ("1 pin heavier than last", "same pin as Oct 1"). Read increments
+  through `incrementFor(ex, name, weight)`, never `ex.increment` directly. The slide-on add-on is
+  never counted on.
 - Things that are not lift sessions (checklists, `RECOVERY`, `REHAB_NAME`) stay out of session
   counting: check `isRecovery` / `trackBy === "checklist"` where entries are iterated.
 - Accessory rep ranges: `repRange: "10-15"` in `EXERCISE_DEFAULTS` (02) turns on double

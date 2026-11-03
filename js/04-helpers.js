@@ -117,9 +117,25 @@ function daysBetween(dateStrA, dateStrB){
 }
 
 // Plate-loaded machines with no bar (Hip Thrust) set barWeight: 0 in EXERCISE_DEFAULTS.
-// Cable lifts move a whole pin at a time (pinStep); everything else by its own increment.
-function pinStepFor(name){ return (EXERCISE_DEFAULTS[name] || {}).pinStep || 0; }
-function incrementFor(ex, name){ return pinStepFor(name) || ex.increment || 5; }
+// Cable lifts move a whole pin at a time: each has a stack (EXERCISE_DEFAULTS), pins every `low` lb up
+// to `to`, then every `step`. A pin is a position on that ladder; everything else steps by its increment.
+function stackFor(name){ return (EXERCISE_DEFAULTS[name] || {}).stack || null; }
+function stackIndex(st, w){ return w <= st.to ? w / st.low : st.to / st.low + (w - st.to) / st.step; }
+function stackWeight(st, i){ const k = st.to / st.low; return i <= k ? i * st.low : st.to + (i - k) * st.step; }
+function onStack(st, w){ return Math.abs(stackIndex(st, w) - Math.round(stackIndex(st, w))) < 1e-9; }
+function pinUp(st, w){ return stackWeight(st, Math.floor(stackIndex(st, w) + 1e-9) + 1); }
+function pinDown(st, w){ return Math.max(st.low, stackWeight(st, Math.ceil(stackIndex(st, w) - 1e-9) - 1)); }
+// The nearest pin to w; halfway goes up only when `up`. Never below the first pin.
+function snapToStack(st, w, up){
+  const k = stackIndex(st, w), lo = Math.floor(k + 1e-9), frac = k - lo;
+  const n = frac < 1e-9 ? lo : frac > 0.5 + 1e-9 ? lo + 1 : frac < 0.5 - 1e-9 ? lo : up ? lo + 1 : lo;
+  return stackWeight(st, Math.max(1, n));
+}
+// How much one step adds from weight w (a pin on a stack, else the lift's own increment).
+function incrementFor(ex, name, w){
+  const st = stackFor(name);
+  return st ? (w > 0 ? pinUp(st, w) - w : st.step) : ex.increment || 5;
+}
 function barWeightFor(name){
   const b = (EXERCISE_DEFAULTS[name] || {}).barWeight;
   return b != null ? b : BAR_WEIGHT;

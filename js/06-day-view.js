@@ -529,8 +529,8 @@ function renderExerciseCard(name, ex){
         } else if(suggestion.range && !suggestion.deloadWeek){
           const [lo, hi] = suggestion.range;
           msg = suggestion.readyToProgress ? (suggestion.rangeEarly ? `${trackWork.reps} reps with reps to spare: ${chg} today, back to ${lo} reps a set.` : `Every set reached ${hi} reps: ${chg} today, back to ${lo} reps a set.`)
-            : suggestion.hitTarget ? `${trackWork.reps} reps a set last time. Today: ${suggestion.reps} reps, same weight. ${pinStepFor(name) ? `Next pin once every set reaches ${hi}.` : `Add weight at ${suggestion.mid} with reps left, or ${hi}.`}`
-            : `Under ${lo} reps last time: same weight, build back to ${lo} reps a set.`;
+            : suggestion.hitTarget ? `${trackWork.reps} reps a set last time. Today: ${suggestion.reps} reps, ${suggestion.weight === trackWork.weight ? "same weight" : `${suggestion.weight} lb`}. ${stackFor(name) ? `Next pin once every set reaches ${hi}.` : `Add weight at ${suggestion.mid} with reps left, or ${hi}.`}`
+            : `Under ${lo} reps last time: ${suggestion.weight === trackWork.weight ? "same weight" : `${suggestion.weight} lb`}, build back to ${lo} reps a set.`;
         } else if(suggestion.readyToProgress){
           if(ex.conservative){
             msg = wentOverTarget
